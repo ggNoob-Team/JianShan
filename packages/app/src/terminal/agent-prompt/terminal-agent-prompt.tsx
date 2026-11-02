@@ -1,6 +1,6 @@
 import { ArrowUp } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Button } from "@/components/ui/button";
@@ -10,34 +10,59 @@ import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { useSessionStore } from "@/stores/session-store";
 import {
-  buildCommandPlanningPrompt,
-  buildCommandSummaryPrompt,
-  parseCommandPlan,
-} from "./command-plan";
-import {
   archiveTerminalOperatorSession,
   ensureTerminalOperatorSession,
   TerminalOperatorError,
   type TerminalOperatorSession,
 } from "./operator-session";
+import {
+  runTerminalOperatorLoop,
+  type TerminalCommandExecutor,
+  type TerminalOperatorApprovalDecision,
+  type TerminalOperatorApprovalRequest,
+  type TerminalOperatorLoopEvent,
+} from "./operator-loop";
 import { selectTerminalPromptAgent } from "./select-agent";
 import { TerminalModelSelector } from "./terminal-model-selector";
-import { TerminalOperatorPanel, type TerminalOperatorRun } from "./terminal-operator-panel";
+import {
+  TerminalOperatorPanel,
+  type TerminalOperatorRound,
+  type TerminalOperatorRun,
+} from "./terminal-operator-panel";
 
 interface TerminalAgentPromptProps {
   serverId: string;
   workspaceId: string;
   workspaceDirectory: string;
   projectId: string | null;
-  runCommands: (commands: string[]) => Promise<string>;
+  runCommands: TerminalCommandExecutor;
 }
 
 const COMMAND_PLAN_TIMEOUT_MS = 120_000;
-const SUMMARY_TIMEOUT_MS = 120_000;
 
 const AgentTextInput = withUnistyles(EditingTextInput, (theme) => ({
   placeholderTextColor: theme.colors.foregroundMuted,
 }));
+
+function createAbortError(): Error {
+  const error = new Error("The terminal operator was canceled");
+  error.name = "AbortError";
+  return error;
+}
+
+async function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw createAbortError();
+  let handleAbort: (() => void) | null = null;
+  const canceled = new Promise<never>((_, reject) => {
+    handleAbort = () => reject(createAbortError());
+    signal.addEventListener("abort", handleAbort, { once: true });
+  });
+  try {
+    return await Promise.race([promise, canceled]);
+  } finally {
+    if (handleAbort) signal.removeEventListener("abort", handleAbort);
+  }
+}
 
 function describeError(error: unknown, translate: (key: string) => string): string {
   if (error instanceof TerminalOperatorError) {
@@ -45,6 +70,9 @@ function describeError(error: unknown, translate: (key: string) => string): stri
       return translate("workspace.terminal.agentPrompt.hostUnsupported");
     }
     return `${translate("workspace.terminal.agentPrompt.sessionFailed")}: ${error.message}`;
+  }
+  if (error instanceof Error && error.message.includes("invalid terminal decision")) {
+    return translate("workspace.terminal.agentPrompt.badDecision");
   }
   return error instanceof Error ? error.message : String(error);
 }
@@ -54,8 +82,9 @@ async function waitForOperatorReply(
   agentId: string,
   timeoutMs: number,
   translate: (key: string) => string,
+  signal: AbortSignal,
 ): Promise<string> {
-  const result = await client.waitForFinish(agentId, timeoutMs);
+  const result = await raceWithAbort(client.waitForFinish(agentId, timeoutMs), signal);
   if (result.status === "timeout") {
     throw new Error(translate("workspace.terminal.agentPrompt.timeout"));
   }
@@ -66,6 +95,129 @@ async function waitForOperatorReply(
     throw new Error(result.error ?? translate("workspace.terminal.agentPrompt.failed"));
   }
   return result.lastMessage?.trim() ?? "";
+}
+
+function createRun(request: string): TerminalOperatorRun {
+  return {
+    request,
+    stage: "starting",
+    rounds: [],
+    output: "",
+    conclusion: null,
+    error: null,
+    awaitingInputHint: null,
+  };
+}
+
+function upsertRound(
+  rounds: TerminalOperatorRound[],
+  round: TerminalOperatorRound,
+): TerminalOperatorRound[] {
+  const index = rounds.findIndex((entry) => entry.round === round.round);
+  if (index < 0) return [...rounds, round];
+  const next = rounds.slice();
+  next[index] = { ...next[index], ...round };
+  return next;
+}
+
+function cancelRounds(rounds: TerminalOperatorRound[]): TerminalOperatorRound[] {
+  return rounds.map((round) =>
+    round.status === "planned" || round.status === "running"
+      ? { ...round, status: "canceled" }
+      : round,
+  );
+}
+
+function applyOperatorEvent(
+  run: TerminalOperatorRun,
+  event: TerminalOperatorLoopEvent,
+): TerminalOperatorRun {
+  switch (event.type) {
+    case "planning":
+      return { ...run, stage: "planning", awaitingInputHint: null };
+    case "approval_required":
+      return {
+        ...run,
+        stage: "approval",
+        awaitingInputHint: null,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "planned",
+          output: null,
+        }),
+      };
+    case "executing":
+      return {
+        ...run,
+        stage: "executing",
+        awaitingInputHint: null,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "running",
+          output: null,
+        }),
+      };
+    case "awaiting_input":
+      return {
+        ...run,
+        stage: "awaiting_user",
+        awaitingInputHint: event.hint,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "running",
+          output: null,
+        }),
+      };
+    case "executed":
+      return {
+        ...run,
+        stage: "planning",
+        output: event.output,
+        awaitingInputHint: null,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "completed",
+          output: event.output,
+        }),
+      };
+    case "blocked":
+      return {
+        ...run,
+        stage: "planning",
+        awaitingInputHint: null,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "blocked",
+          output: event.reasons.join(String.fromCharCode(10)),
+        }),
+      };
+    case "rejected":
+      return {
+        ...run,
+        stage: "planning",
+        awaitingInputHint: null,
+        rounds: upsertRound(run.rounds, {
+          round: event.round,
+          commands: event.commands,
+          status: "rejected",
+          output: null,
+        }),
+      };
+    case "finished":
+      return { ...run, stage: "done", awaitingInputHint: null, conclusion: event.conclusion };
+    case "canceled":
+      return {
+        ...run,
+        stage: "canceled",
+        awaitingInputHint: null,
+        rounds: cancelRounds(run.rounds),
+      };
+  }
 }
 
 export function TerminalAgentPrompt({
@@ -85,9 +237,14 @@ export function TerminalAgentPrompt({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<TerminalOperatorRun | null>(null);
+  const [panelVisible, setPanelVisible] = useState(true);
   const sessionRef = useRef<TerminalOperatorSession | null>(null);
   const mountedRef = useRef(true);
   const clientRef = useRef(client);
+  const abortRef = useRef<AbortController | null>(null);
+  const approvalResolverRef = useRef<((decision: TerminalOperatorApprovalDecision) => void) | null>(
+    null,
+  );
   clientRef.current = client;
 
   const defaultAgent = useMemo(() => {
@@ -123,14 +280,63 @@ export function TerminalAgentPrompt({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
+      approvalResolverRef.current?.("cancel");
+      approvalResolverRef.current = null;
       const session = sessionRef.current;
       sessionRef.current = null;
       const currentClient = clientRef.current;
       if (session && currentClient) {
+        void currentClient.cancelAgent(session.agentId).catch(() => undefined);
         void archiveTerminalOperatorSession(currentClient, session);
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!run) return;
+    if (run.stage === "awaiting_user") {
+      setPanelVisible(false);
+      return;
+    }
+    if (
+      run.stage === "approval" ||
+      run.stage === "done" ||
+      run.stage === "canceled" ||
+      run.stage === "error"
+    ) {
+      setPanelVisible(true);
+    }
+  }, [run]);
+
+  const resolveApproval = useCallback((decision: TerminalOperatorApprovalDecision) => {
+    const resolve = approvalResolverRef.current;
+    if (!resolve) return;
+    approvalResolverRef.current = null;
+    resolve(decision);
+  }, []);
+
+  const handleCancelRun = useCallback(() => {
+    resolveApproval("cancel");
+    abortRef.current?.abort();
+    const agentId = sessionRef.current?.agentId;
+    if (client && agentId) {
+      void client.cancelAgent(agentId).catch(() => undefined);
+    }
+    if (mountedRef.current) {
+      setRun((current) =>
+        current && current.stage !== "done" && current.stage !== "error"
+          ? {
+              ...current,
+              stage: "canceled",
+              awaitingInputHint: null,
+              rounds: cancelRounds(current.rounds),
+            }
+          : current,
+      );
+    }
+  }, [client, resolveApproval]);
 
   const handleSubmit = useCallback(async () => {
     const request = draft.trim();
@@ -141,7 +347,11 @@ export function TerminalAgentPrompt({
     const model = modelForm.selectedModel || null;
     Keyboard.dismiss();
     setBusy(true);
-    setRun({ request, stage: "starting", commands: [], output: "", summary: null, error: null });
+    setPanelVisible(true);
+    setRun(createRun(request));
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
 
     try {
       const session = await ensureTerminalOperatorSession({
@@ -157,62 +367,71 @@ export function TerminalAgentPrompt({
         return;
       }
       sessionRef.current = session;
-      setRun((current) => (current ? { ...current, stage: "planning" } : current));
-
-      await client.sendAgentMessage(
-        session.agentId,
-        buildCommandPlanningPrompt({ request, cwd: workspaceDirectory }),
-      );
-      const planReply = await waitForOperatorReply(
-        client,
-        session.agentId,
-        COMMAND_PLAN_TIMEOUT_MS,
-        t,
-      );
-      const commands = parseCommandPlan(planReply);
-      if (commands.length === 0) {
-        throw new Error(t("workspace.terminal.agentPrompt.noCommands"));
-      }
-      if (!mountedRef.current) {
+      if (signal.aborted) {
+        setRun((current) => (current ? { ...current, stage: "canceled" } : current));
         return;
       }
-      setRun((current) => (current ? { ...current, stage: "executing", commands } : current));
 
-      const output = await runCommands(commands);
-      if (!mountedRef.current) {
-        return;
-      }
-      setRun((current) => (current ? { ...current, stage: "summarizing", output } : current));
+      const requestApproval = (_approval: TerminalOperatorApprovalRequest) => {
+        if (signal.aborted) return Promise.resolve<TerminalOperatorApprovalDecision>("cancel");
+        return new Promise<TerminalOperatorApprovalDecision>((resolve) => {
+          approvalResolverRef.current = resolve;
+        });
+      };
 
-      await client.sendAgentMessage(
-        session.agentId,
-        buildCommandSummaryPrompt({
-          request,
-          cwd: workspaceDirectory,
-          commands,
-          output,
-        }),
-      );
-      const summaryReply = await waitForOperatorReply(
-        client,
-        session.agentId,
-        SUMMARY_TIMEOUT_MS,
-        t,
-      );
-      const summary = summaryReply || t("workspace.terminal.agentPrompt.noSummary");
-      if (!mountedRef.current) {
-        return;
+      const outcome = await runTerminalOperatorLoop({
+        request,
+        cwd: workspaceDirectory,
+        signal,
+        sendPrompt: async (prompt) => {
+          await client.sendAgentMessage(session.agentId, prompt);
+        },
+        waitForReply: (timeoutMs) =>
+          waitForOperatorReply(client, session.agentId, timeoutMs, t, signal),
+        requestApproval,
+        executeCommands: (commands, options) => runCommands(commands, options),
+        onEvent: (event) => {
+          if (!mountedRef.current) return;
+          setRun((current) => {
+            if (!current) return current;
+            const next = applyOperatorEvent(current, event);
+            if (next.stage === "done" && !next.conclusion) {
+              return { ...next, conclusion: t("workspace.terminal.agentPrompt.noConclusion") };
+            }
+            return next;
+          });
+        },
+        replyTimeoutMs: COMMAND_PLAN_TIMEOUT_MS,
+      });
+
+      if (mountedRef.current && outcome.status === "done") {
+        inputRef.current?.reset();
+        setDraft("");
       }
-      setRun((current) => (current ? { ...current, stage: "done", summary } : current));
-      inputRef.current?.reset();
-      setDraft("");
     } catch (error) {
       if (mountedRef.current) {
-        setRun((current) =>
-          current ? { ...current, stage: "error", error: describeError(error, t) } : current,
-        );
+        if (signal.aborted) {
+          setRun((current) =>
+            current
+              ? {
+                  ...current,
+                  stage: "canceled",
+                  awaitingInputHint: null,
+                  rounds: cancelRounds(current.rounds),
+                }
+              : current,
+          );
+        } else {
+          setRun((current) =>
+            current ? { ...current, stage: "error", error: describeError(error, t) } : current,
+          );
+        }
       }
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      approvalResolverRef.current = null;
       if (mountedRef.current) {
         setBusy(false);
       }
@@ -237,11 +456,31 @@ export function TerminalAgentPrompt({
     setDraft(value);
   }, []);
 
+  const handleApprove = useCallback(() => {
+    setRun((current) => (current ? { ...current, stage: "executing" } : current));
+    resolveApproval("run");
+  }, [resolveApproval]);
+
+  const handleReject = useCallback(() => {
+    setRun((current) => (current ? { ...current, stage: "planning" } : current));
+    resolveApproval("reject");
+  }, [resolveApproval]);
+
+  const handleShowDetails = useCallback(() => {
+    setPanelVisible(true);
+  }, []);
+
   const handleClosePanel = useCallback(() => {
-    if (!busy) {
+    if (!run) return;
+    if (run.stage === "awaiting_user") {
+      setPanelVisible(false);
+      return;
+    }
+    if (run.stage === "done" || run.stage === "canceled" || run.stage === "error") {
+      setPanelVisible(false);
       setRun(null);
     }
-  }, [busy]);
+  }, [run]);
 
   const enabled = Boolean(client && modelForm.selectedProvider);
   const canSubmit = enabled && draft.trim().length > 0 && !busy && !modelForm.isAllModelsLoading;
@@ -254,9 +493,30 @@ export function TerminalAgentPrompt({
     modelForm.selectedModel ||
     modelForm.selectedProvider ||
     t("workspace.terminal.agentPrompt.noModel");
+  const showHandoffBar = run?.stage === "awaiting_user" && !panelVisible;
 
   return (
     <View style={styles.root} testID="terminal-agent-prompt">
+      {showHandoffBar ? (
+        <View style={styles.handoffBar} testID="terminal-agent-handoff">
+          <Text numberOfLines={2} style={styles.handoffText}>
+            {t("workspace.terminal.agentPrompt.handoffInline")}
+          </Text>
+          <View style={styles.handoffActions}>
+            <Button onPress={handleShowDetails} size="xs" variant="ghost">
+              {t("workspace.terminal.agentPrompt.showDetails")}
+            </Button>
+            <Button
+              onPress={handleCancelRun}
+              size="xs"
+              testID="terminal-agent-handoff-cancel"
+              variant="ghost"
+            >
+              {t("workspace.terminal.agentPrompt.cancelRun")}
+            </Button>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.inputRow}>
         <TerminalModelSelector
           disabled={busy || modelForm.isAllModelsLoading}
@@ -293,7 +553,15 @@ export function TerminalAgentPrompt({
           variant="default"
         />
       </View>
-      <TerminalOperatorPanel modelLabel={modelLabel} onClose={handleClosePanel} run={run} />
+      <TerminalOperatorPanel
+        modelLabel={modelLabel}
+        onApprove={handleApprove}
+        onCancel={handleCancelRun}
+        onClose={handleClosePanel}
+        onReject={handleReject}
+        run={run}
+        visible={panelVisible}
+      />
     </View>
   );
 }
@@ -306,6 +574,29 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[2],
     paddingTop: theme.spacing[1],
     paddingBottom: theme.spacing[2],
+  },
+  handoffBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    marginBottom: theme.spacing[1],
+    borderWidth: 1,
+    borderColor: theme.colors.borderAccent,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface1,
+    paddingHorizontal: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+  },
+  handoffText: {
+    flex: 1,
+    minWidth: 0,
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  handoffActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
   },
   inputRow: {
     height: 38,

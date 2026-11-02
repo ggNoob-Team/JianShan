@@ -63,6 +63,16 @@ import { useSessionStore } from "@/stores/session-store";
 import { toXtermTheme } from "@/utils/to-xterm-theme";
 import { decodeUtf8 } from "@/utils/decode-utf8";
 import { concatByteChunks, sanitizeTerminalOutput } from "@/terminal/agent-prompt/terminal-output";
+import {
+  detectShellPromptAtEnd,
+  detectTerminalInputRequest,
+  hasTerminalCommandFinishedMarker,
+  readTerminalOutputTail,
+} from "@/terminal/agent-prompt/terminal-execution";
+import type {
+  ExecuteTerminalCommandsOptions,
+  TerminalCommandExecutionResult,
+} from "@/terminal/agent-prompt/operator-loop";
 import TerminalEmulator, { type TerminalEmulatorHandle } from "./terminal-emulator";
 import { TerminalAgentPrompt } from "@/terminal/agent-prompt/terminal-agent-prompt";
 import { TerminalFloatingCopyAction, TerminalPasteAction } from "./terminal-copy-paste-actions";
@@ -109,7 +119,9 @@ const TERMINAL_KEY_BAR_MAX_WIDTH = 880;
 const OPERATOR_OUTPUT_IDLE_MS = 1_200;
 const OPERATOR_OUTPUT_POLL_MS = 120;
 const OPERATOR_OUTPUT_TIMEOUT_MS = 60_000;
+const OPERATOR_INTERACTION_TIMEOUT_MS = 180_000;
 const OPERATOR_MAX_CAPTURE_BYTES = 512 * 1024;
+const OPERATOR_PROMPT_TAIL_BYTES = 4 * 1024;
 
 const MODIFIER_LABELS = {
   ctrl: "Ctrl",
@@ -312,6 +324,7 @@ export function TerminalPane({
     chunks: Uint8Array[];
     bytes: number;
     lastOutputAt: number;
+    lastUserInputAt: number;
   } | null>(null);
   const findRef = useRef<TerminalPaneFindHandle>(null);
   const handleFindRequest = useCallback(() => findRef.current?.open(), []);
@@ -554,7 +567,10 @@ export function TerminalPane({
   );
 
   const runOperatorCommands = useCallback(
-    async (commands: string[]): Promise<string> => {
+    async (
+      commands: string[],
+      options: ExecuteTerminalCommandsOptions,
+    ): Promise<TerminalCommandExecutionResult> => {
       if (!client) {
         throw new Error("Terminal is not connected");
       }
@@ -562,29 +578,87 @@ export function TerminalPane({
         chunks: [] as Uint8Array[],
         bytes: 0,
         lastOutputAt: Date.now(),
+        lastUserInputAt: 0,
       };
       outputCaptureRef.current = capture;
+      let awaitingInput = false;
+      let promptDetectedAt = 0;
+      let sentCommands = false;
+      let interrupted = false;
+      const interruptTerminal = () => {
+        if (!sentCommands || interrupted) return;
+        interrupted = true;
+        client.sendTerminalInput(terminalId, {
+          type: "input",
+          data: String.fromCharCode(3),
+        });
+      };
       try {
+        if (options.signal.aborted) {
+          return { output: "", canceled: true };
+        }
         const enter = String.fromCharCode(13);
         client.sendTerminalInput(terminalId, {
           type: "input",
           data: commands.join(enter) + enter,
         });
-        const deadline = Date.now() + OPERATOR_OUTPUT_TIMEOUT_MS;
+        sentCommands = true;
+        let deadline = Date.now() + OPERATOR_OUTPUT_TIMEOUT_MS;
         while (Date.now() < deadline) {
           await new Promise<void>((resolve) => {
             setTimeout(resolve, OPERATOR_OUTPUT_POLL_MS);
           });
-          if (Date.now() - capture.lastOutputAt >= OPERATOR_OUTPUT_IDLE_MS) {
+          if (options.signal.aborted) {
+            interruptTerminal();
+            return { output: "", canceled: true };
+          }
+          const tail = readTerminalOutputTail(
+            capture.chunks,
+            OPERATOR_PROMPT_TAIL_BYTES,
+            (chunks) => decodeUtf8(concatByteChunks(chunks)),
+            sanitizeTerminalOutput,
+          );
+          const rawTail = readTerminalOutputTail(
+            capture.chunks,
+            OPERATOR_PROMPT_TAIL_BYTES,
+            (chunks) => decodeUtf8(concatByteChunks(chunks)),
+            (text) => text,
+          );
+          const inputRequest = detectTerminalInputRequest(tail);
+          if (inputRequest && !awaitingInput) {
+            awaitingInput = true;
+            promptDetectedAt = Date.now();
+            deadline = Math.max(deadline, promptDetectedAt + OPERATOR_INTERACTION_TIMEOUT_MS);
+            options.onAwaitingInput(
+              t(
+                inputRequest === "password"
+                  ? "workspace.terminal.agentPrompt.passwordHandoffHint"
+                  : "workspace.terminal.agentPrompt.confirmationHandoffHint",
+              ),
+            );
+            setTimeout(() => requestTerminalFocus(), 250);
+          }
+          const idle = Date.now() - capture.lastOutputAt >= OPERATOR_OUTPUT_IDLE_MS;
+          const commandFinished =
+            hasTerminalCommandFinishedMarker(rawTail) || detectShellPromptAtEnd(tail);
+          if (awaitingInput) {
+            const userActed = capture.lastUserInputAt > promptDetectedAt;
+            if (!inputRequest && userActed && idle && commandFinished) {
+              break;
+            }
+          } else if (idle && commandFinished) {
             break;
           }
         }
       } finally {
         outputCaptureRef.current = null;
       }
-      return sanitizeTerminalOutput(decodeUtf8(concatByteChunks(capture.chunks)));
+      return {
+        output: sanitizeTerminalOutput(decodeUtf8(concatByteChunks(capture.chunks))),
+        canceled: false,
+      };
     },
-    [client, terminalId],
+    [client, requestTerminalFocus, t, terminalId],
   );
 
   const handleStreamRestore = useStableEvent(
@@ -807,6 +881,10 @@ export function TerminalPane({
     async (data: string) => {
       if (data.length === 0) {
         return;
+      }
+      const operatorCapture = outputCaptureRef.current;
+      if (operatorCapture) {
+        operatorCapture.lastUserInputAt = Date.now();
       }
 
       if (hasPendingTerminalModifiers(modifiers)) {

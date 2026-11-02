@@ -1,84 +1,140 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCommandPlanningPrompt,
-  buildCommandSummaryPrompt,
+  buildOperatorLimitPrompt,
+  buildOperatorObservationPrompt,
+  buildOperatorStartPrompt,
   parseCommandPlan,
+  parseOperatorDecision,
 } from "./command-plan";
 
-describe("buildCommandPlanningPrompt", () => {
-  it("includes the request and terminal directory", () => {
-    const prompt = buildCommandPlanningPrompt({
+describe("buildOperatorStartPrompt", () => {
+  it("includes the request, cwd, and strict JSON contract", () => {
+    const prompt = buildOperatorStartPrompt({
       request: "当前服务器负载",
       cwd: "/srv/app",
     });
     expect(prompt).toContain("当前服务器负载");
     expect(prompt).toContain("/srv/app");
-    expect(prompt).toContain("one command per line");
-    expect(prompt).toContain("NO_COMMAND");
+    expect(prompt).toContain('"action":"run"');
+    expect(prompt).toContain('"action":"finish"');
+    expect(prompt).toContain("visible PTY");
   });
 });
 
-describe("buildCommandSummaryPrompt", () => {
-  it("includes the request, commands and captured output", () => {
-    const prompt = buildCommandSummaryPrompt({
-      request: "当前服务器负载",
+describe("buildOperatorObservationPrompt", () => {
+  it("feeds real command output into the next round", () => {
+    const prompt = buildOperatorObservationPrompt({
       cwd: "/srv/app",
-      commands: ["uptime", "nproc"],
-      output: "load average: 0.97, 1.04, 1.13\n32",
+      observation: {
+        type: "executed",
+        round: 1,
+        commands: ["uptime", "nproc"],
+        output: "load average: 0.97, 1.04, 1.13\n32",
+      },
     });
-    expect(prompt).toContain("当前服务器负载");
     expect(prompt).toContain("$ uptime");
     expect(prompt).toContain("$ nproc");
     expect(prompt).toContain("load average: 0.97, 1.04, 1.13");
-    expect(prompt).toContain("Do not output shell commands");
+    expect(prompt).toContain("exactly one JSON object");
   });
 
-  it("mentions missing output explicitly", () => {
-    const prompt = buildCommandSummaryPrompt({
-      request: "check disk",
+  it("explains blocked commands and forbids retrying them", () => {
+    const prompt = buildOperatorObservationPrompt({
       cwd: "/srv/app",
-      commands: ["df -h"],
-      output: "   ",
+      observation: {
+        type: "blocked",
+        round: 2,
+        commands: ["rm -rf /"],
+        reasons: ["recursive delete of a root or home target"],
+      },
     });
-    expect(prompt).toContain("(no output captured)");
+    expect(prompt).toContain("safety gate refused");
+    expect(prompt).toContain("recursive delete");
+    expect(prompt).toContain("Never retry");
+  });
+
+  it("explains rejected commands and asks for another approach", () => {
+    const prompt = buildOperatorObservationPrompt({
+      cwd: "/srv/app",
+      observation: {
+        type: "rejected",
+        round: 3,
+        commands: ["chmod 777 file"],
+        reason: null,
+      },
+    });
+    expect(prompt).toContain("user rejected");
+    expect(prompt).toContain("Do not run those commands again");
   });
 
   it("truncates very large output", () => {
-    const prompt = buildCommandSummaryPrompt({
-      request: "dump",
+    const prompt = buildOperatorObservationPrompt({
       cwd: "/srv/app",
-      commands: ["cat big.log"],
-      output: "x".repeat(20_000),
+      observation: {
+        type: "executed",
+        round: 1,
+        commands: ["cat big.log"],
+        output: "x".repeat(30_000),
+      },
     });
     expect(prompt).toContain("...[truncated]");
-    expect(prompt.length).toBeLessThan(12_000);
+    expect(prompt.length).toBeLessThan(14_000);
+  });
+});
+
+describe("buildOperatorLimitPrompt", () => {
+  it("requires a final conclusion without more commands", () => {
+    const prompt = buildOperatorLimitPrompt({ cwd: "/srv/app" });
+    expect(prompt).toContain("maximum number of command rounds");
+    expect(prompt).toContain('"action":"finish"');
+  });
+});
+
+describe("parseOperatorDecision", () => {
+  it("parses a run decision", () => {
+    expect(
+      parseOperatorDecision('{"action":"run","commands":["uptime","df -h"],"note":"inspect"}'),
+    ).toEqual({ type: "commands", commands: ["uptime", "df -h"], note: "inspect" });
+  });
+
+  it("parses a fenced JSON decision surrounded by prose", () => {
+    const reply = 'Here is the next step:\n```json\n{"action":"run","commands":["free -m"]}\n```';
+    expect(parseOperatorDecision(reply)).toEqual({
+      type: "commands",
+      commands: ["free -m"],
+      note: null,
+    });
+  });
+
+  it("parses a finish decision", () => {
+    expect(parseOperatorDecision('{"action":"finish","conclusion":"All good."}')).toEqual({
+      type: "finish",
+      conclusion: "All good.",
+    });
+  });
+
+  it("accepts NO_COMMAND and fenced command fallback", () => {
+    expect(parseOperatorDecision("NO_COMMAND")).toEqual({ type: "finish", conclusion: "" });
+    expect(parseOperatorDecision("```bash\n$ uptime\n> free -m\n```")).toEqual({
+      type: "commands",
+      commands: ["uptime", "free -m"],
+      note: null,
+    });
+  });
+
+  it("rejects malformed replies instead of guessing", () => {
+    expect(() => parseOperatorDecision("I will run something later.")).toThrow(
+      "invalid terminal decision",
+    );
   });
 });
 
 describe("parseCommandPlan", () => {
-  it("extracts commands from a fenced code block", () => {
-    expect(parseCommandPlan("```bash\nuptime\ndf -h\n```")).toEqual(["uptime", "df -h"]);
+  it("returns commands from a structured decision", () => {
+    expect(parseCommandPlan('{"action":"run","commands":["uptime"]}')).toEqual(["uptime"]);
   });
 
-  it("ignores prose around fenced blocks", () => {
-    expect(parseCommandPlan("Here you go:\n```sh\nfree -m\n```\nThis shows memory.")).toEqual([
-      "free -m",
-    ]);
-  });
-
-  it("accepts plain lines and strips shell prompts", () => {
-    expect(parseCommandPlan("$ uptime\n> free -m\n`df -h`\n")).toEqual([
-      "uptime",
-      "free -m",
-      "df -h",
-    ]);
-  });
-
-  it("returns no commands for NO_COMMAND", () => {
-    expect(parseCommandPlan("NO_COMMAND")).toEqual([]);
-  });
-
-  it("returns no commands for empty replies", () => {
-    expect(parseCommandPlan("   \n\n")).toEqual([]);
+  it("returns no commands for a finish decision", () => {
+    expect(parseCommandPlan('{"action":"finish","conclusion":"Done"}')).toEqual([]);
   });
 });

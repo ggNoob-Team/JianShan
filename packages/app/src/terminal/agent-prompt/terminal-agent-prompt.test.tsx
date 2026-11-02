@@ -12,18 +12,21 @@ const {
   waitForFinishMock,
   setAgentModelMock,
   archiveWorkspaceMock,
+  cancelAgentMock,
 } = vi.hoisted(() => {
   const createWorkspaceFn = vi.fn();
   const sendAgentMessageFn = vi.fn(async () => ({}));
   const waitForFinishFn = vi.fn();
   const setAgentModelFn = vi.fn(async () => undefined);
   const archiveWorkspaceFn = vi.fn(async () => ({}));
+  const cancelAgentFn = vi.fn(async () => undefined);
   return {
     createWorkspaceMock: createWorkspaceFn,
     sendAgentMessageMock: sendAgentMessageFn,
     waitForFinishMock: waitForFinishFn,
     setAgentModelMock: setAgentModelFn,
     archiveWorkspaceMock: archiveWorkspaceFn,
+    cancelAgentMock: cancelAgentFn,
     client: {
       supportsBackgroundWorkspaces: () => true,
       createWorkspace: createWorkspaceFn,
@@ -31,6 +34,7 @@ const {
       waitForFinish: waitForFinishFn,
       setAgentModel: setAgentModelFn,
       archiveWorkspace: archiveWorkspaceFn,
+      cancelAgent: cancelAgentFn,
     },
   };
 });
@@ -289,8 +293,19 @@ vi.mock("@/stores/session-store", () => ({
     }),
 }));
 
-function renderPrompt() {
-  const runCommands = vi.fn(async () => "load average: 0.97, 1.04, 1.13\n32");
+function renderPrompt(
+  implementation?: (
+    commands: string[],
+    options: { signal: AbortSignal; onAwaitingInput: (hint: string) => void },
+  ) => Promise<{ output: string; canceled: boolean }>,
+) {
+  const runCommands = vi.fn(
+    implementation ??
+      (async (commands: string[]) => ({
+        output: `output for ${commands.join(" && ")}`,
+        canceled: false,
+      })),
+  );
   const view = render(
     <TerminalAgentPrompt
       projectId="prj-1"
@@ -310,6 +325,10 @@ async function submit(value: string) {
   return input as HTMLInputElement;
 }
 
+function idleReply(lastMessage: string) {
+  return { status: "idle", final: null, error: null, lastMessage };
+}
+
 describe("TerminalAgentPrompt", () => {
   beforeEach(() => {
     createWorkspaceMock.mockReset();
@@ -322,26 +341,18 @@ describe("TerminalAgentPrompt", () => {
     waitForFinishMock.mockReset();
     setAgentModelMock.mockClear();
     archiveWorkspaceMock.mockClear();
+    cancelAgentMock.mockClear();
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("uses an isolated background agent and shows process plus summary", async () => {
+  it("runs multiple rounds in an isolated background session and shows the conclusion", async () => {
     waitForFinishMock
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "```bash\nuptime\ndf -h\n```",
-      })
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "Load is normal.",
-      });
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["uptime"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["df -h"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Load is normal."}'));
 
     const { runCommands } = renderPrompt();
     const input = await submit("当前服务器负载");
@@ -361,18 +372,21 @@ describe("TerminalAgentPrompt", () => {
         }),
       }),
     );
-    expect(sendAgentMessageMock).toHaveBeenNthCalledWith(
+    expect(runCommands).toHaveBeenNthCalledWith(
       1,
-      "operator-agent",
-      expect.stringContaining("当前服务器负载"),
+      ["uptime"],
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        onAwaitingInput: expect.any(Function),
+      }),
     );
+    expect(runCommands).toHaveBeenNthCalledWith(2, ["df -h"], expect.anything());
     expect(sendAgentMessageMock).toHaveBeenNthCalledWith(
       2,
       "operator-agent",
-      expect.stringContaining("load average: 0.97, 1.04, 1.13"),
+      expect.stringContaining("output for uptime"),
     );
     expect(sendAgentMessageMock).not.toHaveBeenCalledWith("agent-1", expect.anything());
-    expect(runCommands).toHaveBeenCalledWith(["uptime", "df -h"]);
     expect(screen.getByTestId("terminal-operator-summary").textContent).toContain(
       "Load is normal.",
     );
@@ -382,50 +396,128 @@ describe("TerminalAgentPrompt", () => {
     expect(input.value).toBe("");
   });
 
-  it("submits with Enter", async () => {
+  it("asks for approval and runs a mutating command only after confirmation", async () => {
     waitForFinishMock
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "free -m",
-      })
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "Memory is fine.",
-      });
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["rm temp.txt"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Removed."}'));
 
     const { runCommands } = renderPrompt();
-    const input = screen.getByTestId("terminal-agent-prompt-input");
-    fireEvent.change(input, { target: { value: "show memory usage" } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    await submit("delete temp file");
 
-    await waitFor(() => expect(runCommands).toHaveBeenCalledWith(["free -m"]));
+    const approve = await screen.findByTestId("terminal-operator-approve");
+    expect(screen.getByTestId("terminal-operator-stage").textContent).toBe(
+      "workspace.terminal.agentPrompt.stageApproval",
+    );
+    expect(runCommands).not.toHaveBeenCalled();
+
+    fireEvent.click(approve);
+    await waitFor(() => expect(screen.getByTestId("terminal-operator-summary")).toBeTruthy());
+    expect(runCommands).toHaveBeenCalledWith(["rm temp.txt"], expect.anything());
   });
 
-  it("reports when the operator returns no runnable command", async () => {
-    waitForFinishMock.mockResolvedValueOnce({
-      status: "idle",
-      final: null,
-      error: null,
-      lastMessage: "NO_COMMAND",
-    });
+  it("feeds a rejection back without running the command", async () => {
+    waitForFinishMock
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["chmod 777 file"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Change skipped."}'));
+
+    const { runCommands } = renderPrompt();
+    await submit("change permissions");
+
+    fireEvent.click(await screen.findByTestId("terminal-operator-reject"));
+    await waitFor(() => expect(screen.getByTestId("terminal-operator-summary")).toBeTruthy());
+
+    expect(runCommands).not.toHaveBeenCalled();
+    expect(sendAgentMessageMock).toHaveBeenNthCalledWith(
+      2,
+      "operator-agent",
+      expect.stringContaining("user rejected"),
+    );
+  });
+
+  it("blocks destructive commands without asking for approval", async () => {
+    waitForFinishMock
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["rm -rf /"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Refused safely."}'));
+
+    const { runCommands } = renderPrompt();
+    await submit("wipe the machine");
+
+    await waitFor(() => expect(screen.getByTestId("terminal-operator-summary")).toBeTruthy());
+    expect(screen.queryByTestId("terminal-operator-approve")).toBeNull();
+    expect(runCommands).not.toHaveBeenCalled();
+    expect(sendAgentMessageMock).toHaveBeenNthCalledWith(
+      2,
+      "operator-agent",
+      expect.stringContaining("safety gate refused"),
+    );
+  });
+
+  it("hands terminal control back for a password prompt and resumes automatically", async () => {
+    let finishExecution: ((result: { output: string; canceled: boolean }) => void) | undefined;
+    const runCommands = vi.fn(
+      async (
+        _commands: string[],
+        options: { signal: AbortSignal; onAwaitingInput: (hint: string) => void },
+      ) => {
+        options.onAwaitingInput("workspace.terminal.agentPrompt.passwordHandoffHint");
+        return new Promise<{ output: string; canceled: boolean }>((resolve) => {
+          finishExecution = resolve;
+        });
+      },
+    );
+    waitForFinishMock
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["sudo apt update"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Packages updated."}'));
+
+    renderPrompt(runCommands);
+    await submit("update packages");
+    fireEvent.click(await screen.findByTestId("terminal-operator-approve"));
+
+    await waitFor(() => expect(screen.getByTestId("terminal-agent-handoff")).toBeTruthy());
+    expect(screen.queryByTestId("terminal-operator-panel")).toBeNull();
+    finishExecution?.({ output: "packages updated", canceled: false });
+
+    await waitFor(() => expect(screen.getByTestId("terminal-operator-summary")).toBeTruthy());
+    expect(sendAgentMessageMock).toHaveBeenNthCalledWith(
+      2,
+      "operator-agent",
+      expect.stringContaining("packages updated"),
+    );
+  });
+
+  it("cancels a pending approval and cancels the agent run", async () => {
+    waitForFinishMock.mockResolvedValueOnce(
+      idleReply('{"action":"run","commands":["rm temp.txt"]}'),
+    );
+
+    const { runCommands } = renderPrompt();
+    await submit("delete file");
+
+    fireEvent.click(await screen.findByTestId("terminal-operator-cancel"));
+    await waitFor(() =>
+      expect(screen.getByTestId("terminal-operator-stage").textContent).toBe(
+        "workspace.terminal.agentPrompt.stageCanceled",
+      ),
+    );
+    expect(runCommands).not.toHaveBeenCalled();
+    expect(cancelAgentMock).toHaveBeenCalledWith("operator-agent");
+  });
+
+  it("finishes without a command when the agent only returns a conclusion", async () => {
+    waitForFinishMock.mockResolvedValueOnce(
+      idleReply('{"action":"finish","conclusion":"No shell command is needed."}'),
+    );
 
     const { runCommands } = renderPrompt();
     const input = await submit("hello");
 
     await waitFor(() =>
-      expect(screen.getByTestId("terminal-operator-error").textContent).toBe(
-        "workspace.terminal.agentPrompt.noCommands",
+      expect(screen.getByTestId("terminal-operator-summary").textContent).toContain(
+        "No shell command is needed.",
       ),
     );
     expect(runCommands).not.toHaveBeenCalled();
-    expect(input.value).toBe("hello");
-    expect(screen.getByTestId("terminal-operator-stage").textContent).toBe(
-      "workspace.terminal.agentPrompt.stageError",
-    );
+    expect(input.value).toBe("");
   });
 
   it("reports a planning timeout", async () => {
@@ -446,26 +538,17 @@ describe("TerminalAgentPrompt", () => {
     );
   });
 
-  it("archives the background operator workspace when the terminal closes", async () => {
+  it("archives and cancels the background operator session when the terminal closes", async () => {
     waitForFinishMock
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "uptime",
-      })
-      .mockResolvedValueOnce({
-        status: "idle",
-        final: null,
-        error: null,
-        lastMessage: "Summary.",
-      });
+      .mockResolvedValueOnce(idleReply('{"action":"run","commands":["uptime"]}'))
+      .mockResolvedValueOnce(idleReply('{"action":"finish","conclusion":"Summary."}'));
 
     const { unmount } = renderPrompt();
     await submit("load");
     await waitFor(() => expect(screen.getByTestId("terminal-operator-summary")).toBeTruthy());
 
     unmount();
+    expect(cancelAgentMock).toHaveBeenCalledWith("operator-agent");
     expect(archiveWorkspaceMock).toHaveBeenCalledWith("wks-operator");
   });
 });

@@ -5,8 +5,11 @@ export const TERMINAL_OPERATOR_TITLE = "Terminal operator";
 
 const TERMINAL_OPERATOR_SYSTEM_PROMPT = [
   "You help the user operate a terminal that is already open on their machine.",
-  "When asked to plan, reply with only the shell commands, one per line, and never execute them yourself.",
-  "When asked to summarize command output, reply with a short, factual summary.",
+  "You reason in short rounds. The app executes each approved command in the visible PTY and sends you its output.",
+  "Reply to every operator turn with exactly one JSON object:",
+  '{"action":"run","commands":["..."],"note":"..."} or {"action":"finish","conclusion":"..."}.',
+  "Never use your own shell or file tools. Never claim to have executed a command yourself.",
+  "Use one-line, non-interactive commands when possible. Finish with a concise conclusion when no more commands are needed.",
 ].join("\n");
 
 export interface TerminalOperatorSession {

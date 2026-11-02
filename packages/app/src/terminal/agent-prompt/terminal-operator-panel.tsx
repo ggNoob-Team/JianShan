@@ -9,38 +9,78 @@ import { PressHighlight } from "@/components/ui/press-highlight";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ScrollView } from "@/components/ui/scroll-view";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
+import type { OperatorCommandAssessment } from "./operator-loop";
 import { truncateTerminalText } from "./terminal-output";
 
 export type TerminalOperatorStage =
   | "starting"
   | "planning"
+  | "approval"
   | "executing"
-  | "summarizing"
+  | "awaiting_user"
   | "done"
+  | "canceled"
   | "error";
+
+export type TerminalOperatorRoundStatus =
+  | "planned"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "rejected"
+  | "canceled";
+
+export interface TerminalOperatorRound {
+  round: number;
+  commands: OperatorCommandAssessment[];
+  status: TerminalOperatorRoundStatus;
+  output: string | null;
+}
 
 export interface TerminalOperatorRun {
   request: string;
   stage: TerminalOperatorStage;
-  commands: string[];
+  rounds: TerminalOperatorRound[];
   output: string;
-  summary: string | null;
+  conclusion: string | null;
   error: string | null;
+  awaitingInputHint: string | null;
 }
 
 interface TerminalOperatorPanelProps {
   run: TerminalOperatorRun | null;
+  visible: boolean;
   modelLabel: string;
+  onApprove: () => void;
+  onReject: () => void;
+  onCancel: () => void;
   onClose: () => void;
 }
 
 const STAGE_KEYS: Record<TerminalOperatorStage, string> = {
   starting: "workspace.terminal.agentPrompt.stageStarting",
   planning: "workspace.terminal.agentPrompt.stagePlanning",
+  approval: "workspace.terminal.agentPrompt.stageApproval",
   executing: "workspace.terminal.agentPrompt.stageExecuting",
-  summarizing: "workspace.terminal.agentPrompt.stageSummarizing",
+  awaiting_user: "workspace.terminal.agentPrompt.stageAwaitingUser",
   done: "workspace.terminal.agentPrompt.stageDone",
+  canceled: "workspace.terminal.agentPrompt.stageCanceled",
   error: "workspace.terminal.agentPrompt.stageError",
+};
+
+const ROUND_STATUS_KEYS: Record<TerminalOperatorRoundStatus, string> = {
+  planned: "workspace.terminal.agentPrompt.roundPlanned",
+  running: "workspace.terminal.agentPrompt.roundRunning",
+  completed: "workspace.terminal.agentPrompt.roundCompleted",
+  blocked: "workspace.terminal.agentPrompt.roundBlocked",
+  rejected: "workspace.terminal.agentPrompt.roundRejected",
+  canceled: "workspace.terminal.agentPrompt.roundCanceled",
+};
+
+const RISK_KEYS: Record<OperatorCommandAssessment["risk"], string> = {
+  safe: "workspace.terminal.agentPrompt.riskSafe",
+  confirm: "workspace.terminal.agentPrompt.riskConfirm",
+  blocked: "workspace.terminal.agentPrompt.riskBlocked",
 };
 
 const OUTPUT_PREVIEW_CHARS = 2_000;
@@ -50,32 +90,93 @@ const ThemedLoadingSpinner = withUnistyles(LoadingSpinner, (theme) => ({
 }));
 
 function isRunFinished(stage: TerminalOperatorStage): boolean {
-  return stage === "done" || stage === "error";
+  return stage === "done" || stage === "canceled" || stage === "error";
+}
+
+function isStageSpinning(stage: TerminalOperatorStage): boolean {
+  return stage === "starting" || stage === "planning" || stage === "executing";
+}
+
+function OperatorCommandRow({ command }: { command: OperatorCommandAssessment }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.commandRow}>
+      <Text style={styles.riskBadge}>{t(RISK_KEYS[command.risk])}</Text>
+      <View style={styles.commandCopy}>
+        <Text selectable style={styles.commandText}>
+          {command.command}
+        </Text>
+        <Text style={styles.commandReason}>{command.reason}</Text>
+      </View>
+    </View>
+  );
+}
+
+function OperatorRoundCard({ round }: { round: TerminalOperatorRound }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.round} testID={`terminal-operator-round-${round.round}`}>
+      <View style={styles.roundHeader}>
+        <Text style={styles.sectionLabel}>
+          {t("workspace.terminal.agentPrompt.round", { round: round.round })}
+        </Text>
+        <Text style={styles.roundStatus}>{t(ROUND_STATUS_KEYS[round.status])}</Text>
+      </View>
+      <View style={styles.commandList}>
+        {round.commands.map((command) => (
+          <OperatorCommandRow
+            command={command}
+            key={`${round.round}:${command.command}:${command.risk}`}
+          />
+        ))}
+      </View>
+      {round.output ? (
+        <View style={styles.outputBox}>
+          <Text selectable style={styles.outputText}>
+            {truncateTerminalText(round.output, OUTPUT_PREVIEW_CHARS)}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 /**
  * Wide layouts get a floating card anchored over the terminal's bottom-right
  * corner; compact layouts use a bottom sheet so the summary stays reachable
- * with one hand.
+ * with one hand. Approval and cancel stay visible in the footer while the
+ * operator is running.
  */
-export function TerminalOperatorPanel({ run, modelLabel, onClose }: TerminalOperatorPanelProps) {
+// oxlint-disable-next-line complexity
+export function TerminalOperatorPanel({
+  run,
+  visible,
+  modelLabel,
+  onApprove,
+  onReject,
+  onCancel,
+  onClose,
+}: TerminalOperatorPanelProps) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const insets = useSafeAreaInsets();
   const busy = run !== null && !isRunFinished(run.stage);
+  const canDismiss = run !== null && (isRunFinished(run.stage) || run.stage === "awaiting_user");
+  const approvalRound =
+    run?.stage === "approval" && run.rounds.length > 0 ? run.rounds[run.rounds.length - 1] : null;
 
   return (
     <Modal
       animationType="fade"
-      onRequestClose={busy ? undefined : onClose}
+      onRequestClose={canDismiss ? onClose : undefined}
       statusBarTranslucent
       transparent
-      visible={run !== null}
+      visible={run !== null && visible}
     >
       <View style={[styles.overlay, isCompact ? styles.overlayCompact : styles.overlayWide]}>
         <PressHighlight
           accessibilityLabel={t("workspace.terminal.agentPrompt.close")}
-          disabled={busy}
+          disabled={!canDismiss}
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
@@ -97,7 +198,7 @@ export function TerminalOperatorPanel({ run, modelLabel, onClose }: TerminalOper
               </View>
               <Button
                 accessibilityLabel={t("workspace.terminal.agentPrompt.close")}
-                disabled={busy}
+                disabled={busy && run.stage !== "awaiting_user"}
                 leftIcon={X}
                 onPress={onClose}
                 size="xs"
@@ -121,7 +222,7 @@ export function TerminalOperatorPanel({ run, modelLabel, onClose }: TerminalOper
               </View>
 
               <View style={styles.stageRow}>
-                {busy ? <ThemedLoadingSpinner size="small" /> : null}
+                {isStageSpinning(run.stage) ? <ThemedLoadingSpinner size="small" /> : null}
                 <Text
                   style={[styles.stageText, run.stage === "error" ? styles.errorText : null]}
                   testID="terminal-operator-stage"
@@ -130,33 +231,47 @@ export function TerminalOperatorPanel({ run, modelLabel, onClose }: TerminalOper
                 </Text>
               </View>
 
-              {run.commands.length > 0 ? (
+              {run.awaitingInputHint ? (
+                <View style={styles.handoffBox} testID="terminal-operator-handoff">
+                  <Text style={styles.handoffTitle}>
+                    {t("workspace.terminal.agentPrompt.handoffTitle")}
+                  </Text>
+                  <Text style={styles.handoffText}>{run.awaitingInputHint}</Text>
+                </View>
+              ) : null}
+
+              {approvalRound ? (
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>
-                    {t("workspace.terminal.agentPrompt.commands")}
+                    {t("workspace.terminal.agentPrompt.approvalTitle")}
                   </Text>
-                  <View style={styles.commandRow}>
-                    <Text selectable style={styles.commandText}>
-                      {run.commands
-                        .map((command, index) => String(index + 1) + ". " + command)
-                        .join(String.fromCharCode(10))}
-                    </Text>
+                  <Text style={styles.approvalHint}>
+                    {t("workspace.terminal.agentPrompt.approvalHint")}
+                  </Text>
+                  <View style={styles.approvalActions}>
+                    <Button
+                      onPress={onApprove}
+                      size="xs"
+                      testID="terminal-operator-approve"
+                      variant="default"
+                    >
+                      {t("workspace.terminal.agentPrompt.approve")}
+                    </Button>
+                    <Button
+                      onPress={onReject}
+                      size="xs"
+                      testID="terminal-operator-reject"
+                      variant="secondary"
+                    >
+                      {t("workspace.terminal.agentPrompt.reject")}
+                    </Button>
                   </View>
                 </View>
               ) : null}
 
-              {run.output ? (
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>
-                    {t("workspace.terminal.agentPrompt.output")}
-                  </Text>
-                  <View style={styles.outputBox}>
-                    <Text selectable style={styles.outputText}>
-                      {truncateTerminalText(run.output, OUTPUT_PREVIEW_CHARS)}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
+              {run.rounds.map((round) => (
+                <OperatorRoundCard key={round.round} round={round} />
+              ))}
 
               {run.error ? (
                 <Text style={styles.errorText} testID="terminal-operator-error">
@@ -164,17 +279,30 @@ export function TerminalOperatorPanel({ run, modelLabel, onClose }: TerminalOper
                 </Text>
               ) : null}
 
-              {run.summary ? (
+              {run.conclusion ? (
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>
-                    {t("workspace.terminal.agentPrompt.summary")}
+                    {t("workspace.terminal.agentPrompt.conclusion")}
                   </Text>
                   <View style={styles.summaryBox} testID="terminal-operator-summary">
-                    <MarkdownRenderer compact={isCompact} text={run.summary} />
+                    <MarkdownRenderer compact={isCompact} text={run.conclusion} />
                   </View>
                 </View>
               ) : null}
             </ScrollView>
+
+            {busy ? (
+              <View style={styles.footer}>
+                <Button
+                  onPress={onCancel}
+                  size="xs"
+                  testID="terminal-operator-cancel"
+                  variant="ghost"
+                >
+                  {t("workspace.terminal.agentPrompt.cancelRun")}
+                </Button>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -206,7 +334,7 @@ const styles = StyleSheet.create((theme) => ({
   panelWide: {
     width: 460,
     maxWidth: "92%",
-    maxHeight: "58%",
+    maxHeight: "64%",
     marginBottom: 84,
     borderRadius: theme.borderRadius.xl,
     shadowColor: "#000",
@@ -217,7 +345,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   panelCompact: {
     width: "100%",
-    maxHeight: "72%",
+    maxHeight: "78%",
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
     borderBottomWidth: 0,
@@ -281,6 +409,51 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
+  handoffBox: {
+    gap: theme.spacing[1],
+    borderWidth: 1,
+    borderColor: theme.colors.borderAccent,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface0,
+    padding: theme.spacing[3],
+  },
+  handoffTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+  },
+  handoffText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  approvalHint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  approvalActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  round: {
+    gap: theme.spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: theme.spacing[3],
+  },
+  roundHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[2],
+  },
+  roundStatus: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  commandList: {
+    gap: theme.spacing[1],
+  },
   commandRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -288,13 +461,25 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.sm,
     backgroundColor: theme.colors.surface0,
     paddingHorizontal: theme.spacing[2],
-    paddingVertical: theme.spacing[1],
+    paddingVertical: theme.spacing[2],
   },
-  commandText: {
+  riskBadge: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    textTransform: "uppercase",
+  },
+  commandCopy: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
+  },
+  commandText: {
     color: theme.colors.foreground,
     fontFamily: theme.fontFamily.mono,
+    fontSize: theme.fontSize.sm,
+  },
+  commandReason: {
+    color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
   },
   outputBox: {
@@ -317,5 +502,13 @@ const styles = StyleSheet.create((theme) => ({
   errorText: {
     color: theme.colors.destructive,
     fontSize: theme.fontSize.sm,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
   },
 }));

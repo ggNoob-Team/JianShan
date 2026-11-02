@@ -1,68 +1,127 @@
 import { truncateTerminalText } from "./terminal-output";
 
-export interface CommandPlanningPromptInput {
+const MAX_OBSERVATION_OUTPUT_CHARS = 12_000;
+
+export type OperatorAgentDecision =
+  | {
+      type: "commands";
+      commands: string[];
+      note: string | null;
+    }
+  | {
+      type: "finish";
+      conclusion: string;
+    };
+
+const REPLY_SCHEMA = [
+  '{"action":"run","commands":["one shell command per string"],"note":"optional short reason"}',
+  '{"action":"finish","conclusion":"final answer to the user"}',
+].join("\n");
+
+export interface OperatorStartPromptInput {
   request: string;
   cwd: string;
 }
 
-const MAX_SUMMARY_OUTPUT_CHARS = 8_000;
-
 /**
- * Asks the terminal operator to translate a request into shell commands for the
- * visible terminal. The operator must not execute them itself; the caller
- * writes the returned lines to the terminal PTY.
+ * The visible terminal is the only execution surface. The operator agent only
+ * reasons about the next command and receives PTY output back in a later turn.
  */
-export function buildCommandPlanningPrompt({ request, cwd }: CommandPlanningPromptInput): string {
+export function buildOperatorStartPrompt({ request, cwd }: OperatorStartPromptInput): string {
   return [
-    "Translate the user request below into shell commands for an existing terminal.",
-    `The terminal is already open in ${cwd}.`,
-    "Reply with only the commands to type into that terminal, one command per line.",
-    "Do not use markdown fences, add explanations, ask questions, or run the commands yourself.",
-    "Use non-interactive commands and prefer safe, read-only operations.",
-    "If no shell command is needed, reply with exactly NO_COMMAND.",
+    "You are operating a terminal that is already open on the user's machine.",
+    `The terminal cwd is ${cwd}.`,
+    "Work in short rounds: request commands, inspect their captured output, then decide what to do next.",
+    "The app, not you, executes commands in the visible PTY. Never claim you executed them yourself.",
+    "Use non-interactive commands when possible. Keep each command on one line.",
+    "Commands that may modify files, permissions, processes, or the network will require user approval.",
+    "The app will refuse destructive commands and hand sudo password prompts back to the user.",
+    "",
+    "Reply with exactly one JSON object and no markdown:",
+    REPLY_SCHEMA,
+    "",
+    'Choose "finish" when no more terminal work is needed. Write the conclusion in the same language as the user request.',
     "",
     "User request:",
     request,
   ].join("\n");
 }
 
-export interface CommandSummaryPromptInput {
-  request: string;
+export type OperatorObservation =
+  | {
+      type: "executed";
+      round: number;
+      commands: string[];
+      output: string;
+    }
+  | {
+      type: "blocked";
+      round: number;
+      commands: string[];
+      reasons: string[];
+    }
+  | {
+      type: "rejected";
+      round: number;
+      commands: string[];
+      reason: string | null;
+    };
+
+export interface OperatorObservationPromptInput {
   cwd: string;
-  commands: string[];
-  output: string;
+  observation: OperatorObservation;
 }
 
-/**
- * Asks the same isolated terminal operator to explain what the visible terminal
- * just did. The command output is captured from the PTY, not re-run.
- */
-export function buildCommandSummaryPrompt({
-  request,
+export function buildOperatorObservationPrompt({
   cwd,
-  commands,
-  output,
-}: CommandSummaryPromptInput): string {
-  const captured = truncateTerminalText(output.trim(), MAX_SUMMARY_OUTPUT_CHARS);
-  return [
-    "The commands below were just executed in the user's visible terminal.",
-    `Terminal cwd: ${cwd}`,
-    "",
-    "User request:",
-    request,
-    "",
-    "Commands:",
-    ...commands.map((command) => `$ ${command}`),
-    "",
-    "Captured terminal output:",
-    captured || "(no output captured)",
-    "",
-    "Write a concise summary in the same language as the user request: what ran, what the results mean, and any errors or next steps.",
-    "Do not output shell commands. Do not ask questions.",
-  ].join("\n");
+  observation,
+}: OperatorObservationPromptInput): string {
+  const lines = [`Terminal cwd: ${cwd}`, `Round ${observation.round} result:`];
+  if (observation.type === "executed") {
+    lines.push(
+      "Commands:",
+      ...observation.commands.map((command) => `$ ${command}`),
+      "",
+      "Captured output:",
+      truncateTerminalText(observation.output.trim(), MAX_OBSERVATION_OUTPUT_CHARS) ||
+        "(no output captured)",
+      "",
+      "Decide the next step from this real output. Run another command only if needed; otherwise return the final conclusion.",
+    );
+  } else if (observation.type === "blocked") {
+    lines.push(
+      "These commands were not executed because the safety gate refused them:",
+      ...observation.commands.map((command) => `$ ${command}`),
+      "",
+      "Reasons:",
+      ...observation.reasons.map((reason) => `- ${reason}`),
+      "",
+      "Choose a safe alternative, or finish by explaining why the request cannot be completed safely. Never retry a refused command.",
+    );
+  } else {
+    lines.push(
+      "The user rejected these commands, so they were not executed:",
+      ...observation.commands.map((command) => `$ ${command}`),
+      ...(observation.reason ? ["", `User reason: ${observation.reason}`] : []),
+      "",
+      "Do not run those commands again. Choose a different approach or finish with a short explanation.",
+    );
+  }
+  lines.push("", "Reply with exactly one JSON object using the same schema as before.");
+  return lines.join("\n");
 }
 
-const FENCED_BLOCK = /```(?:bash|sh|shell|zsh|console)?[^\n]*\n([\s\S]*?)```/gi;
+export interface OperatorLimitPromptInput {
+  cwd: string;
+}
+
+export function buildOperatorLimitPrompt({ cwd }: OperatorLimitPromptInput): string {
+  return [
+    `The terminal at ${cwd} has reached the maximum number of command rounds.`,
+    "Do not request or describe more commands.",
+    'Reply with exactly {"action":"finish","conclusion":"..."} and summarize what was learned or why the task is incomplete.',
+  ].join("\n");
+}
 
 function stripCommandPrefix(line: string): string {
   let next = line.trim();
@@ -77,25 +136,88 @@ function stripCommandPrefix(line: string): string {
   return next;
 }
 
+function normalizeCommands(value: unknown): string[] {
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n/)
+      .map(stripCommandPrefix)
+      .filter((command) => command.length > 0);
+  }
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((command): command is string => typeof command === "string")
+    .map(stripCommandPrefix)
+    .filter((command) => command.length > 0);
+}
+
+function extractJson(reply: string): unknown | null {
+  const candidates: string[] = [];
+  const trimmed = reply.trim();
+  if (!trimmed) return null;
+  candidates.push(trimmed);
+  for (const match of trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) {
+    if (match[1]?.trim()) candidates.push(match[1].trim());
+  }
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+function parseLegacyDecision(reply: string): OperatorAgentDecision | null {
+  const body = reply.trim();
+  if (!body) return null;
+  if (/^NO_COMMAND$/i.test(body)) {
+    return { type: "finish", conclusion: "" };
+  }
+  const fenced = body.match(/```(?:bash|sh|shell|zsh|console)?\s*([\s\S]*?)```/i);
+  if (!fenced?.[1]) return null;
+  const commands = normalizeCommands(fenced[1]);
+  return commands.length > 0 ? { type: "commands", commands, note: null } : null;
+}
+
+/** Parses the operator's JSON decision, with a narrow legacy fallback. */
+export function parseOperatorDecision(reply: string): OperatorAgentDecision {
+  const parsed = extractJson(reply);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>;
+    const action = typeof record.action === "string" ? record.action.toLowerCase() : "";
+    const conclusion = typeof record.conclusion === "string" ? record.conclusion.trim() : "";
+    if (action === "finish" || action === "done" || action === "complete") {
+      return { type: "finish", conclusion };
+    }
+    if (action === "run" || action === "execute" || action === "commands") {
+      const commands = normalizeCommands(record.commands);
+      if (commands.length > 0) {
+        return {
+          type: "commands",
+          commands,
+          note: typeof record.note === "string" ? record.note.trim() || null : null,
+        };
+      }
+    }
+  }
+  const legacy = parseLegacyDecision(reply);
+  if (legacy) return legacy;
+  throw new Error("The agent returned an invalid terminal decision");
+}
+
 /**
- * Extracts commands from a planning reply. Prefers fenced code blocks; otherwise
- * treats non-empty lines as commands so operators that skip fences still work.
+ * Kept for callers and older tests that only need to read command lines from a
+ * fenced block. New operator turns use parseOperatorDecision instead.
  */
 export function parseCommandPlan(reply: string): string[] {
-  const fenced: string[] = [];
-  for (const match of reply.matchAll(FENCED_BLOCK)) {
-    if (match[1]) {
-      fenced.push(match[1]);
-    }
-  }
-  const body = fenced.length > 0 ? fenced.join("\n") : reply;
-  const commands: string[] = [];
-  for (const rawLine of body.split(/\r?\n/)) {
-    const line = stripCommandPrefix(rawLine);
-    if (!line || /^NO_COMMAND$/i.test(line) || line.startsWith("```")) {
-      continue;
-    }
-    commands.push(line);
-  }
-  return commands;
+  const decision = parseOperatorDecision(reply);
+  return decision.type === "commands" ? decision.commands : [];
 }
