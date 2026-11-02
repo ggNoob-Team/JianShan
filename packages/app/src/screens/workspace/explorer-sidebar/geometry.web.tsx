@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { HEADER_TOP_PADDING_MOBILE } from "@/constants/layout";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { ResizeHandle } from "@/components/resize-handle";
 import {
@@ -13,6 +15,7 @@ export function useExplorerGeometry({
   onResize,
   overlay,
 }: ExplorerGeometryInput): ExplorerGeometry {
+  const insets = useSafeAreaInsets();
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
   const requestedWidth = previewWidth ?? width;
   const sizes = resolveExplorerSidebarDockSizes({ requestedWidth, containerWidth });
@@ -35,7 +38,11 @@ export function useExplorerGeometry({
   );
   return {
     frameStyle: inlineUnistylesStyle({ width: overlay ? undefined : requestedWidth }),
-    panelStyle: undefined,
+    panelStyle: {
+      paddingTop: insets.top + (overlay ? HEADER_TOP_PADDING_MOBILE : 0),
+      paddingLeft: overlay ? insets.left : 0,
+      paddingRight: overlay ? insets.right : 0,
+    },
     resizeHandle: (
       <View style={styles.resize}>
         <ResizeHandle
