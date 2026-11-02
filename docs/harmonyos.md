@@ -50,6 +50,22 @@ The `Web` component loads the origin root (`paseo://app/`), not `/index.html`:
 Expo Router matches routes against the document path, and an `/index.html`
 document path matches no route (its "Unmatched Route" page).
 
+### Edge-to-edge
+
+The shell calls `setWindowLayoutFullScreen(true)` and expands the page's
+`SafeAreaType.SYSTEM` area, so the `Web` component covers the status bar and
+navigation indicator instead of stopping above them. The page keeps
+`viewport-fit=cover`, so ArkWeb reports the bars and cutouts through
+`env(safe-area-inset-*)`.
+
+The web layout paints its surface edge to edge and applies those insets only to
+the controls that must stay clear of them: headers use the top inset, the
+composer and desktop sidebar use the bottom inset, and compact headers use the
+side insets. The wide workspace root does not pad for side insets. A side-mounted
+camera therefore overlaps the outer edge of the content rather than reserving a
+full-height empty strip; keep new interactive chrome away from that edge or pad
+it explicitly.
+
 ## Links
 
 The shell owns one `Web` component and draws no browser chrome, so a page loaded

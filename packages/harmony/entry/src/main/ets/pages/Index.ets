@@ -274,6 +274,15 @@ struct Index {
     }
     .width("100%")
     .height("100%")
+    // The shell draws no app chrome, so the page owns the whole window. Expanding
+    // the system safe area lets the web app's background reach the status bar and
+    // navigation indicator instead of leaving a strip of window background below
+    // the Web component. The web app still reads env(safe-area-inset-*) for the
+    // controls that must stay clear of them.
+    .expandSafeArea(
+      [SafeAreaType.SYSTEM],
+      [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM, SafeAreaEdge.START, SafeAreaEdge.END],
+    )
   }
 
   onBackPress(): boolean {

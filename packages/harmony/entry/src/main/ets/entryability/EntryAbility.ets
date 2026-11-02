@@ -37,6 +37,19 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    // Lay the page out behind the status bar and navigation indicator. The page
+    // itself then expands its safe area (pages/Index.ets), so the Web component
+    // covers the whole window and the web app can paint edge to edge.
+    try {
+      windowStage
+        .getMainWindowSync()
+        .setWindowLayoutFullScreen(true)
+        .catch((error: BusinessError) => {
+          hilog.warn(LOG_DOMAIN, LOG_TAG, "full-screen layout failed: %{public}s", `${error}`);
+        });
+    } catch (error) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, "full-screen layout failed: %{public}s", `${error}`);
+    }
     windowStage.loadContent("pages/Index", (err: BusinessError) => {
       if (err.code) {
         hilog.error(LOG_DOMAIN, LOG_TAG, "loadContent failed: %{public}s", JSON.stringify(err));

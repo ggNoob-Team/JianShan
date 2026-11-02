@@ -447,10 +447,11 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   if (isWeb) {
     themedSidebarChrome = <AppearanceStyleBoundary>{sidebarChrome}</AppearanceStyleBoundary>;
   }
-  const workspaceChromeStyle = useMemo(
-    () => [rowStyle, !isCompactLayout && { paddingLeft: insets.left, paddingRight: insets.right }],
-    [insets.left, insets.right, isCompactLayout],
-  );
+  // The window surface paints edge to edge. Side safe areas belong to the
+  // controls that must stay clear of a cutout or camera, not to the whole
+  // workspace: padding the root here left a full-height strip of window
+  // background beside the content whenever the device reported one.
+  const workspaceChromeStyle = rowStyle;
   const workspaceChrome = (
     <View style={workspaceChromeStyle}>
       <WorkspaceLayoutModePublisher />
