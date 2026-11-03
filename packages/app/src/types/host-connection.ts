@@ -19,6 +19,7 @@ import {
   HostAppearanceSchema,
 } from "@/hosts/appearance";
 import { z } from "zod";
+import { ClientNameSchema, normalizeClientName } from "@getpaseo/protocol/agent-actor";
 
 export { DirectTcpHostConnectionSchema };
 export type DirectTcpHostConnection = Omit<WireDirectTcpHostConnection, "password">;
@@ -70,6 +71,8 @@ export type HostLifecycle = Record<string, never>;
 export interface HostProfile {
   serverId: string;
   password?: string;
+  /** Human-readable name of this device/client within the paired host. */
+  clientName?: string;
   label: string;
   appearance: HostAppearance;
   lifecycle: HostLifecycle;
@@ -202,6 +205,7 @@ function hasProfileChanged(input: {
   password?: string;
   createdAt: string;
   label: string;
+  clientName?: string;
   preferredConnectionId: string;
   lifecycle: HostLifecycle;
   connections: HostConnection[];
@@ -213,6 +217,7 @@ function hasProfileChanged(input: {
     (input.password !== undefined && input.password !== previous.password) ||
     input.createdAt !== previous.createdAt ||
     input.label !== previous.label ||
+    (input.clientName !== undefined && input.clientName !== previous.clientName) ||
     input.preferredConnectionId !== previous.preferredConnectionId ||
     !hostLifecycleEquals(previous.lifecycle, input.lifecycle) ||
     connections.length !== previous.connections.length ||
@@ -227,6 +232,7 @@ export function upsertHostConnectionInProfiles(input: {
   profiles: HostProfile[];
   serverId: string;
   label?: string;
+  clientName?: string;
   connection: HostConnection;
   password?: string;
   now?: string;
@@ -241,6 +247,7 @@ export function upsertHostConnectionInProfiles(input: {
   const normalizedConnection = input.connection;
   const labelTrimmed = input.label?.trim() ?? "";
   const derivedLabel = labelTrimmed || serverId;
+  const clientName = normalizeClientName(input.clientName);
   const existing = input.profiles;
   const matchingIndexes = existing.reduce<number[]>((matches, daemon, index) => {
     if (
@@ -260,6 +267,7 @@ export function upsertHostConnectionInProfiles(input: {
     const profile: HostProfile = {
       serverId,
       ...(password ? { password } : {}),
+      ...(clientName ? { clientName } : {}),
       label: derivedLabel,
       appearance: defaultHostAppearance(),
       lifecycle: defaultLifecycle(),
@@ -279,6 +287,7 @@ export function upsertHostConnectionInProfiles(input: {
   );
   const nextLifecycle = prev.lifecycle;
   const nextLabel = prev.label === prev.serverId ? derivedLabel : prev.label;
+  const nextClientName = clientName ?? prev.clientName;
   const nextPreferredConnectionId =
     prev.preferredConnectionId &&
     nextConnections.some((connection) => connection.id === prev.preferredConnectionId)
@@ -295,6 +304,7 @@ export function upsertHostConnectionInProfiles(input: {
     password,
     createdAt: nextCreatedAt,
     label: nextLabel,
+    clientName,
     preferredConnectionId: nextPreferredConnectionId,
     lifecycle: nextLifecycle,
     connections: nextConnections,
@@ -307,6 +317,7 @@ export function upsertHostConnectionInProfiles(input: {
   const nextProfile: HostProfile = {
     ...prev,
     ...(password ? { password } : {}),
+    ...(nextClientName ? { clientName: nextClientName } : {}),
     serverId,
     label: nextLabel,
     lifecycle: nextLifecycle,
@@ -447,6 +458,7 @@ const StoredHostProfileSchema = z.strictObject({
   serverId: z.string().trim().min(1),
   password: z.string().optional(),
   label: z.string().optional(),
+  clientName: ClientNameSchema.optional(),
   appearance: HostAppearanceSchema.optional(),
   lifecycle: z.strictObject({}).optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),
@@ -546,6 +558,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
   return {
     serverId,
     ...(password ? { password } : {}),
+    ...(record.clientName ? { clientName: record.clientName } : {}),
     label,
     appearance: record.appearance ?? defaultHostAppearance(),
     lifecycle: defaultLifecycle(),

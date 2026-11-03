@@ -20,6 +20,7 @@ import {
 } from "./agent-manager.js";
 import { AgentStorage } from "./agent-storage.js";
 import { InMemoryAgentTimelineStore } from "./agent-timeline-store.js";
+import { FileAgentActorLedger } from "./agent-actor-ledger.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { projectTimelineRows } from "./timeline-projection.js";
 import { getOpenAgentTabLabel, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
@@ -693,6 +694,118 @@ test("uses an injected timeline store without making it a production requirement
     );
   } finally {
     if (agentId) await manager.closeAgent(agentId).catch(() => undefined);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("records the client actor on submitted prompts", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-actor-"));
+  const manager = new AgentManager({ clients: { codex: new TestAgentClient() }, logger });
+  let agentId: string | null = null;
+  try {
+    const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: undefined,
+    });
+    agentId = agent.id;
+    const actor = { clientId: "client-harmony", clientName: "Harmony Emulator" };
+    const run = manager.streamAgent(agent.id, "hello", {
+      clientMessageId: "hello-client",
+      actor,
+    });
+    void (async () => {
+      for await (const _event of run) {
+      }
+    })();
+    await manager.waitForAgentRunStart(agent.id);
+
+    expect(manager.getTimeline(agent.id)).toContainEqual(
+      expect.objectContaining({
+        type: "user_message",
+        text: "hello",
+        clientMessageId: "hello-client",
+        actor,
+      }),
+    );
+  } finally {
+    if (agentId) await manager.closeAgent(agentId).catch(() => undefined);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("restores user message actors after a daemon-style provider history replay", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-actor-replay-"));
+  const ledgerDirectory = join(workdir, "actor-ledger");
+  const agentId = "00000000-0000-4000-8000-000000000402";
+  const actor = { clientId: "client-harmony", clientName: "Harmony Emulator Final" };
+  let firstManager: AgentManager | null = null;
+  let secondManager: AgentManager | null = null;
+  try {
+    firstManager = new AgentManager({
+      clients: { codex: new TestAgentClient() },
+      actorLedger: new FileAgentActorLedger(ledgerDirectory),
+      logger,
+    });
+    await firstManager.createAgent({ provider: "codex", cwd: workdir }, agentId, {
+      workspaceId: undefined,
+    });
+    const run = firstManager.streamAgent(agentId, "restart-safe prompt", {
+      clientMessageId: "restart-message",
+      actor,
+    });
+    void drainAsyncGenerator(run);
+    await firstManager.waitForAgentRunStart(agentId);
+    await firstManager.flush();
+    await firstManager.closeAgent(agentId);
+
+    class ReplayedHistorySession extends TestAgentSession {
+      override async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+        yield {
+          type: "timeline",
+          provider: this.provider,
+          item: { type: "user_message", text: "restart-safe prompt", messageId: "item-1" },
+        };
+        yield {
+          type: "timeline",
+          provider: this.provider,
+          item: { type: "assistant_message", text: "restored" },
+        };
+      }
+    }
+    const replayClient = new (class extends TestAgentClient {
+      override async resumeSession(
+        _handle: AgentPersistenceHandle,
+        config?: Partial<AgentSessionConfig>,
+      ): Promise<AgentSession> {
+        return new ReplayedHistorySession({
+          provider: "codex",
+          cwd: config?.cwd ?? workdir,
+        });
+      }
+    })();
+    secondManager = new AgentManager({
+      clients: { codex: replayClient },
+      actorLedger: new FileAgentActorLedger(ledgerDirectory),
+      logger,
+    });
+    await secondManager.resumeAgentFromPersistence(
+      { provider: "codex", sessionId: "persisted-session" },
+      { cwd: workdir },
+      agentId,
+    );
+    await secondManager.hydrateTimelineFromProvider(agentId);
+
+    expect(secondManager.getTimeline(agentId)).toEqual([
+      {
+        type: "user_message",
+        text: "restart-safe prompt",
+        messageId: "item-1",
+        actor,
+      },
+      { type: "assistant_message", text: "restored" },
+    ]);
+  } finally {
+    if (secondManager) await secondManager.closeAgent(agentId).catch(() => undefined);
+    if (firstManager) await firstManager.closeAgent(agentId).catch(() => undefined);
     rmSync(workdir, { recursive: true, force: true });
   }
 });

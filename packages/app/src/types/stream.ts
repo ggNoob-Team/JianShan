@@ -6,7 +6,11 @@ import type {
   ToolCallDetail,
 } from "@getpaseo/protocol/agent-types";
 import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
-import type { AgentAttachment, AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type {
+  AgentActor,
+  AgentAttachment,
+  AgentStreamEventPayload,
+} from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { extractTaskEntriesFromToolCall } from "../utils/tool-call-parsers";
 
@@ -102,6 +106,7 @@ export interface UserMessageItem {
   timestamp: Date;
   images?: UserMessageImageAttachment[];
   attachments?: AgentAttachment[];
+  actor?: AgentActor;
 }
 
 export interface UserMessageInput {
@@ -114,6 +119,7 @@ export interface UserMessageInput {
   timestamp: Date;
   images?: UserMessageImageAttachment[];
   attachments?: AgentAttachment[];
+  actor?: AgentActor;
 }
 
 export function createUserMessage(input: UserMessageInput): UserMessageItem {
@@ -134,6 +140,7 @@ export function createUserMessage(input: UserMessageInput): UserMessageItem {
     ...(input.attachments && input.attachments.length > 0
       ? { attachments: input.attachments }
       : {}),
+    ...(input.actor ? { actor: input.actor } : {}),
   };
 }
 
@@ -223,6 +230,16 @@ export function upsertUserMessage(
 
 type UserMessagePresentationPolicy = "existing" | "incoming";
 
+function actorsEqual(left: AgentActor | undefined, right: AgentActor | undefined): boolean {
+  return (
+    left === right ||
+    (left !== undefined &&
+      right !== undefined &&
+      left.clientId === right.clientId &&
+      left.clientName === right.clientName)
+  );
+}
+
 interface UserMessageProductionResult {
   items: StreamItem[];
   index: number;
@@ -262,6 +279,7 @@ function produceUserMessage(
     clientMessageId: incoming.clientMessageId ?? existing.clientMessageId,
     messageId: incoming.messageId ?? existing.messageId,
     timelineCursor: incoming.timelineCursor ?? existing.timelineCursor,
+    actor: incoming.actor ?? existing.actor,
   });
   if (
     existing.id === merged.id &&
@@ -271,7 +289,8 @@ function produceUserMessage(
     existing.text === merged.text &&
     existing.timestamp === merged.timestamp &&
     existing.images === merged.images &&
-    existing.attachments === merged.attachments
+    existing.attachments === merged.attachments &&
+    actorsEqual(existing.actor, merged.actor)
   ) {
     return { items, index, message: existing, matched: true };
   }
@@ -909,6 +928,7 @@ function appendUserMessage(
   clientMessageId?: string,
   timelineCursor?: TimelinePosition,
   turnId?: string,
+  actor?: AgentActor,
 ): StreamItem[] {
   const { chunk, hasContent } = normalizeChunk(text);
   if (!hasContent) {
@@ -924,6 +944,7 @@ function appendUserMessage(
     turnId,
     text: chunk,
     timestamp,
+    actor,
   });
   return upsertUserMessage(state, nextItem);
 }
@@ -1532,6 +1553,7 @@ function reduceTimelineEvent(
           item.clientMessageId,
           timelineCursor,
           event.turnId,
+          item.actor,
         ),
       );
     case "assistant_message":
@@ -1905,6 +1927,7 @@ function applyCanonicalUserMessageEvent(params: {
     timelineCursor,
     text: normalized.chunk,
     timestamp,
+    actor: event.item.actor,
   });
   if (unmatchedInsert === "head") {
     const reconciled = upsertUserMessageAcrossStream({

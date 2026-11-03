@@ -510,6 +510,18 @@ function findConnectionById(host: HostProfile, connectionId: string | null): Hos
   return host.connections.find((connection) => connection.id === connectionId) ?? null;
 }
 
+function shouldReactivateActiveConnection(input: {
+  previous: HostConnection | null;
+  next: HostConnection | null;
+  passwordChanged: boolean;
+  clientNameChanged: boolean;
+}): boolean {
+  if (!input.previous || !input.next) {
+    return false;
+  }
+  return !equal(input.previous, input.next) || input.passwordChanged || input.clientNameChanged;
+}
+
 function probeIntervalForConnection(
   firstSeenAt: number,
   isActiveOnline: boolean,
@@ -554,6 +566,7 @@ function createDefaultDeps(
         suppressSendErrors: true,
         clientId,
         clientType: "mobile",
+        ...(host.clientName ? { clientName: host.clientName } : {}),
         appVersion: resolveAppVersion() ?? undefined,
         runtimeGeneration,
         capabilities: appCapabilities,
@@ -627,6 +640,8 @@ function createDefaultDeps(
         const client = new DaemonClient({
           url: "ws://routed-host/ws",
           clientId: crypto.randomUUID(),
+          clientType: "mobile",
+          ...(host.clientName ? { clientName: host.clientName } : {}),
           transportFactory: createHostChannelTransport(
             origin,
             host.serverId,
@@ -647,6 +662,7 @@ function createDefaultDeps(
       return connectToDaemon(connection, {
         ...(host.serverId ? { serverId: host.serverId } : {}),
         ...(host.password ? { password: host.password } : {}),
+        ...(host.clientName ? { clientName: host.clientName } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         capabilities: appCapabilities,
@@ -791,8 +807,15 @@ export class HostRuntimeController {
     });
   }
 
-  async updateHost(host: HostProfile): Promise<void> {
+  async updateHost(
+    host: HostProfile,
+    options?: {
+      initialConnection?: { connectionId: string; existingClient: DaemonClient };
+    },
+  ): Promise<void> {
+    const initialConnection = options?.initialConnection;
     const passwordChanged = this.host.password !== host.password;
+    const clientNameChanged = this.host.clientName !== host.clientName;
     if (passwordChanged) {
       this.probeRequestVersion += 1;
       this.authRejectedConnectionIds.clear();
@@ -802,18 +825,29 @@ export class HostRuntimeController {
     const previousActiveConnection = findConnectionById(this.host, activeConnectionId);
     this.host = host;
     this.trackConnectionFirstSeen();
-    const nextActiveConnection = findConnectionById(this.host, activeConnectionId);
-    if (
-      activeConnectionId &&
-      previousActiveConnection &&
-      nextActiveConnection &&
-      (!equal(previousActiveConnection, nextActiveConnection) || passwordChanged)
-    ) {
-      this.connectionLastProbedAt.delete(activeConnectionId);
-      await this.switchToConnection({ connectionId: activeConnectionId });
+    const activationConnectionId = initialConnection?.connectionId ?? activeConnectionId;
+    const nextActiveConnection = findConnectionById(this.host, activationConnectionId);
+    const shouldActivate =
+      initialConnection !== undefined ||
+      shouldReactivateActiveConnection({
+        previous: previousActiveConnection,
+        next: nextActiveConnection,
+        passwordChanged,
+        clientNameChanged,
+      });
+    if (activationConnectionId && nextActiveConnection && shouldActivate) {
+      this.connectionLastProbedAt.delete(activationConnectionId);
+      await this.switchToConnection({
+        connectionId: activationConnectionId,
+        ...(initialConnection ? { existingClient: initialConnection.existingClient } : {}),
+      });
+    } else if (initialConnection) {
+      await initialConnection.existingClient.close().catch(() => undefined);
     }
-    if (passwordChanged) this.connectionLastProbedAt.clear();
-    if (passwordChanged) await this.probeCycleInFlight;
+    if (passwordChanged) {
+      this.connectionLastProbedAt.clear();
+      await this.probeCycleInFlight;
+    }
     await this.runProbeCycleNow();
   }
 
@@ -2080,6 +2114,7 @@ export class HostRuntimeStore {
     useTls?: boolean;
     daemonPublicKeyB64: string;
     label?: string;
+    clientName?: string;
     password?: string;
   }): Promise<HostProfile> {
     const relayEndpoint = normalizeHostPort(input.relayEndpoint);
@@ -2092,6 +2127,7 @@ export class HostRuntimeStore {
     const profile = await this.upsertHostConnection({
       serverId: input.serverId,
       label: input.label,
+      clientName: input.clientName,
       connection: {
         id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
         type: "relay",
@@ -2192,6 +2228,7 @@ export class HostRuntimeStore {
       useTls: connection.useTls,
       daemonPublicKeyB64: connection.daemonPublicKeyB64,
       label,
+      clientName: offer.clientName,
       password,
     });
   }
@@ -2206,6 +2243,7 @@ export class HostRuntimeStore {
       serverId: offer.serverId,
       ...(password ? { password } : {}),
       label: offer.serverId,
+      ...(offer.clientName ? { clientName: offer.clientName } : {}),
       appearance: defaultHostAppearance(),
       lifecycle: {},
       connections: [connection],
@@ -2344,6 +2382,7 @@ export class HostRuntimeStore {
   private async upsertHostConnection(input: {
     serverId: string;
     label?: string;
+    clientName?: string;
     password?: string;
     connection: HostConnection;
     existingClient?: DaemonClient;
@@ -2353,6 +2392,7 @@ export class HostRuntimeStore {
       profiles: this.hosts,
       serverId: input.serverId,
       label: input.label,
+      clientName: input.clientName,
       connection: input.connection,
       password: input.password,
       now,
@@ -2441,11 +2481,16 @@ export class HostRuntimeStore {
       const initialConnection = options?.initialConnectionByServerId?.get(host.serverId);
       const existing = this.controllers.get(host.serverId);
       if (existing) {
-        void existing.updateHost(host);
-        if (initialConnection) {
-          void existing.activateConnection(initialConnection).catch(() => {
-            void initialConnection.existingClient.close().catch(() => undefined);
+        void existing
+          .updateHost(host, initialConnection ? { initialConnection } : undefined)
+          .catch(() => {
+            if (initialConnection) {
+              void initialConnection.existingClient.close().catch(() => undefined);
+            }
           });
+        if (initialConnection) {
+          // Activation is owned by updateHost so a clientName change cannot race a second switch.
+          continue;
         }
         continue;
       }

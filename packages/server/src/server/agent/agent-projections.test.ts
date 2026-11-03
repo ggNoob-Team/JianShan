@@ -139,6 +139,16 @@ function createFeature(overrides: Partial<AgentFeature> = {}): AgentFeature {
 }
 
 describe("toStoredAgentRecord", () => {
+  it("persists and projects who created the agent", () => {
+    const createdBy = { clientId: "client-harmony", clientName: "Harmony Emulator" };
+    const agent = createManagedAgent({ createdBy });
+    const record = toStoredAgentRecord(agent);
+
+    expect(record.createdBy).toEqual(createdBy);
+    expect(toAgentPayload(agent).createdBy).toEqual(createdBy);
+    expect(buildStoredAgentPayload(record, ["claude"]).createdBy).toEqual(createdBy);
+  });
+
   it("captures lifecycle metadata, config, and persistence", () => {
     const agent = createManagedAgent({
       currentModeId: "focus",

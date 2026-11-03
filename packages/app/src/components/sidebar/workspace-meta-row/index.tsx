@@ -66,17 +66,21 @@ export function WorkspaceMetaRow({
   projectName,
   hostBadge,
   statusEnteredAt = null,
+  createdByName = null,
   prHint,
   serviceSummary,
   labels = EMPTY_LABELS,
+  compact = false,
 }: {
   currentBranch: string | null;
   projectName: string | null;
   hostBadge: HostBadgeModel | null;
   statusEnteredAt?: Date | null;
+  createdByName?: string | null;
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
+  compact?: boolean;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
   const items = selectMetaRowItems({
@@ -84,6 +88,7 @@ export function WorkspaceMetaRow({
     projectName,
     hasHostBadge: hostBadge !== null,
     statusEnteredAt,
+    createdByName,
     prHint,
     serviceSummary,
     labels,
@@ -94,7 +99,7 @@ export function WorkspaceMetaRow({
   if (items.length === 0) return null;
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, compact && styles.rowCompact]}>
       {items.map((item, index) => (
         <Fragment key={item.kind}>
           {index > 0 ? <Text style={styles.separator}>·</Text> : null}
@@ -127,6 +132,9 @@ function MetaItemNode({
   if (item.kind === "timestamp") {
     return <WorkspaceTimestamp enteredAt={item.enteredAt} />;
   }
+  if (item.kind === "creator") {
+    return <WorkspaceCreator name={item.name} />;
+  }
   if (item.kind === "changeRequest") {
     return <PullRequestItem hint={item.hint} />;
   }
@@ -146,6 +154,16 @@ function WorkspaceTimestamp({ enteredAt }: { enteredAt: Date }) {
     <Text style={styles.timestamp} numberOfLines={1} testID="sidebar-workspace-timestamp">
       {label}
     </Text>
+  );
+}
+
+function WorkspaceCreator({ name }: { name: string }) {
+  return (
+    <View style={styles.creatorItem} testID="sidebar-workspace-creator">
+      <Text style={styles.creatorText} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
   );
 }
 
@@ -333,6 +351,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1.5],
     minWidth: 0,
   },
+  rowCompact: {
+    gap: theme.spacing[1],
+  },
   item: {
     flexDirection: "row",
     alignItems: "center",
@@ -362,6 +383,16 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
     lineHeight: 16,
     flexShrink: 0,
+  },
+  creatorItem: {
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  creatorText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 16,
+    flexShrink: 1,
   },
   itemPressed: {
     opacity: 0.82,

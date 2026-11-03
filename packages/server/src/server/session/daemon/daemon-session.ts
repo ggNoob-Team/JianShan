@@ -226,6 +226,7 @@ export class DaemonSession {
         relayPublicUseTls: relay?.publicUseTls,
         appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
         includeQr: true,
+        clientName: msg.clientName,
         logger: this.logger,
       });
       this.host.emit({
@@ -235,6 +236,7 @@ export class DaemonSession {
           url: pairing.url ?? "",
           qr: pairing.qr ?? null,
           relayEnabled: pairing.relayEnabled,
+          ...(pairing.clientName ? { clientName: pairing.clientName } : {}),
         },
       });
     } catch (error) {

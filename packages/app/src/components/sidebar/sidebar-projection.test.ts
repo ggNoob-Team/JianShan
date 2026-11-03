@@ -40,6 +40,7 @@ function makeWorkspace(
     archiveUnpushedCommitCount: null,
     scripts: [],
     hasRunningScripts: false,
+    createdByName: null,
     labels,
   };
   return { placement, entry };

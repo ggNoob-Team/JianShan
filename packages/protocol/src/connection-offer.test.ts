@@ -40,6 +40,21 @@ describe("connection offer", () => {
     expect(parseConnectionOfferFromUrl(`https://app.paseo.sh/#offer=${encoded}`)).toEqual(offer);
   });
 
+  it("round-trips the paired client name", () => {
+    const offer = ConnectionOfferSchema.parse({
+      v: 2,
+      serverId: "server-123",
+      daemonPublicKeyB64: "pubkey",
+      clientName: "Harmony Emulator",
+      relay: { endpoint: "relay.paseo.sh:443" },
+    });
+    const encoded = encodeBase64UrlNoPadUtf8(JSON.stringify(offer));
+
+    expect(parseConnectionOfferFromUrl(`https://app.paseo.sh/#offer=${encoded}`)).toMatchObject({
+      clientName: "Harmony Emulator",
+    });
+  });
+
   it("leaves relay TLS unset when absent", () => {
     expect(
       ConnectionOfferSchema.parse({

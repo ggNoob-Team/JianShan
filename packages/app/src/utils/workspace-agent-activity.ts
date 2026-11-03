@@ -6,6 +6,7 @@ export interface WorkspaceAgentActivity {
   agentId: string;
   status: WorkspaceDescriptor["status"];
   enteredAt: Date | null;
+  createdByName: string | null;
 }
 
 function workspaceAgentStatus(agent: Agent): Agent["status"] {
@@ -43,6 +44,7 @@ export function buildWorkspaceAgentActivityIndex(
       agentId: agent.id,
       status,
       enteredAt,
+      createdByName: agent.createdBy?.clientName ?? null,
     });
   }
 
@@ -50,7 +52,8 @@ export function buildWorkspaceAgentActivityIndex(
     const previousActivity = previous?.get(workspaceId);
     if (
       previousActivity?.agentId === activity.agentId &&
-      previousActivity.status === activity.status
+      previousActivity.status === activity.status &&
+      previousActivity.createdByName === activity.createdByName
     ) {
       activityByWorkspaceId.set(workspaceId, previousActivity);
     }

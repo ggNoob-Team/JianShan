@@ -89,6 +89,38 @@ describe("createSidebarWorkspaceEntry workspace directory label", () => {
   });
 });
 
+describe("createSidebarWorkspaceEntry creator name", () => {
+  it("threads the root agent creator name from workspace activity", () => {
+    const descriptor = workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42");
+    const entry = createSidebarWorkspaceEntry({
+      serverId: "srv",
+      workspace: descriptor,
+      workspaceAgentActivity: new Map([
+        [
+          descriptor.id,
+          {
+            agentId: "agent-1",
+            status: "done",
+            enteredAt: null,
+            createdByName: "Harmony Emulator Final",
+          },
+        ],
+      ]),
+    });
+
+    expect(entry.createdByName).toBe("Harmony Emulator Final");
+  });
+
+  it("leaves the creator name empty when the workspace has no root activity", () => {
+    const entry = createSidebarWorkspaceEntry({
+      serverId: "srv",
+      workspace: workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42"),
+    });
+
+    expect(entry.createdByName).toBeNull();
+  });
+});
+
 interface OrderedItem {
   key: string;
 }

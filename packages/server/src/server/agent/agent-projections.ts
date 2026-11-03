@@ -61,6 +61,12 @@ function normalizeLabels(labels: Record<string, unknown> | undefined): Record<st
   );
 }
 
+function optionalCreatedByFields(
+  createdBy: StoredAgentRecord["createdBy"],
+): Pick<AgentSnapshotPayload, "createdBy"> {
+  return createdBy ? { createdBy } : {};
+}
+
 export function resolveEffectiveThinkingOptionId(options: {
   runtimeInfo?: AgentRuntimeInfo | null;
   configuredThinkingOptionId?: string | null;
@@ -106,6 +112,7 @@ export function toStoredAgentRecord(
       : null,
     internal: options?.internal,
     owner: agent.owner,
+    createdBy: agent.createdBy,
   } satisfies StoredAgentRecord;
 }
 
@@ -149,6 +156,7 @@ export function toAgentPayload(
     labels: agent.labels,
     archivedAt: options?.archivedAt ?? null,
     ...(agent.internal ? { internal: true } : {}),
+    ...(agent.createdBy ? { createdBy: agent.createdBy } : {}),
   };
 
   const usage = sanitizeUsage(agent.lastUsage);
@@ -261,6 +269,7 @@ export function buildStoredAgentPayload(
     labels: normalizeLabels(record.labels),
     ...(typeof record.lastError === "string" ? { lastError: record.lastError } : {}),
     ...(providerAvailable ? {} : { providerUnavailable: true }),
+    ...optionalCreatedByFields(record.createdBy),
   };
 }
 
@@ -283,6 +292,7 @@ export function toAgentListItemPayload(agent: AgentSnapshotPayload): AgentListIt
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp ?? null,
     labels: agent.labels,
+    ...(agent.createdBy ? { createdBy: agent.createdBy } : {}),
     ...(agent.providerUnavailable ? { providerUnavailable: true } : {}),
   };
 }

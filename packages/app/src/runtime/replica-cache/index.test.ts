@@ -152,6 +152,7 @@ function agent(id = "agent-1"): Agent {
         persistence: null,
         title: "Cached agent",
         labels: {},
+        createdBy: { clientId: "client-1", clientName: "Harmony Emulator Final" },
       },
       SERVER_ID,
     ),
@@ -399,10 +400,39 @@ describe("ReplicaCache", () => {
     const restoredTimeline = await reader.readTimeline(SERVER_ID, "agent-1");
 
     expect(restoredDirectory.agents.get("agent-1")?.title).toBe("Cached agent");
+    expect(restoredDirectory.agents.get("agent-1")?.createdBy?.clientName).toBe(
+      "Harmony Emulator Final",
+    );
     expect(restoredDirectory.workspaces.get("workspace-1")?.name).toBe("main");
     expect(restoredDirectory.projects.get("project-1")?.projectDisplayName).toBe("Paseo");
     expect(restoredDirectory.checkpoint).toEqual({ agents: { generation: "g", afterSeq: 12 } });
     expect(restoredTimeline).toEqual(timeline());
+  });
+
+  it("round-trips user message actor metadata", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const value = {
+      ...timeline(),
+      items: [
+        {
+          kind: "user_message" as const,
+          id: "user-message-1",
+          clientMessageId: "client-message-1",
+          text: "Who sent this?",
+          timestamp: new Date("2026-07-18T08:02:00.000Z"),
+          timelineCursor: { epoch: "epoch-1", seq: 12 },
+          actor: {
+            clientId: "client-1",
+            clientName: "Harmony Emulator Final",
+          },
+        },
+      ],
+    };
+    writer.commitTimeline(SERVER_ID, "agent-1", value);
+    await writer.flush();
+
+    expect(await createCache(storage).readTimeline(SERVER_ID, "agent-1")).toEqual(value);
   });
 
   it("preserves pending timeline updates across directory baseline replacement", async () => {

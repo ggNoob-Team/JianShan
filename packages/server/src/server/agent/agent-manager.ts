@@ -19,6 +19,7 @@ import {
 import type { Logger } from "pino";
 import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
 import type { ProviderPaseoToolsPolicy } from "@getpaseo/protocol/provider-config";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import { z } from "zod";
 import type { TerminalManager } from "../../terminal/terminal-manager.js";
 
@@ -68,6 +69,11 @@ import type {
   AgentTimelineRow,
   AgentTimelineStore,
 } from "./agent-timeline-store-types.js";
+import {
+  AgentActorHistoryMatcher,
+  type AgentActorLedger,
+  type RecordAgentActorInput,
+} from "./agent-actor-ledger.js";
 import {
   AGENT_STREAM_COALESCE_DEFAULT_WINDOW_MS,
   AgentStreamCoalescer,
@@ -315,6 +321,7 @@ export interface CreateAgentOptions {
   // undefined is an explicit decision: the agent never appears in the sidebar.
   workspaceId: string | undefined;
   owner?: AgentOwner;
+  createdBy?: AgentActor;
 }
 
 export interface AgentManagerOptions {
@@ -328,6 +335,7 @@ export interface AgentManagerOptions {
   onWorkspaceStateMayHaveChanged?: (params: { cwd: string }) => void;
   timelineStore?: InMemoryAgentTimelineStore;
   durableTimelineStore?: AgentTimelineStore;
+  actorLedger?: AgentActorLedger;
   terminalManager?: TerminalManager | null;
   mcpBaseUrl?: string;
   mcpAuthToken?: string;
@@ -410,6 +418,7 @@ interface ManagedAgentBase {
    */
   workspaceId?: string;
   owner?: AgentOwner;
+  createdBy?: AgentActor;
   capabilities: AgentCapabilityFlags;
   config: AgentSessionConfig;
   runtimeInfo?: AgentRuntimeInfo;
@@ -753,6 +762,7 @@ export class AgentManager {
   private readonly idFactory: () => string;
   private readonly registry?: AgentStorage;
   private readonly durableTimelineStore?: AgentTimelineStore;
+  private readonly actorLedger?: AgentActorLedger;
   private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
@@ -783,6 +793,7 @@ export class AgentManager {
     this.idFactory = options.idFactory ?? (() => randomUUID());
     this.registry = options?.registry;
     this.durableTimelineStore = options?.durableTimelineStore;
+    this.actorLedger = options.actorLedger;
     this.onAgentAttention = options?.onAgentAttention;
     this.onWorkspaceStateMayHaveChanged = options?.onWorkspaceStateMayHaveChanged;
     this.mcpBaseUrl = options?.mcpBaseUrl ?? null;
@@ -1319,6 +1330,7 @@ export class AgentManager {
       initialTitle: options.initialTitle,
       workspaceId: options.workspaceId,
       owner: options.owner,
+      createdBy: options.createdBy,
       historyPrimed: true,
     });
     if (!agent.internal) {
@@ -1350,6 +1362,7 @@ export class AgentManager {
       labels?: Record<string, string>;
       workspaceId?: string;
       owner?: AgentOwner;
+      createdBy?: AgentActor;
       attention?: AttentionState;
     },
     resumeOptions?: AgentResumeSessionOptions,
@@ -1382,6 +1395,7 @@ export class AgentManager {
       labels?: Record<string, string>;
       workspaceId?: string;
       owner?: AgentOwner;
+      createdBy?: AgentActor;
       attention?: AttentionState;
     },
     resumeOptions?: AgentResumeSessionOptions,
@@ -1442,6 +1456,7 @@ export class AgentManager {
     await this.requireExternalMcpSupport(session, storedConfig);
     return this.registerSession(session, storedConfig, resolvedAgentId, {
       ...options,
+      createdBy: options?.createdBy ?? record?.createdBy,
       persistence: handle,
       restoring: true,
     });
@@ -1626,6 +1641,7 @@ export class AgentManager {
         labels: existing.labels,
         workspaceId: existing.workspaceId,
         owner: existing.owner,
+        createdBy: existing.createdBy,
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         lastUserMessageAt: existing.lastUserMessageAt,
@@ -1989,6 +2005,7 @@ export class AgentManager {
         cwd: record.cwd,
         workspaceId: record.workspaceId,
         owner: record.owner,
+        createdBy: record.createdBy,
         session: null,
         capabilities: STORED_AGENT_CAPABILITIES,
         config: buildStoredAgentConfig(record),
@@ -2471,7 +2488,9 @@ export class AgentManager {
       return false;
     }
     if (options?.clientMessageId) {
-      this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted");
+      this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted", {
+        actor: options.actor,
+      });
       this.emitState(agent);
     }
     const dispatch = (event: AgentStreamEvent): void => {
@@ -2571,6 +2590,7 @@ export class AgentManager {
       if (options?.clientMessageId) {
         this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "rejected", {
           messageId: options.clientMessageId,
+          actor: options.actor,
         });
       }
       await this.handleStreamEvent(agent, {
@@ -2665,6 +2685,7 @@ export class AgentManager {
         this.recordSubmittedPrompt(agent, prompt, options.clientMessageId, "accepted", {
           messageId: options.clientMessageId,
           turnId,
+          actor: options.actor,
           providerMessageId:
             stagedSubmittedPromptEcho?.item.type === "user_message"
               ? stagedSubmittedPromptEcho.item.messageId
@@ -2829,7 +2850,13 @@ export class AgentManager {
         expectedTurnId,
       });
       if (admission.status === "accepted") {
-        await this.recordAcceptedSteer(agent, prompt, options?.clientMessageId, expectedTurnId);
+        await this.recordAcceptedSteer(
+          agent,
+          prompt,
+          options?.clientMessageId,
+          expectedTurnId,
+          options?.actor,
+        );
       }
       return admission;
     });
@@ -2859,7 +2886,13 @@ export class AgentManager {
             expectedTurnId,
           });
           if (admission.status === "accepted") {
-            await this.recordAcceptedSteer(agent, prompt, options?.clientMessageId, expectedTurnId);
+            await this.recordAcceptedSteer(
+              agent,
+              prompt,
+              options?.clientMessageId,
+              expectedTurnId,
+              options?.actor,
+            );
           }
           return admission;
         })
@@ -2964,6 +2997,7 @@ export class AgentManager {
     prompt: AgentPromptInput,
     clientMessageId: string | undefined,
     expectedTurnId: string,
+    actor: AgentActor | undefined,
   ): Promise<void> {
     if (!clientMessageId) {
       return;
@@ -2971,6 +3005,7 @@ export class AgentManager {
     this.recordSubmittedPrompt(agent, prompt, clientMessageId, "accepted", {
       messageId: clientMessageId,
       turnId: expectedTurnId,
+      actor,
     });
     this.emitState(agent);
   }
@@ -3315,6 +3350,7 @@ export class AgentManager {
   async deleteAgentState(agentId: string): Promise<void> {
     this.discardRetainedAgentState(agentId);
     await this.deleteCommittedTimeline(agentId);
+    await this.actorLedger?.deleteAgent(agentId);
   }
 
   async deleteCommittedTimeline(agentId: string): Promise<void> {
@@ -3577,6 +3613,7 @@ export class AgentManager {
       publishWhenReady?: boolean;
       workspaceId?: string;
       owner?: AgentOwner;
+      createdBy?: AgentActor;
     },
   ): Promise<ManagedAgent> {
     let registered = false;
@@ -3755,6 +3792,7 @@ export class AgentManager {
           persistence?: AgentPersistenceHandle;
           workspaceId?: string;
           owner?: AgentOwner;
+          createdBy?: AgentActor;
         }
       | undefined;
   }): ActiveManagedAgent {
@@ -3765,6 +3803,7 @@ export class AgentManager {
       cwd: config.cwd,
       workspaceId: options?.workspaceId,
       owner: options?.owner,
+      createdBy: options?.createdBy,
       session,
       capabilities: session.capabilities,
       config,
@@ -4133,11 +4172,12 @@ export class AgentManager {
   ): Promise<void> {
     const historyEvents: Extract<AgentStreamEvent, { type: "timeline" }>[] = [];
     const providerSubagentEvents: Extract<AgentStreamEvent, { type: "provider_subagent" }>[] = [];
+    const actorMatcher = await this.loadAgentActorHistoryMatcher(agent.id);
     for await (const rawEvent of agent.session.streamHistory()) {
       const event = limitAgentStreamEventContent(rawEvent);
       if (event.type === "timeline") {
         for (const item of projectAgentMessages(event.item)) {
-          historyEvents.push({ ...event, item });
+          historyEvents.push({ ...event, item: actorMatcher?.match(item) ?? item });
         }
       } else if (event.type === "provider_subagent") {
         providerSubagentEvents.push(event);
@@ -4190,6 +4230,7 @@ export class AgentManager {
     const historyEvents: Extract<AgentStreamEvent, { type: "timeline" }>[] = [];
     const historySubagentEvents: Extract<AgentStreamEvent, { type: "provider_subagent" }>[] = [];
     agent.historyPrimed = false;
+    const actorMatcher = await this.loadAgentActorHistoryMatcher(agent.id);
     try {
       // Collect the whole replay before touching either store. A stream that fails
       // halfway then leaves the committed timeline as it was, instead of a partial
@@ -4204,7 +4245,7 @@ export class AgentManager {
           continue;
         }
         for (const item of projectAgentMessages(event.item)) {
-          historyEvents.push({ ...event, item });
+          historyEvents.push({ ...event, item: actorMatcher?.match(item) ?? item });
         }
       }
     } catch (error) {
@@ -4806,14 +4847,30 @@ export class AgentManager {
     prompt: AgentPromptInput,
     clientMessageId: string,
     outcome: "accepted" | "rejected",
-    options?: { messageId?: string; providerMessageId?: string; turnId?: string },
+    options?: {
+      messageId?: string;
+      providerMessageId?: string;
+      turnId?: string;
+      actor?: AgentActor;
+    },
   ): void {
     const items = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),
       clientMessageId,
+      ...(options?.actor ? { actor: options.actor } : {}),
       ...(options?.messageId ? { messageId: options.messageId } : {}),
     });
+    if (options?.actor) {
+      this.enqueueAgentActorRecord({
+        agentId: agent.id,
+        clientMessageId,
+        text: submittedPromptText(prompt),
+        actor: options.actor,
+        recordedAt: new Date().toISOString(),
+        ...(options.providerMessageId ? { providerMessageId: options.providerMessageId } : {}),
+      });
+    }
     for (const item of items) {
       // Human attempts stay in history on rejection; delivery notifications require acceptance.
       if (outcome === "rejected" && item.type !== "user_message") continue;
@@ -4863,7 +4920,10 @@ export class AgentManager {
         clientMessageId,
         messageId,
       );
-      if (enriched) this.enqueueDurableTimelineUpdate(agent.id, enriched);
+      if (enriched) {
+        this.enqueueDurableTimelineUpdate(agent.id, enriched);
+        this.enqueueAgentActorProviderMessageId(agent.id, clientMessageId, messageId);
+      }
     }
     return existing;
   }
@@ -5059,6 +5119,46 @@ export class AgentManager {
     this.trackBackgroundTask(task);
   }
 
+  private enqueueAgentActorRecord(input: RecordAgentActorInput): void {
+    if (!this.actorLedger) return;
+    const task = this.actorLedger.record(input).catch((err) => {
+      this.logger.error(
+        { err, agentId: input.agentId, clientMessageId: input.clientMessageId },
+        "Failed to persist user message actor",
+      );
+    });
+    this.trackBackgroundTask(task);
+  }
+
+  private enqueueAgentActorProviderMessageId(
+    agentId: string,
+    clientMessageId: string,
+    providerMessageId: string,
+  ): void {
+    if (!this.actorLedger) return;
+    const task = this.actorLedger
+      .setProviderMessageId(agentId, clientMessageId, providerMessageId)
+      .catch((err) => {
+        this.logger.error(
+          { err, agentId, clientMessageId, providerMessageId },
+          "Failed to persist user message provider id",
+        );
+      });
+    this.trackBackgroundTask(task);
+  }
+
+  private async loadAgentActorHistoryMatcher(
+    agentId: string,
+  ): Promise<AgentActorHistoryMatcher | null> {
+    if (!this.actorLedger) return null;
+    try {
+      return new AgentActorHistoryMatcher(await this.actorLedger.list(agentId));
+    } catch (err) {
+      this.logger.warn({ err, agentId }, "Failed to load user message actor ledger");
+      return null;
+    }
+  }
+
   private trackBackgroundTask(task: Promise<void>): void {
     this.backgroundTasks.add(task);
     void task.finally(() => {
@@ -5107,6 +5207,7 @@ export class AgentManager {
         : [...this.backgroundTasks];
       await Promise.allSettled(pending);
     }
+    await this.actorLedger?.flush().catch(() => undefined);
   }
 
   private broadcastAgentAttention(

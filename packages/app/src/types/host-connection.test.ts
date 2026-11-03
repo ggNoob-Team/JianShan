@@ -50,6 +50,16 @@ describe("orderHostsLocalFirst", () => {
 });
 
 describe("normalizeStoredHostProfile", () => {
+  it("normalizes the paired client name", () => {
+    const profile = normalizeStoredHostProfile({
+      serverId: "srv_named",
+      clientName: "  Harmony Emulator  ",
+      connections: [{ type: "directTcp", endpoint: "localhost:6767" }],
+    });
+
+    expect(profile?.clientName).toBe("Harmony Emulator");
+  });
+
   it("loads direct TCP connections stored before TLS and password fields existed", () => {
     const profile = normalizeStoredHostProfile({
       serverId: "srv_old",
@@ -204,6 +214,28 @@ describe("upsertHostConnectionInProfiles", () => {
     type: "directSocket",
     path: "/tmp/paseo.sock",
   };
+
+  it("keeps the paired client name when a later link omits it", () => {
+    const existing: HostProfile = {
+      ...makeHost("srv_named"),
+      clientName: "Harmony Emulator",
+    };
+
+    const [unchanged] = upsertHostConnectionInProfiles({
+      profiles: [existing],
+      serverId: "srv_named",
+      connection,
+    });
+    expect(unchanged.clientName).toBe("Harmony Emulator");
+
+    const [renamed] = upsertHostConnectionInProfiles({
+      profiles: [existing],
+      serverId: "srv_named",
+      clientName: "Living Room Tablet",
+      connection,
+    });
+    expect(renamed.clientName).toBe("Living Room Tablet");
+  });
 
   it.each([false, true])(
     "keeps destinations distinct when a persisted route shares an origin (C already saved: %s)",

@@ -1,4 +1,6 @@
 import { AgentMessageSchema } from "./agent-message.js";
+import { AgentActorSchema, ClientNameSchema } from "./agent-actor.js";
+export { AgentActorSchema, ClientNameSchema, type AgentActor } from "./agent-actor.js";
 import {
   HostsListRequestSchema,
   HostsAddRequestSchema,
@@ -689,6 +691,7 @@ export const AgentTimelineItemPayloadSchema: z.ZodType<AgentTimelineItem, unknow
     text: z.string(),
     messageId: z.string().optional(),
     clientMessageId: z.string().optional(),
+    actor: AgentActorSchema.optional(),
   }),
   z.object({
     type: z.literal("assistant_message"),
@@ -860,6 +863,7 @@ export const AgentSnapshotPayloadSchema = z.object({
   providerUnavailable: z.boolean().optional(),
   // Private helper marker, retained for exact-ID snapshots and older wire messages.
   internal: z.boolean().optional(),
+  createdBy: AgentActorSchema.optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -883,6 +887,7 @@ export const AgentListItemPayloadSchema = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   labels: z.record(z.string(), z.string()).default({}),
   providerUnavailable: z.boolean().optional(),
+  createdBy: AgentActorSchema.optional(),
 });
 
 export type AgentListItemPayload = z.infer<typeof AgentListItemPayloadSchema>;
@@ -1411,6 +1416,7 @@ export const DaemonGetStatusRequestSchema = z.object({
 export const DaemonGetPairingOfferRequestSchema = z.object({
   type: z.literal("daemon.get_pairing_offer.request"),
   requestId: z.string(),
+  clientName: ClientNameSchema.optional(),
 });
 
 export const DaemonConfigReloadRequestSchema = z.object({
@@ -5654,6 +5660,7 @@ export const DaemonGetPairingOfferResponseSchema = z.object({
       url: z.string(),
       qr: z.string().nullable().optional(),
       relayEnabled: z.boolean(),
+      clientName: ClientNameSchema.optional(),
     })
     .passthrough(),
 });
@@ -8278,6 +8285,7 @@ export const WSHelloMessageSchema = z.object({
     .object({ serverId: z.string().min(1).max(256), sourceId: z.string().min(1).max(1024) })
     .optional(),
   clientId: z.string().min(1),
+  clientName: ClientNameSchema.optional(),
   clientType: z.enum(["mobile", "browser", "cli", "mcp", "hub"]),
   protocolVersion: z.number().int(),
   auth: z

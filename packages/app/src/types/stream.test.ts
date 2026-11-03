@@ -158,6 +158,27 @@ describe("plugin timeline rows", () => {
 });
 
 describe("user message identity", () => {
+  it("keeps the submitting client actor on canonical user messages", () => {
+    const actor = { clientId: "client-harmony", clientName: "Harmony Emulator" };
+    const result = applyStreamEvent({
+      tail: [],
+      head: [],
+      event: {
+        type: "timeline",
+        provider: "codex",
+        item: {
+          type: "user_message",
+          text: "hello",
+          clientMessageId: "hello-client",
+          actor,
+        },
+      },
+      timestamp: new Date("2026-08-15T10:00:00Z"),
+    });
+
+    expect(result.tail[0]).toMatchObject({ kind: "user_message", actor });
+  });
+
   it("replaces provisional optimistic turn membership with canonical membership", () => {
     const optimistic = createUserMessage({
       clientMessageId: "hello-client",

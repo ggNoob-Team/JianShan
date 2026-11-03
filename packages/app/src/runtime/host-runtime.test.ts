@@ -438,8 +438,8 @@ function makeHost(input?: Partial<HostProfile>): HostProfile {
   };
 
   return {
-    serverId: input?.serverId ?? "srv_test",
-    ...(input?.password ? { password: input.password } : {}),
+    serverId: "srv_test",
+    ...input,
     label: input?.label ?? "test host",
     appearance: input?.appearance ?? defaultHostAppearance(),
     lifecycle: input?.lifecycle ?? {},
@@ -783,6 +783,39 @@ describe("HostRuntimeController", () => {
     );
 
     expect(createdClients.map((entry) => entry.connection)).toEqual([oldRelay, newRelay]);
+    expect(createdClients[0]?.client.isDisposed()).toBe(true);
+    expect(controller.getSnapshot().client).toBe(createdClients[1]?.client);
+  });
+
+  it("replaces the active client when re-pairing changes the client name", async () => {
+    const host = makeHost({ clientName: "Old client name" });
+    const createdClients: Array<{ client: FakeDaemonClient; clientName: string | undefined }> = [];
+    const controller = new HostRuntimeController({
+      host,
+      deps: {
+        createClient: ({ host: currentHost }) => {
+          const client = new FakeDaemonClient();
+          createdClients.push({ client, clientName: currentHost.clientName });
+          return client as unknown as DaemonClient;
+        },
+        connectToDaemon: async () => ({
+          client: makeConnectedProbeClient(5) as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: null,
+        }),
+        getClientId: async () => "cid_test_runtime",
+      },
+    });
+
+    await controller.activateConnection({ connectionId: host.connections[0]!.id });
+    expect(createdClients.map((entry) => entry.clientName)).toEqual(["Old client name"]);
+
+    await controller.updateHost(makeHost({ clientName: "Harmony Emulator Final" }));
+
+    expect(createdClients.map((entry) => entry.clientName)).toEqual([
+      "Old client name",
+      "Harmony Emulator Final",
+    ]);
     expect(createdClients[0]?.client.isDisposed()).toBe(true);
     expect(controller.getSnapshot().client).toBe(createdClients[1]?.client);
   });

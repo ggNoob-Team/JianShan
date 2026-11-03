@@ -163,6 +163,7 @@ interface WebSocketConnectionIdentity {
   relayConnectionId?: string;
   hubDaemonId?: string;
   clientId?: string;
+  clientName?: string;
   sessionId?: string;
   appVersion?: string;
 }
@@ -478,6 +479,7 @@ type SessionConnection = ReconnectableSessionConnection | PluginSessionConnectio
 interface SocketSessionOptions {
   sourceId?: string;
   clientId: string;
+  clientName?: string;
   appVersion: string | null;
   clientCapabilities: Record<string, unknown> | null;
   permissions: readonly DaemonPermission[];
@@ -1482,18 +1484,28 @@ export class VoiceAssistantWebSocketServer {
   private createSessionConnection(params: {
     ws: WebSocketLike;
     clientId: string;
+    clientName?: string;
     appVersion: string | null;
     clientCapabilities: Record<string, unknown> | null;
     connectionLogger: pino.Logger;
     lifecycle: { kind: "reconnectable" } | { kind: "ephemeral-plugin"; pluginId: string };
     admission: SessionAdmission;
   }): SessionConnection {
-    const { ws, clientId, appVersion, clientCapabilities, connectionLogger, lifecycle, admission } =
-      params;
+    const {
+      ws,
+      clientId,
+      clientName,
+      appVersion,
+      clientCapabilities,
+      connectionLogger,
+      lifecycle,
+      admission,
+    } = params;
     let connection: SessionConnection | null = null;
 
     const session = this.createSocketSession({
       clientId,
+      clientName,
       appVersion,
       clientCapabilities,
       permissions: admission.permissions,
@@ -1584,6 +1596,7 @@ export class VoiceAssistantWebSocketServer {
       sourceId: options.sourceId,
       browserToolsBroker: this.browserToolsBroker,
       clientId: options.clientId,
+      clientName: options.clientName,
       appVersion: options.appVersion,
       clientCapabilities: options.clientCapabilities,
       permissions: options.permissions,
@@ -1749,6 +1762,7 @@ export class VoiceAssistantWebSocketServer {
       };
     pending.admission = admitted;
     pending.identity.clientId = clientId;
+    pending.identity.clientName = message.clientName;
     if (message.appVersion) {
       pending.identity.appVersion = message.appVersion;
     }
@@ -1764,6 +1778,7 @@ export class VoiceAssistantWebSocketServer {
     const connection = this.createSessionConnection({
       ws,
       clientId,
+      clientName: message.clientName,
       appVersion: message.appVersion ?? null,
       clientCapabilities: message.capabilities ?? null,
       connectionLogger,
@@ -1895,6 +1910,7 @@ export class VoiceAssistantWebSocketServer {
     existing.permissionCeiling = message.sessionPermissions;
     existing.session.setPermissions(pending.admission!.permissions);
     existing.session.setRouted(message.routed === true);
+    existing.session.updateClientName(message.clientName);
     this.assignHostSource(existing, message, pending.admission!.principalId);
     const newAppVersion = message.appVersion ?? null;
     if (newAppVersion && newAppVersion !== existing.appVersion) {
@@ -3043,6 +3059,7 @@ function toConnectionLogFields(identity: WebSocketConnectionIdentity): Record<st
     ...(identity.relayConnectionId ? { relayConnectionId: identity.relayConnectionId } : {}),
     ...(identity.hubDaemonId ? { hubDaemonId: identity.hubDaemonId } : {}),
     ...(identity.clientId ? { clientId: identity.clientId } : {}),
+    ...(identity.clientName ? { clientName: identity.clientName } : {}),
     ...(identity.sessionId ? { sessionId: identity.sessionId } : {}),
     ...(identity.appVersion ? { appVersion: identity.appVersion } : {}),
   };

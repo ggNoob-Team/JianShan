@@ -4,6 +4,7 @@ interface PairingInstructions {
   url: string;
   qr: string | null;
   connectionUri?: string | null;
+  clientName?: string;
   columns?: number;
 }
 
@@ -50,6 +51,7 @@ export function formatPairingInstructions({
   qr,
   columns,
   connectionUri,
+  clientName,
 }: PairingInstructions): string {
-  return `\nScan to pair:\n${formatQr(qr, columns)}\n\nPairing link:\n${url}${connectionUri ? `\n\nConnection URI:\n${redactConnectionUri(connectionUri)}` : ""}\n\nTreat this pairing link like a password. Anyone with it can access this daemon.\n`;
+  return `\nScan to pair${clientName ? ` as ${clientName}` : ""}:\n${formatQr(qr, columns)}\n\nPairing link:\n${url}${connectionUri ? `\n\nConnection URI:\n${redactConnectionUri(connectionUri)}` : ""}\n\nTreat this pairing link like a password. Anyone with it can access this daemon.\n`;
 }

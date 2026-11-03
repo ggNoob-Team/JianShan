@@ -14,6 +14,7 @@ function agent(input: {
   pendingPermissionCount?: number;
   archivedAt?: string | null;
   parentAgentId?: string | null;
+  createdBy?: Agent["createdBy"];
 }): Agent {
   return {
     serverId: "host-a",
@@ -60,6 +61,7 @@ function agent(input: {
     attentionReason: input.attentionReason,
     attentionTimestamp: input.attentionTimestamp ? new Date(input.attentionTimestamp) : null,
     archivedAt: input.archivedAt ? new Date(input.archivedAt) : null,
+    createdBy: input.createdBy,
     parentAgentId: input.parentAgentId ?? null,
     labels: {},
   };
@@ -120,6 +122,7 @@ describe("workspace agent activity index", () => {
             workspaceId: "workspace-a",
             updatedAt: "2026-06-01T10:01:00.000Z",
             pendingPermissionCount: 1,
+            createdBy: { clientId: "client-harmony", clientName: "Harmony Emulator" },
           }),
         ],
         [
@@ -144,6 +147,7 @@ describe("workspace agent activity index", () => {
             agentId: "permission",
             status: "needs_input",
             enteredAt: new Date("2026-06-01T10:01:00.000Z"),
+            createdByName: "Harmony Emulator",
           },
         ],
         [
@@ -152,6 +156,7 @@ describe("workspace agent activity index", () => {
             agentId: "attention",
             status: "attention",
             enteredAt: new Date("2026-06-01T10:02:00.000Z"),
+            createdByName: null,
           },
         ],
       ]),
@@ -198,6 +203,7 @@ describe("workspace agent activity index", () => {
       agentId: "root",
       status: "running",
       enteredAt: new Date("2026-06-01T10:00:00.000Z"),
+      createdByName: null,
     });
   });
 
@@ -233,6 +239,7 @@ describe("workspace agent activity index", () => {
             agentId: "parent",
             status: "done",
             enteredAt: new Date("2026-06-01T10:00:00.000Z"),
+            createdByName: null,
           },
         ],
         [
@@ -241,6 +248,7 @@ describe("workspace agent activity index", () => {
             agentId: "child",
             status: "running",
             enteredAt: new Date("2026-06-01T10:03:00.000Z"),
+            createdByName: null,
           },
         ],
       ]),
@@ -317,6 +325,7 @@ describe("workspace agent activity index", () => {
       agentId: "root",
       status: "needs_input",
       enteredAt: new Date("2026-06-01T10:05:00.000Z"),
+      createdByName: null,
     });
   });
 });

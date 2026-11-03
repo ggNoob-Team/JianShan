@@ -32,6 +32,7 @@ import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { useTargetAgentTitle } from "@/tool-calls/use-target-agent-title";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import type { AgentMessage } from "@getpaseo/protocol/agent-message";
 import type { AgentCapabilityFlags, ToolCallDetail } from "@getpaseo/protocol/agent-types";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
@@ -100,6 +101,7 @@ interface UserMessageProps {
   images?: UserMessageImageAttachment[];
   attachments?: AgentAttachment[];
   timestamp: number;
+  actor?: AgentActor;
   capabilities?: AgentCapabilityFlags;
   client?: DaemonClient | null;
   isFirstInGroup?: boolean;
@@ -367,9 +369,15 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
   trailingRowVisible: {
     opacity: 1,
   },
+  actorText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: STREAM_METADATA_FONT_SIZE,
+    flexShrink: 1,
+  },
   timestampText: {
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
+    flexShrink: 0,
   },
 }));
 
@@ -400,6 +408,7 @@ export const UserMessage = memo(function UserMessage({
   images = [],
   attachments = [],
   timestamp,
+  actor,
   capabilities,
   client,
   isFirstInGroup = true,
@@ -524,6 +533,15 @@ export const UserMessage = memo(function UserMessage({
             pointerEvents={showTrailingRow ? "auto" : "none"}
             testID="user-message-trailing-row"
           >
+            {actor?.clientName ? (
+              <Text
+                style={userMessageStylesheet.actorText}
+                numberOfLines={1}
+                testID="user-message-actor"
+              >
+                {actor.clientName}
+              </Text>
+            ) : null}
             <Text style={userMessageStylesheet.timestampText} testID="user-message-timestamp">
               {formattedTimestamp}
             </Text>

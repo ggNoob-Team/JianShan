@@ -30,12 +30,22 @@ function createSnapshot(
     availableModes: input.availableModes ?? [],
     pendingPermissions: input.pendingPermissions ?? [],
     persistence: input.persistence ?? null,
+    createdBy: input.createdBy,
     title: input.title ?? null,
     labels: (input.labels ?? {}) as AgentSnapshotPayload["labels"],
   };
 }
 
 describe("normalizeAgentSnapshot", () => {
+  it("round-trips the client that created the agent", () => {
+    const createdBy = { clientId: "client-harmony", clientName: "Harmony Emulator" };
+    const snapshot = createSnapshot({ createdBy });
+
+    expect(projectAgentSnapshot(normalizeAgentSnapshot(snapshot, "server-1"))).toMatchObject({
+      createdBy,
+    });
+  });
+
   it("round-trips identified active turns through the canonical snapshot boundary", () => {
     const snapshot = createSnapshot({
       status: "running",

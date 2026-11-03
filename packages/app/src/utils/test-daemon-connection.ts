@@ -43,6 +43,12 @@ const defaultDaemonConnectionDependencies: DaemonConnectionDependencies<DaemonCl
   createClient: (config) => new DaemonClient(config),
 };
 
+function optionalClientNameFields(
+  clientName: DaemonClientConfig["clientName"],
+): Pick<DaemonClientConfig, "clientName"> {
+  return clientName ? { clientName } : {};
+}
+
 function buildRemoteSshClientConfig(input: {
   connection: Extract<HostConnection, { type: "remoteSsh" }>;
   base: Omit<DaemonClientConfig, "url">;
@@ -136,6 +142,7 @@ export async function buildClientConfig(
     capabilities?: DaemonClientConfig["capabilities"];
     trace?: DaemonClientConfig["trace"];
     password?: string;
+    clientName?: DaemonClientConfig["clientName"];
     localCredential?: DaemonClientConfig["localCredential"];
   },
   deps: Pick<
@@ -153,6 +160,7 @@ export async function buildClientConfig(
   const base = {
     clientId,
     clientType: "mobile" as const,
+    ...optionalClientNameFields(options?.clientName),
     appVersion: deps.resolveAppVersion() ?? undefined,
     suppressSendErrors: true,
     reconnect: { enabled: false },
@@ -281,6 +289,7 @@ interface ProbeOptions {
   serverId?: string;
   timeoutMs?: number;
   password?: string;
+  clientName?: DaemonClientConfig["clientName"];
   localCredential?: DaemonClientConfig["localCredential"];
   capabilities?: DaemonClientConfig["capabilities"];
   trace?: DaemonClientConfig["trace"];

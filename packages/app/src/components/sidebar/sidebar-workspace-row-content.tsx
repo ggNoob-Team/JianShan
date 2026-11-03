@@ -179,9 +179,11 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
             projectName={leadingProjectName}
             hostBadge={hostBadge ?? null}
             statusEnteredAt={statusEnteredAt}
+            createdByName={workspace.createdByName}
             prHint={workspace.prHint}
             serviceSummary={serviceSummary}
             labels={labels}
+            compact
           />
         </View>
       </View>

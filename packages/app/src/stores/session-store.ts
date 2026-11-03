@@ -33,6 +33,7 @@ import type {
   AgentUsage,
   AgentPersistenceHandle,
 } from "@getpaseo/protocol/agent-types";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import type {
   ServerInfoStatusPayload,
   ProjectPlacementPayload,
@@ -97,6 +98,7 @@ export interface Agent {
   attentionReason?: "finished" | "error" | "permission" | null;
   attentionTimestamp?: Date | null;
   archivedAt?: Date | null;
+  createdBy?: AgentActor;
   parentAgentId: string | null;
   labels: Record<string, string>;
   projectPlacement?: ProjectPlacementPayload | null;

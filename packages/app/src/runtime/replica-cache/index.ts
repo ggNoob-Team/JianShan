@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  AgentActorSchema,
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
   WorkspaceGitHubRuntimePayloadSchema,
@@ -117,6 +118,8 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
     kind: z.literal("user_message"),
     clientMessageId: z.string().optional(),
     messageId: z.string().optional(),
+    // COMPAT(user-message-actor): absent on caches written before actor metadata.
+    actor: AgentActorSchema.optional(),
     text: z.string(),
   }),
   z.strictObject({
@@ -250,6 +253,8 @@ const StoredAgentSnapshotSchema = z.strictObject({
   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
   attentionTimestamp: IsoDateSchema.nullable().optional(),
   archivedAt: IsoDateSchema.nullable().optional(),
+  // COMPAT(agent-created-by): absent on caches written before creator metadata.
+  createdBy: AgentActorSchema.optional(),
 });
 
 const StoredAgentSchema = z.strictObject({
@@ -445,6 +450,7 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
+        ...(item.actor ? { actor: item.actor } : {}),
         text: item.text,
       };
     case "assistant_message":
@@ -537,6 +543,7 @@ function deserializeBuiltinTimelineItem(
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
+        ...(item.actor ? { actor: item.actor } : {}),
         text: item.text,
       };
     case "assistant_message":
@@ -611,6 +618,12 @@ function serializeAgentTurn(agent: Agent): NonNullable<StoredAgent["turn"]> {
   };
 }
 
+function optionalCreatedByFields(
+  createdBy: Agent["createdBy"],
+): Pick<NonNullable<StoredAgent["snapshot"]>, "createdBy"> {
+  return createdBy ? { createdBy } : {};
+}
+
 function serializeAgent(agent: Agent): StoredAgent {
   const snapshot = {
     id: agent.id,
@@ -662,6 +675,7 @@ function serializeAgent(agent: Agent): StoredAgent {
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
+    ...optionalCreatedByFields(agent.createdBy),
   };
   return {
     snapshot,

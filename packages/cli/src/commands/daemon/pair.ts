@@ -1,5 +1,5 @@
 import { confirm, isCancel, log } from "@clack/prompts";
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 import chalk from "chalk";
 import { generateLocalPairingOffer } from "@getpaseo/server/pairing";
 import { readDaemonInstance } from "@getpaseo/server/daemon-control";
@@ -14,12 +14,14 @@ import { addJsonAndDaemonHostOptions, withGlobalOptions } from "../../utils/comm
 import { formatPairingInstructions } from "../../output/pairing.js";
 import { parseConnectionOfferFromUrl } from "@getpaseo/protocol/connection-offer";
 import { serializeRelayConnectionUri } from "@getpaseo/protocol/daemon-endpoints";
+import { MAX_CLIENT_NAME_LENGTH, normalizeClientName } from "@getpaseo/protocol/agent-actor";
 
 interface PairOptions {
   daemonTarget: DaemonTarget;
   home?: string;
   json?: boolean;
   relay?: boolean;
+  name?: string;
 }
 
 export interface PairCommandOutput {
@@ -34,10 +36,37 @@ export interface PairingOffer {
   relayEnabled: boolean;
   url: string | null;
   qr: string | null;
+  clientName?: string;
 }
 
 const PAIRING_DAEMON_RPC_TIMEOUT_MS = 1500;
 const RELAY_DOCS_URL = "https://paseo.sh/docs/security";
+
+function parseClientName(value: string): string {
+  const name = normalizeClientName(value);
+  if (!name) {
+    throw new InvalidArgumentError("Client name must not be empty.");
+  }
+  if (name.length > MAX_CLIENT_NAME_LENGTH) {
+    throw new InvalidArgumentError(
+      `Client name must be at most ${MAX_CLIENT_NAME_LENGTH} characters.`,
+    );
+  }
+  return name;
+}
+
+function rejectRemovedNameFlagArgs(argv: string[]): string[] {
+  if (argv.some((arg) => arg === "-name" || arg.startsWith("-name="))) {
+    throw new InvalidArgumentError('Use "-n <name>" or "--name <name>".');
+  }
+  return argv;
+}
+
+class PairCommand extends Command {
+  override parseOptions(argv: string[]): ReturnType<Command["parseOptions"]> {
+    return super.parseOptions(rejectRemovedNameFlagArgs(argv));
+  }
+}
 
 function createProcessOutput(): PairCommandOutput {
   return {
@@ -59,9 +88,10 @@ function createProcessOutput(): PairCommandOutput {
 
 export function pairCommand(): Command {
   return addJsonAndDaemonHostOptions(
-    new Command("pair").description("Print the daemon pairing QR code and link"),
+    new PairCommand("pair").description("Print the daemon pairing QR code and link"),
   )
     .option("--relay", "Enable relay without prompting")
+    .option("-n, --name <name>", "Name the client receiving this pairing link", parseClientName)
     .action(
       withGlobalOptions((options: PairOptions, _command: Command) => runPairCommand(options)),
     );
@@ -70,12 +100,14 @@ export function pairCommand(): Command {
 export async function resolveLocalPairingOffer(options: {
   paseoHome: string;
   enableRelay?: boolean;
+  clientName?: string;
 }): Promise<PairingOffer> {
   const instance = await readDaemonInstance(options.paseoHome);
   if (instance)
     return resolveDaemonPairingOffer(
       { kind: "instance", home: options.paseoHome },
       options.enableRelay,
+      options.clientName,
     );
   if (options.enableRelay)
     editPersistedConfig(options.paseoHome, "daemon.relay.enabled", { value: true });
@@ -94,12 +126,14 @@ export async function resolveLocalPairingOffer(options: {
     relayPublicUseTls: config.relayPublicUseTls,
     appBaseUrl: config.appBaseUrl,
     includeQr: true,
+    clientName: options.clientName,
   });
 }
 
 async function resolveDaemonPairingOffer(
   target: DaemonTarget,
   enableRelay: boolean | undefined,
+  clientName: string | undefined,
 ): Promise<PairingOffer> {
   const client = await connectToDaemon({
     target,
@@ -114,6 +148,7 @@ async function resolveDaemonPairingOffer(
 
     let offer = await client.getDaemonPairingOffer({
       timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
+      clientName,
     });
     if (!offer.relayEnabled && enableRelay) {
       if (serverInfo.features.relayConfig !== true) {
@@ -121,7 +156,10 @@ async function resolveDaemonPairingOffer(
       }
       await client.patchDaemonConfig({ relay: { enabled: true } });
       try {
-        offer = await client.getDaemonPairingOffer({ timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS });
+        offer = await client.getDaemonPairingOffer({
+          timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
+          clientName,
+        });
       } catch (error) {
         throw new Error(
           `Relay configuration was saved, but fetching the pairing offer failed: ${String(error)}`,
@@ -133,6 +171,7 @@ async function resolveDaemonPairingOffer(
       relayEnabled: offer.relayEnabled,
       url: offer.url || null,
       qr: offer.qr ?? null,
+      clientName: offer.clientName,
     };
   } finally {
     await client.close().catch(() => undefined);
@@ -162,8 +201,8 @@ export async function runPairCommand(options: PairOptions): Promise<void> {
   const target = options.daemonTarget;
   const resolveOffer = (enableRelay: boolean) =>
     target.kind === "instance"
-      ? resolveLocalPairingOffer({ paseoHome: target.home, enableRelay })
-      : resolveDaemonPairingOffer(target, enableRelay);
+      ? resolveLocalPairingOffer({ paseoHome: target.home, enableRelay, clientName: options.name })
+      : resolveDaemonPairingOffer(target, enableRelay, options.name);
   const offline = target.kind === "instance" && !(await readDaemonInstance(target.home));
   const pairing = await resolveOffer(options.relay === true);
 
@@ -199,11 +238,18 @@ function outputPairingResult(
 
   const offer = parseConnectionOfferFromUrl(pairing.url);
   const connectionUri = offer ? serializeRelayConnectionUri({ offer }) : null;
+  const clientName = offer?.clientName ?? pairing.clientName;
 
   if (options.json) {
     output.writeStdout(
       `${JSON.stringify(
-        { relayEnabled: pairing.relayEnabled, url: pairing.url, qr: pairing.qr, connectionUri },
+        {
+          relayEnabled: pairing.relayEnabled,
+          url: pairing.url,
+          qr: pairing.qr,
+          connectionUri,
+          clientName,
+        },
         null,
         2,
       )}\n`,
@@ -216,6 +262,7 @@ function outputPairingResult(
       url: pairing.url,
       qr: pairing.qr,
       connectionUri,
+      clientName,
       columns: output.columns,
     }),
   );

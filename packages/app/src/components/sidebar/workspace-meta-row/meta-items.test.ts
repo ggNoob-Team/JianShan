@@ -25,6 +25,7 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
     projectName: "Paseo",
     hasHostBadge: true,
     statusEnteredAt: null,
+    createdByName: null,
     prHint: PR_HINT,
     serviceSummary: SERVICE,
     labels: LABELS,
@@ -65,6 +66,21 @@ describe("selectMetaRowItems", () => {
       "labels",
     ]);
     expect(items[1]).toEqual({ kind: "timestamp", enteredAt: STATUS_ENTERED_AT });
+  });
+
+  it("puts the creator name after the host and timestamp", () => {
+    const items = select({
+      statusEnteredAt: STATUS_ENTERED_AT,
+      createdByName: "Harmony Emulator Final",
+    });
+
+    expect(kinds(items).slice(0, 4)).toEqual(["host", "timestamp", "creator", "changeRequest"]);
+    expect(items[2]).toEqual({ kind: "creator", name: "Harmony Emulator Final" });
+  });
+
+  it("shows a creator without a timestamp", () => {
+    const items = select({ createdByName: "Harmony Emulator Final" });
+    expect(kinds(items).slice(0, 2)).toEqual(["host", "creator"]);
   });
 
   it("uses the host position for the timestamp when the host is hidden", () => {

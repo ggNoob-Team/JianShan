@@ -49,6 +49,7 @@ import {
   type ProjectPlacementPayload,
   type WorkspaceSetupSnapshot,
   type WorkspaceDescriptorPayload,
+  type AgentActor,
 } from "./messages.js";
 import type {
   TerminalManager,
@@ -465,6 +466,7 @@ export interface SessionOptions {
   routed?: boolean;
   browserToolsBroker?: BrowserToolsBroker | null;
   clientId: string;
+  clientName?: string;
   permissions: readonly DaemonPermission[];
   appVersion?: string | null;
   clientCapabilities?: Record<string, unknown> | null;
@@ -749,6 +751,7 @@ export class Session {
   );
   private readonly browserToolsBroker: SessionOptions["browserToolsBroker"];
   private readonly clientId: string;
+  private clientName: string | null;
   private readonly authorization: SessionAuthorization;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
@@ -859,6 +862,7 @@ export class Session {
   constructor(options: SessionOptions) {
     const {
       clientId,
+      clientName,
       permissions,
       appVersion,
       clientCapabilities,
@@ -917,6 +921,7 @@ export class Session {
     } = options;
     this.browserToolsBroker = options.browserToolsBroker;
     this.clientId = clientId;
+    this.clientName = normalizeSessionClientName(clientName);
     this.authorization = new SessionAuthorization(permissions);
 
     this.appVersion = appVersion ?? null;
@@ -944,11 +949,9 @@ export class Session {
     this.worktreesRoot = worktreesRoot;
     this.pluginRuntime = pluginRuntime;
     this.orchestrationSkills = orchestrationSkills;
-    this.sessionLogger = logger.child({
-      module: "session",
-      clientId: this.clientId,
-      sessionId: this.sessionId,
-    });
+    this.sessionLogger = logger.child(
+      sessionLogContext(this.clientId, this.clientName, this.sessionId),
+    );
     this.workspaceFilesSession = new WorkspaceFilesSession({
       host: {
         emit: (msg, source) => this.emitForSource(msg, source),
@@ -1316,6 +1319,17 @@ export class Session {
     if (appVersion && appVersion !== this.appVersion) {
       this.appVersion = appVersion;
     }
+  }
+
+  updateClientName(clientName: string | undefined): void {
+    this.clientName = clientName ?? null;
+  }
+
+  private currentActor(): AgentActor {
+    return {
+      clientId: this.clientId,
+      ...(this.clientName ? { clientName: this.clientName } : {}),
+    };
   }
 
   updateClientCapabilities(
@@ -4244,7 +4258,10 @@ export class Session {
         agentId,
         prompt,
         messageId,
-        runOptions,
+        runOptions: {
+          ...runOptions,
+          actor: this.currentActor(),
+        },
         // A typed or spoken message from the human answers any permission the
         // agent is blocked on.
         clearPendingPermissions: true,
@@ -4686,6 +4703,7 @@ export class Session {
           env,
           provisionalTitle,
           firstAgentContext,
+          actor: this.currentActor(),
         },
       );
       createdAgentId = snapshot.id;
@@ -8866,6 +8884,7 @@ export class Session {
           activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt",
           sessionMode: msg.sessionMode,
           clearPendingPermissions: true,
+          runOptions: { actor: this.currentActor() },
           logger: this.sessionLogger,
         });
         if (result.disposition === "turn_started") {
@@ -9426,4 +9445,17 @@ function createHostSession(options: SessionOptions, session: Session): Connected
 
 function hostSource(options: SessionOptions): string {
   return options.sourceId ?? "owner";
+}
+
+function normalizeSessionClientName(clientName: string | undefined): string | null {
+  return clientName ?? null;
+}
+
+function sessionLogContext(clientId: string, clientName: string | null, sessionId: string) {
+  return {
+    module: "session",
+    clientId,
+    ...(clientName ? { clientName } : {}),
+    sessionId,
+  };
 }

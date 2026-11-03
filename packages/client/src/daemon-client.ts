@@ -412,6 +412,8 @@ export interface DaemonClientConfig {
   sessionPermissions?: import("@getpaseo/protocol/messages").DaemonPermission[];
   url: string;
   clientId: string;
+  /** Human-readable client name for display and audit metadata, never authentication. */
+  clientName?: string;
   clientType?: "mobile" | "browser" | "cli" | "mcp" | "hub";
   appVersion?: string;
   runtimeGeneration?: number | null;
@@ -816,6 +818,7 @@ export interface DaemonStatusOptions {
 export interface DaemonPairingOfferOptions {
   requestId?: string;
   timeout?: number;
+  clientName?: string;
 }
 type DaemonUpdateResponse = z.infer<typeof DaemonUpdateResponseSchema>;
 type FetchAgentsPayload = Extract<
@@ -6174,6 +6177,7 @@ export class DaemonClient {
       requestId: options?.requestId,
       message: {
         type: "daemon.get_pairing_offer.request",
+        ...(options?.clientName ? { clientName: options.clientName } : {}),
       },
       responseType: "daemon.get_pairing_offer.response",
       timeout: options?.timeout,
@@ -7395,6 +7399,7 @@ export class DaemonClient {
           ? { sessionPermissions: this.config.sessionPermissions }
           : {}),
         clientId: this.config.clientId,
+        ...(this.config.clientName ? { clientName: this.config.clientName } : {}),
         clientType: this.config.clientType ?? "cli",
         protocolVersion: 1,
         ...(auth ? { auth } : {}),

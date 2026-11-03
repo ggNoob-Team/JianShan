@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ClientNameSchema } from "./agent-actor.js";
+
 /**
  * Relay-only pairing offer.
  *
@@ -10,6 +12,7 @@ export const ConnectionOfferV2Schema = z.object({
   v: z.literal(2),
   serverId: z.string().min(1),
   daemonPublicKeyB64: z.string().min(1),
+  clientName: ClientNameSchema.optional(),
   relay: z.object({
     endpoint: z.string().min(1),
     useTls: z.boolean().optional(),
