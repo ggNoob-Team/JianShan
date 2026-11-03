@@ -1039,6 +1039,42 @@ export class AgentManager {
     return retired;
   }
 
+  /**
+   * Agents created before creator metadata existed have no `createdBy`. Attribute those
+   * legacy records to the first named actor in their durable message ledger. A known
+   * creator is never overwritten; agents without any named message history are skipped.
+   */
+  async backfillMissingCreatedByFromActorLedger(): Promise<number> {
+    const registry = this.registry;
+    const actorLedger = this.actorLedger;
+    if (!registry || !actorLedger) {
+      return 0;
+    }
+
+    let backfilled = 0;
+    for (const record of await registry.list()) {
+      if (record.createdBy || record.internal) {
+        continue;
+      }
+      try {
+        const actor = (await actorLedger.list(record.id)).find(
+          (entry) => entry.actor.clientName,
+        )?.actor;
+        if (!actor) {
+          continue;
+        }
+        await registry.upsert({ ...record, createdBy: actor });
+        backfilled += 1;
+      } catch (error) {
+        this.logger.warn(
+          { err: error, agentId: record.id },
+          "Failed to backfill legacy agent creator",
+        );
+      }
+    }
+    return backfilled;
+  }
+
   async listImportableSessions(
     options?: ImportablePersistedAgentQueryOptions,
   ): Promise<ManagedImportableSessionsResult> {
@@ -4854,6 +4890,11 @@ export class AgentManager {
       actor?: AgentActor;
     },
   ): void {
+    // Legacy agents have no creator. The first accepted named prompt supplies it without
+    // another ledger read; callers emit the resulting agent state so it is persisted.
+    if (outcome === "accepted" && options?.actor?.clientName && !agent.createdBy) {
+      agent.createdBy = options.actor;
+    }
     const items = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),

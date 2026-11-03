@@ -984,6 +984,13 @@ export async function createPaseoDaemon(
   );
   await agentStorage.initialize();
   await closeStaleAgentRecords(agentStorage);
+  const backfilledAgentCreators = await agentManager.backfillMissingCreatedByFromActorLedger();
+  if (backfilledAgentCreators > 0) {
+    logger.info(
+      { count: backfilledAgentCreators },
+      "Backfilled legacy agent creators from the actor ledger",
+    );
+  }
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
   await bootstrapWorkspaceRegistries({
     serverId,

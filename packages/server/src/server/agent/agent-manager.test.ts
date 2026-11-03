@@ -718,6 +718,7 @@ test("records the client actor on submitted prompts", async () => {
     })();
     await manager.waitForAgentRunStart(agent.id);
 
+    expect(manager.getAgent(agent.id)?.createdBy).toEqual(actor);
     expect(manager.getTimeline(agent.id)).toContainEqual(
       expect.objectContaining({
         type: "user_message",
@@ -806,6 +807,77 @@ test("restores user message actors after a daemon-style provider history replay"
   } finally {
     if (secondManager) await secondManager.closeAgent(agentId).catch(() => undefined);
     if (firstManager) await firstManager.closeAgent(agentId).catch(() => undefined);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("backfills legacy creators from actor history without overwriting known creators", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-legacy-creator-"));
+  const storagePath = join(workdir, "agents");
+  const ledgerDirectory = join(workdir, "actor-ledger");
+  const originalCreator = { clientId: "client-original", clientName: "Original Client" };
+  const legacyActor = { clientId: "client-legacy", clientName: "少爷" };
+  const conflictingActor = { clientId: "client-other", clientName: "Other Client" };
+  let firstManager: AgentManager | null = null;
+  let legacyAgentId: string | null = null;
+  let knownAgentId: string | null = null;
+  try {
+    const storage = new AgentStorage(storagePath, logger);
+    const ledger = new FileAgentActorLedger(ledgerDirectory);
+    firstManager = new AgentManager({
+      clients: { codex: new TestAgentClient() },
+      registry: storage,
+      actorLedger: ledger,
+      logger,
+    });
+    const legacy = await firstManager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: "workspace-legacy",
+    });
+    legacyAgentId = legacy.id;
+    const known = await firstManager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+      workspaceId: "workspace-known",
+      createdBy: originalCreator,
+    });
+    knownAgentId = known.id;
+    await firstManager.closeAgent(legacy.id);
+    await firstManager.closeAgent(known.id);
+
+    await ledger.record({
+      agentId: legacy.id,
+      clientMessageId: "legacy-message",
+      text: "legacy prompt",
+      actor: legacyActor,
+      recordedAt: "2026-11-03T00:00:00.000Z",
+    });
+    await ledger.record({
+      agentId: known.id,
+      clientMessageId: "known-message",
+      text: "known prompt",
+      actor: conflictingActor,
+      recordedAt: "2026-11-03T00:00:01.000Z",
+    });
+    await ledger.flush();
+
+    const reopenedStorage = new AgentStorage(storagePath, logger);
+    await reopenedStorage.initialize();
+    const secondManager = new AgentManager({
+      registry: reopenedStorage,
+      actorLedger: new FileAgentActorLedger(ledgerDirectory),
+      logger,
+    });
+
+    await expect(secondManager.backfillMissingCreatedByFromActorLedger()).resolves.toBe(1);
+    await expect(reopenedStorage.get(legacy.id)).resolves.toMatchObject({ createdBy: legacyActor });
+    await expect(reopenedStorage.get(known.id)).resolves.toMatchObject({
+      createdBy: originalCreator,
+    });
+  } finally {
+    if (firstManager && legacyAgentId) {
+      await firstManager.closeAgent(legacyAgentId).catch(() => undefined);
+    }
+    if (firstManager && knownAgentId) {
+      await firstManager.closeAgent(knownAgentId).catch(() => undefined);
+    }
     rmSync(workdir, { recursive: true, force: true });
   }
 });
