@@ -1,5 +1,5 @@
 import { Redirect } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useHostRouteServerId } from "@/navigation/host-route-context";
 import {
   resolveHostIndexRoute,
@@ -21,6 +21,10 @@ import {
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 
+// Workspace hydration needs a live daemon. Without a bound, an offline host
+// (or a settings load that never settles) pins the splash forever.
+const STARTUP_DATA_GRACE_MS = 2_000;
+
 export default function HostIndexRoute() {
   const serverId = useHostRouteServerId();
   const { settings, isLoading: settingsLoading } = useAppSettings();
@@ -35,6 +39,14 @@ export default function HostIndexRoute() {
     hasHydratedWorkspaces,
     workspaceExists: workspaceSelectionExists,
   });
+  const [startupGraceElapsed, setStartupGraceElapsed] = useState(false);
+  useEffect(() => {
+    const handle = setTimeout(() => setStartupGraceElapsed(true), STARTUP_DATA_GRACE_MS);
+    return () => clearTimeout(handle);
+  }, []);
+
+  const waitingForStartupData =
+    settingsLoading || (workspaceSelectionWorkspaceId !== null && !hasHydratedWorkspaces);
   const launchConsumed = hasQuickInputLaunchBeenConsumed();
   const routingToQuickInput =
     settings.quickInputEnabled &&
@@ -44,10 +56,10 @@ export default function HostIndexRoute() {
     workspaceSelectionStatus !== "missing";
 
   useEffect(() => {
-    if (settingsLoading || !isWorkspaceSelectionLoaded || !serverId) {
+    if (!isWorkspaceSelectionLoaded || !serverId) {
       return;
     }
-    if (workspaceSelectionWorkspaceId && !hasHydratedWorkspaces) {
+    if (waitingForStartupData && !startupGraceElapsed) {
       return;
     }
     if (routingToQuickInput) {
@@ -55,20 +67,14 @@ export default function HostIndexRoute() {
     }
     consumeQuickInputLaunch();
   }, [
-    hasHydratedWorkspaces,
     isWorkspaceSelectionLoaded,
     routingToQuickInput,
     serverId,
-    settingsLoading,
-    workspaceSelectionWorkspaceId,
+    startupGraceElapsed,
+    waitingForStartupData,
   ]);
 
-  if (
-    !serverId ||
-    !isWorkspaceSelectionLoaded ||
-    settingsLoading ||
-    (workspaceSelectionWorkspaceId && !hasHydratedWorkspaces)
-  ) {
+  if (!serverId || !isWorkspaceSelectionLoaded || (waitingForStartupData && !startupGraceElapsed)) {
     return <StartupSplashScreen />;
   }
 
