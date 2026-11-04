@@ -15,6 +15,10 @@
     {
       "name": "mic_reason",
       "value": "po uses the microphone for voice input to your agents."
+    },
+    {
+      "name": "camera_reason",
+      "value": "Paseo uses the camera to scan a pairing QR code."
     }
   ]
 }

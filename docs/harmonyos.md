@@ -325,15 +325,19 @@ when you press Connect:
 - **Baked endpoint.** `PASEO_HARMONY_DAEMON=<endpoint> npm run harmony:build`.
   Inlined at bundle time, so changing it needs a rebuild.
 
-Pairing links work as they do on the web: the welcome screen offers a direct
-connection and a paste-a-link field. Scanning a pairing QR is native-only and
-is not wired up in the shell; `npm run cli -- pair` prints the daemon's QR code
-and link to paste.
+Pairing links work as they do on the web: the welcome screen offers direct
+connection, paste-a-link, and QR scanning. The scan screen uses the web camera
+path (`expo-camera` with its bundled barcode-detector fallback); the shell
+declares `ohos.permission.CAMERA` and grants ArkWeb's camera request. The
+OpenHarmony CameraKit metadata API returns only a barcode's bounding box, not
+its payload, so it is not used for pairing.
 
 ## Known gaps
 
 - No push notifications. `packages/app/src/push-notifications/index.web.ts` is a no-op.
-- No QR scanning. The web app shows `pairing.scan.webUnavailableTitle` on non-native platforms.
+- Camera scanning depends on ArkWeb's `getUserMedia`, `createImageBitmap`, and
+  WebAssembly support for the barcode-detector fallback. Verify the OS camera
+  permission prompt on a physical phone.
 - The webview suspends when the app is backgrounded, so streams pause.
 - Verified on the Windows DevEco emulator (HarmonyOS 7.0.0, API 26): the hap
   installs unsigned, renders, and holds a daemon WebSocket over `hdc rport`. A

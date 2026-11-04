@@ -6,6 +6,7 @@ import { QrCode, Link2, ClipboardPaste, Terminal } from "lucide-react-native";
 import { AdaptiveModalSheet, type SheetHeader } from "./adaptive-modal-sheet";
 import { isFdroidBuild } from "@/constants/build-profile";
 import { isNative } from "@/constants/platform";
+import { hasHarmonyQrScanner } from "@/utils/harmony-shell";
 import { isElectronRuntime } from "@/desktop/host";
 import type { Theme } from "@/styles/theme";
 
@@ -118,7 +119,7 @@ export function AddHostMethodModal({
         </Pressable>
       ) : null}
 
-      {isNative && !isFdroidBuild ? (
+      {!isFdroidBuild && (isNative || hasHarmonyQrScanner()) ? (
         <Pressable
           style={styles.option}
           onPress={handleScan}

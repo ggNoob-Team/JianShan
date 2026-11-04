@@ -10,6 +10,7 @@ import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { openPairScan } from "@/hosts/pair-scan-model";
 import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
 import { isWeb } from "@/constants/platform";
+import { hasHarmonyQrScanner } from "@/utils/harmony-shell";
 import { BackHeader } from "@/components/headers/back-header";
 import { PairLinkModal } from "@/components/pair-link-modal";
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,7 @@ export default function PairScanScreen() {
     source?: string;
   }>();
   const source = typeof params.source === "string" ? params.source : "settings";
+  const canScanQr = !isWeb || hasHarmonyQrScanner();
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -158,10 +160,10 @@ export default function PairScanScreen() {
   }, [router]);
 
   useEffect(() => {
-    if (isWeb) return;
+    if (!canScanQr) return;
     if (permission && permission.granted) return;
     void requestPermission().catch(() => undefined);
-  }, [permission, requestPermission]);
+  }, [canScanQr, permission, requestPermission]);
 
   const handleScan = useCallback(
     (result: BarcodeScanningResult) =>
@@ -187,7 +189,7 @@ export default function PairScanScreen() {
     [theme.colors.foreground],
   );
 
-  if (isWeb) {
+  if (!canScanQr) {
     return (
       <View style={styles.container}>
         <BackHeader title={t("pairing.scan.title")} onBack={handleRouterBack} />

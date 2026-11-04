@@ -16,3 +16,18 @@ export function isHarmonyShell(): boolean {
     typeof shell.paseoClipboard?.writeText === "function"
   );
 }
+
+/**
+ * HarmonyOS runs the Expo web build, so `isWeb` is true. The web camera path can
+ * still scan a pairing QR when ArkWeb exposes camera capture; expo-camera
+ * supplies the barcode decoder.
+ */
+export function hasHarmonyQrScanner(): boolean {
+  if (!isHarmonyShell() || typeof navigator === "undefined") {
+    return false;
+  }
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return false;
+  }
+  return typeof navigator.mediaDevices?.getUserMedia === "function";
+}

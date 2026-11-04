@@ -233,8 +233,8 @@ struct Index {
         .onPageEnd(() => {
           this.logWebPlatformDiagnostics();
         })
-        // The web app records audio with getUserMedia; ArkWeb routes those
-        // requests through here.
+        // The web app records audio and scans pairing QR codes with
+        // getUserMedia; ArkWeb routes those requests through here.
         .onPermissionRequest((event) => {
           if (!event) {
             return;
