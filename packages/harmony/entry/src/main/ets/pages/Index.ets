@@ -12,7 +12,6 @@ import {
   rawFilePathForUrl,
   readRawFile,
 } from "../web/rawfile-assets";
-import { PhotoLibraryBridge } from "../web/photo-library-bridge";
 
 const LOG_DOMAIN: number = 0x0000;
 const LOG_TAG: string = "PaseoHarmony";
@@ -93,7 +92,6 @@ class ScreenKeepAwakeBridge {
 struct Index {
   private controller: web_webview.WebviewController = new web_webview.WebviewController();
   private screenKeepAwake = new ScreenKeepAwakeBridge();
-  private photoLibrary = new PhotoLibraryBridge();
   private resources: resourceManager.ResourceManager | null = null;
   /**
    * A unique document URL per launch. The bundle and its document are served from
@@ -107,7 +105,6 @@ struct Index {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     this.resources = context.resourceManager;
     this.screenKeepAwake.setContext(context);
-    this.photoLibrary.setContext(context);
   }
 
   /**
@@ -158,7 +155,6 @@ struct Index {
       origin: location.origin,
       ua: navigator.userAgent,
       clip: typeof window.paseoClipboard?.writeText,
-      photos: typeof window.paseoPhotoLibrary?.getRecentPhotos,
     })`;
     this.controller.runJavaScript(script, (error: BusinessError, result: string) => {
       if (error) {
@@ -213,16 +209,6 @@ struct Index {
           name: "paseoKeepScreenOn",
           methodList: [],
           asyncMethodList: ["setKeepScreenOn"],
-          controller: this.controller,
-        })
-        // Recent photo thumbnails and image bytes for the web composer. The
-        // HarmonyOS build is a web app, so the native media library is reached
-        // through this bridge instead of expo-media-library.
-        .javaScriptProxy({
-          object: this.photoLibrary,
-          name: "paseoPhotoLibrary",
-          methodList: [],
-          asyncMethodList: ["getRecentPhotos", "getPhotoData"],
           controller: this.controller,
         })
         // IndexedDB backs the replica row store on web (row-store.web.ts).

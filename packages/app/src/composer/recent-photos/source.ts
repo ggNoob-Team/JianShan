@@ -1,5 +1,4 @@
 import type { RecentPhoto } from "./model";
-import { hasHarmonyPhotoLibrary, requestPhotoDataFromHarmony } from "./harmony-bridge";
 
 export interface RecentPhotoSource {
   uri: string;
@@ -7,19 +6,9 @@ export interface RecentPhotoSource {
   mimeType: string;
 }
 
+/** Native platforms replace this module with `source.native.ts`. */
 export async function resolveRecentPhotoSource(
-  photo: RecentPhoto,
+  _photo: RecentPhoto,
 ): Promise<RecentPhotoSource | null> {
-  if (!hasHarmonyPhotoLibrary()) {
-    return null;
-  }
-  const data = await requestPhotoDataFromHarmony(photo.assetId);
-  if (!data) {
-    return null;
-  }
-  return {
-    uri: data.dataUrl,
-    fileName: data.fileName,
-    mimeType: data.mimeType,
-  };
+  return null;
 }

@@ -159,7 +159,6 @@ import { normalizeNativePastedImages, type NativePastedFile } from "./native-pas
 import { RecentPhotosRow } from "./recent-photos/row";
 import type { RecentPhoto } from "./recent-photos/model";
 import { resolveRecentPhotoSource } from "./recent-photos/source";
-import { hasHarmonyPhotoLibrary } from "./recent-photos/harmony-bridge";
 import { normalizePickedImageAssets } from "@/hooks/image-attachment-picker";
 import { PluginResourceAttachmentPill, usePluginAttachmentPicker } from "@/plugins";
 import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-slash-commands";
@@ -2221,10 +2220,7 @@ function ComposerContentImpl({
   ]);
 
   const attachmentMenuHeader = useMemo(
-    () =>
-      isNative || hasHarmonyPhotoLibrary() ? (
-        <RecentPhotosRow onSelect={handleAddRecentPhoto} />
-      ) : null,
+    () => (isNative ? <RecentPhotosRow onSelect={handleAddRecentPhoto} /> : null),
     [handleAddRecentPhoto],
   );
 
