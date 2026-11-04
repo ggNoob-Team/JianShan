@@ -94,6 +94,59 @@ personal dogfooding. Android system-trace spans require the separate `PASEO_PROF
 watchdog recording does not send duplicate spans to that sink by default. Normal store/release
 workflows leave diagnostics disabled.
 
+### Production arm64 APK
+
+Use the production script for an APK that will be published. The dogfood commands above enable
+watchdog diagnostics; this path does not.
+
+```bash
+JAVA_HOME=<path-to-jdk-17> \
+  ./scripts/build-android-apk.sh --architectures arm64-v8a --no-publish
+```
+
+`build-android-apk.sh` requires JDK 17. The `mise` setup in this repo pins Java 21, so point
+`JAVA_HOME` at a JDK 17 install. Gradle already downloads one under `~/.gradle/jdks/` on this
+checkout. The script reuses `packages/app/android` when it exists; pass `--clean` after changing
+native config. It writes `~/paseo-artifacts/paseo-<version>-android-arm64-v8a.apk`; override the
+directory with `PASEO_APK_OUTPUT_DIR`.
+
+The release build signs with `signingConfigs.debug` in
+`packages/app/android/app/build.gradle`, the same key as the published dogfood APK. That keeps
+`adb install -r` updates working; it is not a Play Store signing key.
+
+The default release build does not shrink code or resources. `android.enableMinifyInReleaseBuilds`
+and `android.enableShrinkResourcesInReleaseBuilds` default to false, and `expo.useLegacyPackaging`
+defaults to false, so native libraries stay uncompressed in the APK. To produce a smaller download,
+set them in the `expo-build-properties` plugin in `packages/app/app.config.js`:
+
+```js
+[
+  "expo-build-properties",
+  {
+    android: {
+      enableMinifyInReleaseBuilds: true,
+      enableShrinkResourcesInReleaseBuilds: true,
+      useLegacyPackaging: true,
+    },
+  },
+];
+```
+
+Run `expo prebuild --clean` after changing the config. The 0.13.22 arm64 build measured 168 MB
+before and 77 MB after (DEX 57 → 22 MiB, native libraries 71 → 20 MiB). R8 can break
+reflection-based modules.
+
+For a one-off size test without changing the config, pass the same values to Gradle:
+`-Pandroid.enableMinifyInReleaseBuilds=true`,
+`-Pandroid.enableShrinkResourcesInReleaseBuilds=true`, and
+`-Pexpo.useLegacyPackaging=true`.
+
+To attach the APK to a GitHub release, authenticate `gh` and upload it:
+
+```bash
+gh release upload <tag> ~/paseo-artifacts/paseo-<version>-android-arm64-v8a.apk --clobber
+```
+
 The older `android`, `android:development`, and `ios` commands remain aliases for development.
 `android:production` still builds and installs a release through Expo; use `build:apk` when you
 need an artifact. `android:clear` removes the generated Android project.
