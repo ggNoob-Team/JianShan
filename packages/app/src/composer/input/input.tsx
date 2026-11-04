@@ -26,7 +26,16 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square, X } from "lucide-react-native";
+import {
+  ArrowUp,
+  CornerDownLeft,
+  Image as ImageIcon,
+  Mic,
+  MicOff,
+  Plus,
+  Square,
+  X,
+} from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/use-fine-pointer";
 import { DictationOverlay } from "@/components/dictation-controls";
@@ -140,6 +149,9 @@ export interface MessageInputProps {
   attachmentMenuItems: AttachmentMenuItem[];
   /** Content rendered above the attachment menu rows, such as recent photos. */
   attachmentMenuHeader?: React.ReactNode;
+  /** Opens the HarmonyOS gallery directly instead of going through the file chooser. */
+  showGalleryButton?: boolean;
+  onOpenGallery?: () => void;
   onAttachButtonRef?: (node: View | null) => void;
   onAddImages?: (images: ImageAttachment[]) => void;
   onPasteImages?: (files: readonly NativePastedFile[]) => void;
@@ -355,6 +367,46 @@ function AttachmentDropdown({
         <AttachmentMenuList items={attachmentMenuItems} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function GalleryButton({
+  visible,
+  disabled,
+  buttonStyle,
+  buttonIconSize,
+  label,
+  onPress,
+}: {
+  visible: boolean;
+  disabled: boolean;
+  buttonStyle: React.ComponentProps<typeof TooltipTrigger>["style"];
+  buttonIconSize: number;
+  label: string;
+  onPress: (() => void) | undefined;
+}) {
+  if (!visible || !onPress) return null;
+  return (
+    <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
+      <TooltipTrigger
+        disabled={disabled}
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        testID="message-input-gallery-button"
+        style={buttonStyle}
+        onPress={onPress}
+      >
+        {({ hovered = false }) => (
+          <ThemedImageIcon
+            size={buttonIconSize}
+            uniProps={hovered ? iconForegroundMapping : iconForegroundMutedMapping}
+          />
+        )}
+      </TooltipTrigger>
+      <TooltipContent side="top" align="center" offset={8}>
+        <Text style={styles.tooltipText}>{label}</Text>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -1133,6 +1185,8 @@ interface ResolvedMessageInputProps {
   cwd: string;
   attachmentMenuItems: AttachmentMenuItem[];
   attachmentMenuHeader: React.ReactNode;
+  showGalleryButton: boolean;
+  onOpenGallery: (() => void) | undefined;
   onAttachButtonRef: ((node: View | null) => void) | undefined;
   onAddImages: ((images: ImageAttachment[]) => void) | undefined;
   onPasteImages: ((files: readonly NativePastedFile[]) => void) | undefined;
@@ -1181,6 +1235,8 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     cwd: props.cwd,
     attachmentMenuItems: props.attachmentMenuItems,
     attachmentMenuHeader: props.attachmentMenuHeader,
+    showGalleryButton: props.showGalleryButton ?? false,
+    onOpenGallery: props.onOpenGallery,
     onAttachButtonRef: props.onAttachButtonRef,
     onAddImages: props.onAddImages,
     onPasteImages: props.onPasteImages,
@@ -1259,6 +1315,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       cwd,
       attachmentMenuItems,
       attachmentMenuHeader,
+      showGalleryButton,
+      onOpenGallery,
       onAttachButtonRef,
       onAddImages,
       onPasteImages,
@@ -2110,6 +2168,14 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               attachmentMenuHeader={attachmentMenuHeader}
               addAttachmentLabel={t("composer.input.addAttachment")}
             />
+            <GalleryButton
+              visible={showGalleryButton && Boolean(onOpenGallery)}
+              disabled={!isConnected || disabled}
+              buttonStyle={attachButtonStyle}
+              buttonIconSize={buttonIconSize}
+              label={t("composer.attachments.gallery")}
+              onPress={onOpenGallery}
+            />
             {leftContent}
           </View>
 
@@ -2141,6 +2207,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         renderAttachButtonIcon,
         attachmentMenuItems,
         attachmentMenuHeader,
+        showGalleryButton,
+        onOpenGallery,
+        buttonIconSize,
         t,
         leftContent,
         beforeVoiceContent,
@@ -2455,6 +2524,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
 })) as unknown as Record<string, object>;
 
 const ThemedPlus = withUnistyles(Plus);
+const ThemedImageIcon = withUnistyles(ImageIcon);
 const ThemedMic = withUnistyles(Mic);
 const ThemedMicOff = withUnistyles(MicOff);
 const ThemedArrowUp = withUnistyles(ArrowUp);

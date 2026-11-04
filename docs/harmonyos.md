@@ -4,11 +4,11 @@
 project whose only job is to serve the Expo web build of `packages/app` from
 `rawfile/` over a custom scheme and load it in a single `Web` component.
 
-Apart from the small native bridges (clipboard, screen keep-awake), there is no
-app logic in the HarmonyOS code. Connections, pairing links, the terminal, and
-the file panes all run in the web app, exactly as they do in a browser. If you
-find yourself adding a feature to `Index.ets`, check whether the web app already
-has it.
+Apart from the small native bridges (clipboard, screen keep-awake, photo picker),
+there is no app logic in the HarmonyOS code. Connections, pairing links, the
+terminal, and the file panes all run in the web app, exactly as they do in a
+browser. If you find yourself adding a feature to `Index.ets`, check whether the
+web app already has it.
 
 The module is deliberately **not** an npm workspace. It has `oh-package.json5`
 instead of `package.json`; adding it to `workspaces` breaks `npm ci`. The root
@@ -91,9 +91,15 @@ shell without the bridge is harmless: the helper falls back to the browser API.
 The composer's recent-photo strip is native-only. HarmonyOS lists
 `ohos.permission.READ_IMAGEVIDEO` as a restricted permission at `system_basic`
 level: a normal app needs an ACL-enabled profile, and the documented ACL editing
-path is for debugging rather than store builds. The shell keeps the system picker
-behind **Add image** instead. `utils/harmony-shell.ts` still marks the shell as a
-touch device so controls such as attachment removal do not depend on hover.
+path is for debugging rather than store builds.
+
+Instead, the shell injects `window.paseoPhotoPicker`, backed by
+`PhotoViewPicker`, and the composer adds a Gallery button after `+`. The picker
+opens the system gallery directly and needs no media-library permission; it
+grants temporary read access to the selected URIs, which `readImages` consumes in
+a second bridge call. **Add image** remains available in the attachment menu.
+`utils/harmony-shell.ts` still marks the shell as a touch device so controls such
+as attachment removal do not depend on hover.
 
 ## Version stamping
 

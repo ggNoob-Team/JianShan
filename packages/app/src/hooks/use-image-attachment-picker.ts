@@ -8,6 +8,10 @@ import {
   pickImagesWithDesktopDialog,
   type PickedImageAttachmentInput,
 } from "@/hooks/image-attachment-picker";
+import {
+  hasHarmonyGalleryPicker,
+  pickImagesWithHarmonyGallery,
+} from "@/hooks/harmony-gallery-picker";
 import { isWeb } from "@/constants/platform";
 
 interface UseImageAttachmentPickerResult {
@@ -50,6 +54,10 @@ export function useImageAttachmentPicker(): UseImageAttachmentPickerResult {
     isPickingRef.current = true;
 
     try {
+      if (hasHarmonyGalleryPicker()) {
+        return await pickImagesWithHarmonyGallery();
+      }
+
       if (isWeb && isElectronRuntime()) {
         const selectedImages = await pickImagesWithDesktopDialog(getDesktopHost()?.dialog);
         if (selectedImages.length === 0) {

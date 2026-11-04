@@ -234,6 +234,7 @@ export const fr: TranslationResources = {
     },
     attachments: {
       addImage: "Ajouter une image",
+      gallery: "Galerie",
       pasteImage: "Coller une image",
       addFile: "Importer un fichier",
       addIssueOrPr: "Ajouter un ticket ou une PR",

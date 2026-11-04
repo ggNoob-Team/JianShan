@@ -2,8 +2,8 @@
   app: {
     bundleName: "sh.paseo.app",
     vendor: "paseo",
-    versionCode: 13020,
-    versionName: "0.13.20",
+    versionCode: 13021,
+    versionName: "0.13.21",
     icon: "$media:app_icon",
     label: "$string:app_name",
   },

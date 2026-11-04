@@ -228,6 +228,7 @@ export const en = {
     },
     attachments: {
       addImage: "Add image",
+      gallery: "Gallery",
       pasteImage: "Paste image",
       addFile: "Upload file",
       addIssueOrPr: "Add issue or PR",

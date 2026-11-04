@@ -12,6 +12,7 @@ import {
   rawFilePathForUrl,
   readRawFile,
 } from "../web/rawfile-assets";
+import { PhotoPickerBridge } from "../web/photo-picker-bridge";
 
 const LOG_DOMAIN: number = 0x0000;
 const LOG_TAG: string = "PaseoHarmony";
@@ -92,6 +93,7 @@ class ScreenKeepAwakeBridge {
 struct Index {
   private controller: web_webview.WebviewController = new web_webview.WebviewController();
   private screenKeepAwake = new ScreenKeepAwakeBridge();
+  private photoPicker = new PhotoPickerBridge();
   private resources: resourceManager.ResourceManager | null = null;
   /**
    * A unique document URL per launch. The bundle and its document are served from
@@ -155,6 +157,7 @@ struct Index {
       origin: location.origin,
       ua: navigator.userAgent,
       clip: typeof window.paseoClipboard?.writeText,
+      gallery: typeof window.paseoPhotoPicker?.pickImages,
     })`;
     this.controller.runJavaScript(script, (error: BusinessError, result: string) => {
       if (error) {
@@ -209,6 +212,15 @@ struct Index {
           name: "paseoKeepScreenOn",
           methodList: [],
           asyncMethodList: ["setKeepScreenOn"],
+          controller: this.controller,
+        })
+        // Direct gallery picker for the composer. PhotoViewPicker needs no
+        // media-library permission and grants temporary access to its result.
+        .javaScriptProxy({
+          object: this.photoPicker,
+          name: "paseoPhotoPicker",
+          methodList: [],
+          asyncMethodList: ["pickImages", "readImages"],
           controller: this.controller,
         })
         // IndexedDB backs the replica row store on web (row-store.web.ts).

@@ -232,6 +232,7 @@ export const ko: TranslationResources = {
     },
     attachments: {
       addImage: "이미지 추가",
+      gallery: "갤러리",
       pasteImage: "이미지 붙여넣기",
       addFile: "파일 업로드",
       addIssueOrPr: "이슈 또는 PR 추가",
