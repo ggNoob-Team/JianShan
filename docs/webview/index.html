@@ -616,8 +616,9 @@
         优先级只看 P0 → P1 → P2。P0 先解决笔记闭环、链接打开、角色归属、个人首页；P1 做代码 /
         需求可视化、会话收纳、个人知识库、本地意图目录、团队 daemon 以及消息 / 实时聊天；P2
         才是任务闭环、分布式 Agent、通用办公、通用 Agent 与新书。<br />
-        下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android 固定直链
-        <code>https://paseo.zxyz.app/apk/paseo-latest.apk</code> · 桌面端 GitHub Release v0.13.3。
+        下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android GitHub 直链
+        <code>https://github.com/ggNoob-Team/paseo/releases/latest/download/paseo-latest.apk</code>
+        · 桌面端 GitHub Release v0.13.4。
       </div>
 
       <div class="tabs" id="tabs">
@@ -1751,22 +1752,22 @@
       </div>
       <div class="pane" id="pane-download">
         <section>
-          <h2>桌面端 <span class="n">WINDOWS / MACOS · GITHUB RELEASE V0.13.3</span></h2>
+          <h2>桌面端 <span class="n">WINDOWS / MACOS · GITHUB RELEASE V0.13.4</span></h2>
           <div class="grid">
             <div class="card">
               <div class="t">Windows 安装包<span class="badge b-live">EXE</span></div>
-              <div class="d">Paseo-Setup-0.13.3-x64.exe · 约 139 MB · Windows 10/11（x64）</div>
+              <div class="d">Paseo-Setup-0.13.4-x64.exe · 约 139 MB · Windows 10/11（x64）</div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/paseo/releases/download/v0.13.3/Paseo-Setup-0.13.3-x64.exe"
+                  href="https://github.com/ggNoob-Team/paseo/releases/download/v0.13.4/Paseo-Setup-0.13.4-x64.exe"
                   >下载 Windows 版</a
                 >
               </div>
               <div class="src">
-                GitHub Release v0.13.3 ·
+                GitHub Release v0.13.4 ·
                 <a
-                  href="https://github.com/ggNoob-Team/paseo/releases/tag/v0.13.3"
+                  href="https://github.com/ggNoob-Team/paseo/releases/tag/v0.13.4"
                   style="color: var(--accent, #38bdf8)"
                   >Release 页面</a
                 >还有 Windows arm64 安装器、通用安装器与 zip
@@ -1774,11 +1775,11 @@
             </div>
             <div class="card">
               <div class="t">macOS 安装包<span class="badge b-live">DMG</span></div>
-              <div class="d">Paseo-0.13.3-arm64.dmg · 约 180 MB · Apple Silicon（M 系列芯片）</div>
+              <div class="d">Paseo-0.13.4-arm64.dmg · 约 180 MB · Apple Silicon（M 系列芯片）</div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/paseo/releases/download/v0.13.3/Paseo-0.13.3-arm64.dmg"
+                  href="https://github.com/ggNoob-Team/paseo/releases/download/v0.13.4/Paseo-0.13.4-arm64.dmg"
                   >下载 macOS 版</a
                 >
               </div>
@@ -1790,18 +1791,24 @@
           </div>
         </section>
         <section>
-          <h2>Android <span class="n">APK · 发布脚本会替换为最新构建</span></h2>
+          <h2>Android <span class="n">APK · GITHUB RELEASE 直链</span></h2>
           <div class="grid">
             <div class="card">
               <div class="t">下载最新 Android 安装包<span class="badge b-live">APK</span></div>
               <div class="d" id="apk-meta">正在读取最新版本信息…</div>
               <div class="card-actions">
-                <a class="primary-button" id="apk-download" href="/apk/paseo-latest.apk" download
+                <a
+                  class="primary-button"
+                  id="apk-download"
+                  href="https://github.com/ggNoob-Team/paseo/releases/latest/download/paseo-latest.apk"
+                  download
                   >下载 APK</a
                 >
               </div>
               <div class="src">
-                固定直链 https://paseo.zxyz.app/apk/paseo-latest.apk · 版本信息 /apk/latest.json
+                GitHub Release 固定直链
+                https://github.com/ggNoob-Team/paseo/releases/latest/download/paseo-latest.apk ·
+                版本信息 /apk/latest.json
               </div>
             </div>
             <div class="card">
@@ -1809,9 +1816,7 @@
               <div class="d apk-detail">
                 <div><span>完整 sha256</span><code id="apk-sha">读取中…</code></div>
                 <div><span>构建时间</span><code id="apk-built">读取中…</code></div>
-                <div>
-                  <span>ABI</span><code>arm64-v8a + x86_64（真机与 MuMu 等模拟器都可用）</code>
-                </div>
+                <div><span>ABI</span><code>arm64-v8a（ARM64 真机）</code></div>
                 <div>
                   <span>安装方式</span
                   ><code>把 APK 传到手机点开安装；Android 12+ 需允许「安装未知应用 / 此来源」</code>
@@ -1826,6 +1831,10 @@
       </div>
 
       <footer>
+        更新于 <code>2026-11-04 17:49 CST</code> · APK 更新到 <code>0.13.22</code> arm64
+        （<code>f7d2ca7…</code>，77,235,915 字节），已上传 GitHub Release
+        <code>v0.13.4</code>；下载页 APK 按钮改为 GitHub latest 直链，桌面端下载同步到
+        <code>v0.13.4</code>。<br />
         更新于 <code>2026-11-04 15:57 CST</code> · 「输入框加号默认展示最近 5 张图片」已实现
         <code>2c872fa9c</code>，从计划中 / 未开发移入已实现（P0 5 → 4、已实现 15 → 16）。<br />
         更新于 <code>2026-11-04 15:03 CST</code> · 新增 P1「消息系统（持久化消息中心）」和
@@ -1986,9 +1995,6 @@
           })
           .then(function (info) {
             var version = info.version || "unknown";
-            if (info.downloadPath) {
-              button.setAttribute("href", info.downloadPath + "?v=" + encodeURIComponent(version));
-            }
             meta.textContent =
               "版本 " +
               version +

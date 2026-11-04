@@ -9,6 +9,7 @@ publish_dir="${PASEO_APK_PUBLISH_DIR:-$artifacts_dir/published}"
 web_root="${PASEO_APK_WEB_ROOT:-/www/wwwroot/paseo.zxyz.app}"
 web_link_name="${PASEO_APK_WEB_LINK:-apk}"
 site_url="${PASEO_APK_SITE_URL:-https://paseo.zxyz.app}"
+github_url="${PASEO_APK_GITHUB_URL:-https://github.com/ggNoob-Team/paseo/releases/latest/download/paseo-latest.apk}"
 source_apk=""
 skip_verify=false
 
@@ -27,6 +28,9 @@ Options:
   --link <name>      Symlink inside the web root (default: apk)
   --no-verify        Skip the local nginx check
   -h, --help         Show this help
+
+Environment:
+  PASEO_APK_GITHUB_URL  Public GitHub asset URL written to latest.json.
 
 The chosen APK becomes <publish-dir>/paseo-latest.apk and is described in
 <publish-dir>/latest.json, which the portal page reads.
@@ -134,7 +138,9 @@ fs.writeFileSync(
       ...entry,
       builtAt: ${built_at@Q} || null,
       downloadPath: ${download_path@Q},
-      downloadUrl: ${download_url@Q},
+      siteDownloadUrl: ${download_url@Q},
+      downloadUrl: ${github_url@Q},
+      githubDownloadUrl: ${github_url@Q},
     },
     null,
     2,
@@ -151,7 +157,8 @@ fi
 log "version: $version_label"
 log "size: $size_label"
 log "sha256: $sha256"
-log "download: $download_url"
+log "site: $download_url"
+log "github: $github_url"
 
 if [[ "$skip_verify" != true ]]; then
   status="$(
