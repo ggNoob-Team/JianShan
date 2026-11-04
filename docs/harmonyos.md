@@ -4,10 +4,11 @@
 project whose only job is to serve the Expo web build of `packages/app` from
 `rawfile/` over a custom scheme and load it in a single `Web` component.
 
-There is no app logic in the HarmonyOS code. Connections, pairing links, the
-terminal, and the file panes all run in the web app, exactly as they do in a
-browser. If you find yourself adding a feature to `Index.ets`, check whether the
-web app already has it.
+Apart from the small native bridges (clipboard, screen keep-awake, photos), there
+is no app logic in the HarmonyOS code. Connections, pairing links, the terminal,
+and the file panes all run in the web app, exactly as they do in a browser. If
+you find yourself adding a feature to `Index.ets`, check whether the web app
+already has it.
 
 The module is deliberately **not** an npm workspace. It has `oh-package.json5`
 instead of `package.json`; adding it to `workspaces` breaks `npm ci`. The root
@@ -84,6 +85,17 @@ first" to a clipboard that already had the text. The shell injects a pasteboard
 bridge (`window.paseoClipboard`, `readText`/`writeText`) and the web app's
 `utils/clipboard.ts` prefers it over `expo-clipboard` for both directions. A
 shell without the bridge is harmless: the helper falls back to the browser API.
+
+## Photos
+
+`expo-media-library` cannot reach the HarmonyOS photo library from the web shell.
+`photo-library-bridge.ets` injects `window.paseoPhotoLibrary`
+(`getRecentPhotos`/`getPhotoData`) backed by `photoAccessHelper` and
+`ohos.permission.READ_IMAGEVIDEO`. The first composer `+` open requests the
+permission; thumbnails are small JPEG data URLs and a tapped photo comes back as
+a downscaled JPEG. `utils/harmony-shell.ts` detects either shell bridge so
+attachment controls that are touch-only on phones (such as the remove button)
+stay visible even though the runtime reports itself as web.
 
 ## Version stamping
 

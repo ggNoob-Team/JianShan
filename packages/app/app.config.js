@@ -127,6 +127,7 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       softwareKeyboardLayoutMode: "resize",
+      blockedPermissions: ["android.permission.WRITE_EXTERNAL_STORAGE"],
       // Allow HTTP connections for local network hosts (required for release builds)
       usesCleartextTraffic: true,
       permissions: buildProfile.androidPermissions,
@@ -162,6 +163,15 @@ export default {
       ],
       ...buildProfile.notificationPlugins,
       "expo-audio",
+      [
+        "expo-media-library",
+        {
+          photosPermission:
+            "Allow Paseo to access your photos so you can attach recent images to a message.",
+          savePhotosPermission: false,
+          granularPermissions: ["photo"],
+        },
+      ],
       [
         "expo-gradle-jvmargs",
         {

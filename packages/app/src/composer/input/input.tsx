@@ -26,7 +26,7 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
+import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square, X } from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/use-fine-pointer";
 import { DictationOverlay } from "@/components/dictation-controls";
@@ -51,6 +51,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useMenuContext } from "@/components/ui/menu";
+import { Button } from "@/components/ui/button";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useIosHardwareKeyboardSubmit } from "@/hooks/use-ios-hardware-keyboard-submit";
 import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
@@ -136,6 +138,8 @@ export interface MessageInputProps {
   attachments: ComposerAttachment[];
   cwd: string;
   attachmentMenuItems: AttachmentMenuItem[];
+  /** Content rendered above the attachment menu rows, such as recent photos. */
+  attachmentMenuHeader?: React.ReactNode;
   onAttachButtonRef?: (node: View | null) => void;
   onAddImages?: (images: ImageAttachment[]) => void;
   onPasteImages?: (files: readonly NativePastedFile[]) => void;
@@ -265,6 +269,38 @@ function AttachmentMenuList({ items }: { items: AttachmentMenuItem[] }) {
   );
 }
 
+function AttachmentMenuCloseButton() {
+  const { setOpen } = useMenuContext("AttachmentMenuCloseButton");
+  const { t } = useTranslation();
+  const handleClose = useCallback(() => setOpen(false), [setOpen]);
+  const renderCloseIcon = useCallback((color: string) => <X color={color} size={16} />, []);
+  return (
+    <Button
+      variant="ghost"
+      size="xs"
+      accessibilityLabel={t("common.actions.close")}
+      onPress={handleClose}
+      leftIcon={renderCloseIcon}
+      testID="message-input-attachment-menu-close"
+    >
+      {null}
+    </Button>
+  );
+}
+
+function AttachmentMenuTopBar({ label }: { label: string }) {
+  const { presentation } = useMenuContext("AttachmentMenuTopBar");
+  if (presentation === "sheet") {
+    return null;
+  }
+  return (
+    <View style={styles.attachmentMenuTopBar}>
+      <Text style={styles.attachmentMenuTitle}>{label}</Text>
+      <AttachmentMenuCloseButton />
+    </View>
+  );
+}
+
 function AttachmentDropdown({
   visible,
   isConnected,
@@ -272,6 +308,7 @@ function AttachmentDropdown({
   attachButtonStyle,
   renderAttachButtonIcon,
   attachmentMenuItems,
+  attachmentMenuHeader,
   addAttachmentLabel,
 }: {
   visible: boolean;
@@ -280,9 +317,11 @@ function AttachmentDropdown({
   attachButtonStyle: React.ComponentProps<typeof DropdownMenuTrigger>["style"];
   renderAttachButtonIcon: (input: { hovered?: boolean }) => React.ReactElement;
   attachmentMenuItems: AttachmentMenuItem[];
+  attachmentMenuHeader?: React.ReactNode;
   addAttachmentLabel: string;
 }) {
   const isButtonDisabled = !isConnected || disabled;
+  const sheetTrailing = useMemo(() => <AttachmentMenuCloseButton />, []);
   if (!visible) return null;
   return (
     <DropdownMenu compactMode="sheet">
@@ -309,7 +348,10 @@ function AttachmentDropdown({
         minWidth={220}
         testID="message-input-attachment-menu"
         sheetTitle={addAttachmentLabel}
+        sheetTrailing={sheetTrailing}
       >
+        <AttachmentMenuTopBar label={addAttachmentLabel} />
+        {attachmentMenuHeader}
         <AttachmentMenuList items={attachmentMenuItems} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -1090,6 +1132,7 @@ interface ResolvedMessageInputProps {
   attachments: ComposerAttachment[];
   cwd: string;
   attachmentMenuItems: AttachmentMenuItem[];
+  attachmentMenuHeader: React.ReactNode;
   onAttachButtonRef: ((node: View | null) => void) | undefined;
   onAddImages: ((images: ImageAttachment[]) => void) | undefined;
   onPasteImages: ((files: readonly NativePastedFile[]) => void) | undefined;
@@ -1137,6 +1180,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     attachments: props.attachments,
     cwd: props.cwd,
     attachmentMenuItems: props.attachmentMenuItems,
+    attachmentMenuHeader: props.attachmentMenuHeader,
     onAttachButtonRef: props.onAttachButtonRef,
     onAddImages: props.onAddImages,
     onPasteImages: props.onPasteImages,
@@ -1214,6 +1258,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       attachments,
       cwd,
       attachmentMenuItems,
+      attachmentMenuHeader,
       onAttachButtonRef,
       onAddImages,
       onPasteImages,
@@ -2062,6 +2107,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               attachButtonStyle={attachButtonStyle}
               renderAttachButtonIcon={renderAttachButtonIcon}
               attachmentMenuItems={attachmentMenuItems}
+              attachmentMenuHeader={attachmentMenuHeader}
               addAttachmentLabel={t("composer.input.addAttachment")}
             />
             {leftContent}
@@ -2094,6 +2140,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         attachButtonStyle,
         renderAttachButtonIcon,
         attachmentMenuItems,
+        attachmentMenuHeader,
         t,
         leftContent,
         beforeVoiceContent,
@@ -2332,6 +2379,21 @@ const styles = StyleSheet.create((theme: Theme) => ({
     height: 28,
     alignItems: "center",
     justifyContent: "center",
+  },
+  attachmentMenuTopBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
+    paddingTop: theme.spacing[1],
+    paddingBottom: theme.spacing[1],
+  },
+  attachmentMenuTitle: {
+    flexShrink: 1,
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
   },
   voiceButton: {
     width: 28,

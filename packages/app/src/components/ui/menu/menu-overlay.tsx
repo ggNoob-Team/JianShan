@@ -42,6 +42,7 @@ import {
 
 const SCROLL_CONTENT_STYLE = { flexGrow: 1 } as const;
 const CONTENT_ENTERING_DURATION_MS = 150;
+const CONTENT_HEIGHT_RELEASE_MS = CONTENT_ENTERING_DURATION_MS + 750;
 
 const contentEntering = new Keyframe({
   0: { opacity: 0, transform: [{ scale: 0.97 }] },
@@ -88,6 +89,9 @@ function useReleaseFixedMenuHeight({
     };
     const timers: ReturnType<typeof setTimeout>[] = [
       setTimeout(release, CONTENT_ENTERING_DURATION_MS),
+      // Reanimated's web cleanup can write the animation's height snapshot back
+      // after the entering duration. Release once more after that write.
+      setTimeout(release, CONTENT_HEIGHT_RELEASE_MS),
     ];
 
     if (contentSize) {

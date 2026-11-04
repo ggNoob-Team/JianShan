@@ -58,4 +58,23 @@ describe("Android app config", () => {
     },
     30_000,
   );
+
+  it("requests photo-library read access without write access", async () => {
+    const manifest = await resolveAndroidManifest();
+    const permissionEntries = (manifest["uses-permission"] ?? []) as ManifestEntry[];
+    const permissions = permissionEntries.map((entry) => entry.$["android:name"]);
+
+    expect(permissions).toEqual(
+      expect.arrayContaining([
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+      ]),
+    );
+    expect(
+      permissionEntries.find(
+        (entry) => entry.$["android:name"] === "android.permission.WRITE_EXTERNAL_STORAGE",
+      )?.$["tools:node"],
+    ).toBe("remove");
+  });
 });

@@ -15,6 +15,10 @@
     {
       "name": "mic_reason",
       "value": "po uses the microphone for voice input to your agents."
+    },
+    {
+      "name": "photo_reason",
+      "value": "po uses your photos to attach recent images to a message."
     }
   ]
 }

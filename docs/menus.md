@@ -188,6 +188,8 @@ its own.
 - **Released height.** Reanimated's web entering animation leaves an inline height snapshot on
   the surface. `AnchoredSurface` clears it, and a `revision` prop re-clears it when content
   identity changes — a pushed page taller than the one it replaced is clipped without that.
+  Content that loads after the surface opens calls `bumpRevision` from `useMenuContext` when its
+  height changes, so ArkWeb does not keep the pre-load height and clip the last row.
 - **Animate only once placed.** The same snapshot carries top/left, and Reanimated writes it back
   750ms after mount. `AnchoredSurface` remounts the surface when its position resolves so the
   entering animation never ends at the off-screen measuring position; on a slow machine that

@@ -7,6 +7,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-url";
 import type { Theme } from "@/styles/theme";
+import { isHarmonyShell } from "@/utils/harmony-shell";
 
 // Every attachment pill body — image thumbnail or labelled — renders at this
 // height so mixed attachment trays line up.
@@ -34,7 +35,7 @@ export function AttachmentPill({
   const isCompact = useIsCompactFormFactor();
   const [isBodyHovered, setIsBodyHovered] = useState(false);
   const [isCloseHovered, setIsCloseHovered] = useState(false);
-  const alwaysShow = isNative || isCompact;
+  const alwaysShow = isNative || isCompact || isHarmonyShell();
   const showRemove = alwaysShow || isBodyHovered || isCloseHovered;
   const closeButtonStyle = useMemo(
     () => [styles.closeButton, !showRemove && styles.closeButtonHidden],

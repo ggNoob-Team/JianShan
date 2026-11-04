@@ -255,6 +255,7 @@ function MenuPopoverSurface({
         <>
           <AnchoredSurface
             open={menu.open}
+            revision={menu.revision}
             onClose={handleClose}
             anchorRect={menu.anchorRect}
             anchorRef={menu.triggerRef}

@@ -156,6 +156,11 @@ import { ForgeBrandIcon } from "@/git/forge-icon";
 import { useComposerForgeAutoAttach } from "./forge-auto-attach";
 import { readClipboardImage } from "./clipboard-image";
 import { normalizeNativePastedImages, type NativePastedFile } from "./native-pasted-image";
+import { RecentPhotosRow } from "./recent-photos/row";
+import type { RecentPhoto } from "./recent-photos/model";
+import { resolveRecentPhotoSource } from "./recent-photos/source";
+import { hasHarmonyPhotoLibrary } from "./recent-photos/harmony-bridge";
+import { normalizePickedImageAssets } from "@/hooks/image-attachment-picker";
 import { PluginResourceAttachmentPill, usePluginAttachmentPicker } from "@/plugins";
 import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-slash-commands";
 import {
@@ -1784,6 +1789,36 @@ function ComposerContentImpl({
     [addImages, t],
   );
 
+  const handleAddRecentPhoto = useCallback(
+    async (photo: RecentPhoto) => {
+      try {
+        const source = await resolveRecentPhotoSource(photo);
+        if (!source) {
+          toastErrorRef.current(t("imageAttachmentPicker.failedToSelect"));
+          return;
+        }
+        const pickedImages = await normalizePickedImageAssets([
+          {
+            uri: source.uri,
+            mimeType: source.mimeType,
+            fileName: source.fileName,
+          },
+        ]);
+        const newImages = await pickAndPersistImages({
+          pickImages: async () => pickedImages,
+          persister: composerImageAttachmentPersister,
+        });
+        if (newImages.length > 0) {
+          addImages(newImages);
+        }
+      } catch (error) {
+        console.error("[Composer] Failed to add recent photo:", error);
+        toastErrorRef.current(t("imageAttachmentPicker.failedToSelect"));
+      }
+    },
+    [addImages, t],
+  );
+
   const uploadSelectedFiles = useCallback(
     async (files: SelectedFile[]) => {
       if (files.length === 0) return;
@@ -2185,6 +2220,14 @@ function ComposerContentImpl({
     t,
   ]);
 
+  const attachmentMenuHeader = useMemo(
+    () =>
+      isNative || hasHarmonyPhotoLibrary() ? (
+        <RecentPhotosRow onSelect={handleAddRecentPhoto} />
+      ) : null,
+    [handleAddRecentPhoto],
+  );
+
   const handleToggleGithubItem = useCallback(
     (item: ForgeSearchItem) => {
       const nextAttachments = toggleForgeAttachmentFromPicker({
@@ -2456,6 +2499,7 @@ function ComposerContentImpl({
                   attachments={selectedAttachments}
                   cwd={cwd}
                   attachmentMenuItems={attachmentMenuItems}
+                  attachmentMenuHeader={attachmentMenuHeader}
                   onAttachButtonRef={handleAttachButtonRef}
                   onAddImages={addImages}
                   onPasteImages={handleNativePasteImages}

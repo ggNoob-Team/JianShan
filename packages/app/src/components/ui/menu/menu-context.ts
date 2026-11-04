@@ -38,6 +38,9 @@ export interface MenuContextValue {
   setAnchorRect: (rect: Rect | null) => void;
   presentation: MenuPresentation;
   path: MenuPath;
+  /** Bumps when menu content changes identity or size, so floating surfaces release stale height. */
+  revision: number;
+  bumpRevision: () => void;
   openSub: (sub: { id: string; depth: number }) => void;
   closeSub: (depth: number) => void;
   goBack: () => void;
@@ -108,6 +111,7 @@ export function useMenuState({
   const triggerRef = useRef<View>(null);
   const [anchorRect, setAnchorRect] = useState<Rect | null>(null);
   const [path, setPath] = useState<MenuPath>(MENU_ROOT_PATH);
+  const [revision, setRevision] = useState(0);
   const isCompact = useIsCompactFormFactor();
   const presentation: MenuPresentation = isCompact && compactMode === "sheet" ? "sheet" : "popover";
 
@@ -163,6 +167,10 @@ export function useMenuState({
     setPath((current) => goBackPath(current));
   }, []);
 
+  const bumpRevision = useCallback(() => {
+    setRevision((current) => current + 1);
+  }, []);
+
   return useMemo(
     () => ({
       open: isOpen,
@@ -173,10 +181,24 @@ export function useMenuState({
       setAnchorRect,
       presentation,
       path,
+      revision,
+      bumpRevision,
       openSub,
       closeSub,
       goBack,
     }),
-    [isOpen, setOpen, selectItem, anchorRect, presentation, path, openSub, closeSub, goBack],
+    [
+      isOpen,
+      setOpen,
+      selectItem,
+      anchorRect,
+      presentation,
+      path,
+      revision,
+      bumpRevision,
+      openSub,
+      closeSub,
+      goBack,
+    ],
   );
 }
