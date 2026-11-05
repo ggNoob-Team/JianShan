@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { lazy, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigation } from "expo-router/react-navigation";
 import { StyleSheet, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
 import { RetainedPanel } from "@/components/retained-panel";
+import { RouteSuspense } from "@/components/route-suspense";
 import {
   type ActiveWorkspaceSelection,
   useActiveWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { useHasHydratedWorkspaces, useWorkspaceExists } from "@/stores/session-store-hooks";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
-import { WorkspaceScreen } from "@/screens/workspace/workspace-screen";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import {
   areRetainedWorkspaceSelectionListsEqual,
@@ -36,6 +36,12 @@ import {
 import { prepareWorkspaceTab } from "@/utils/prepare-workspace-tab";
 import { isNative, isWeb } from "@/constants/platform";
 import { RenderProfile } from "@/utils/render-profiler";
+
+const WorkspaceScreen = lazy(() =>
+  import("@/screens/workspace/workspace-screen").then((module) => ({
+    default: module.WorkspaceScreen,
+  })),
+);
 
 function getParamValue(value: string | string[] | undefined): string {
   if (typeof value === "string") {
@@ -253,11 +259,13 @@ function WorkspaceDeckEntry({
       active={active}
       testID={`workspace-deck-entry-${selection.serverId}:${selection.workspaceId}`}
     >
-      <WorkspaceScreen
-        serverId={selection.serverId}
-        workspaceId={selection.workspaceId}
-        isRouteFocused={active}
-      />
+      <RouteSuspense>
+        <WorkspaceScreen
+          serverId={selection.serverId}
+          workspaceId={selection.workspaceId}
+          isRouteFocused={active}
+        />
+      </RouteSuspense>
     </RetainedPanel>
   );
 }

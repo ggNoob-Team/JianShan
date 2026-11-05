@@ -2,9 +2,10 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { useHostRuntimeBootstrapState } from "@/app/_layout";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
+import { RouteSuspense } from "@/components/route-suspense";
 import { useLocalDaemonServerIdState } from "@/hooks/use-is-local-daemon";
 import { useHosts } from "@/runtime/host-runtime";
-import SettingsScreen from "@/screens/settings-screen";
+import { LazySettingsScreen } from "@/screens/settings-screen-lazy";
 import { StartupSplashScreen } from "@/screens/startup-splash-screen";
 import {
   buildSettingsHostSectionRoute,
@@ -50,5 +51,9 @@ export default function SettingsSectionRoute() {
     );
   }
 
-  return <SettingsScreen view={view} openAddHostIntent={openAddHostIntent} />;
+  return (
+    <RouteSuspense>
+      <LazySettingsScreen view={view} openAddHostIntent={openAddHostIntent} />
+    </RouteSuspense>
+  );
 }

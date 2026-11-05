@@ -140,7 +140,16 @@ struct Index {
     response.setResponseCode(200);
     response.setReasonMessage("OK");
     response.setResponseMimeType(mimeTypeFor(path));
-    response.setResponseHeader([{ headerKey: "Cache-Control", headerValue: "no-cache" }]);
+    // Expo names every bundle and asset after its content hash. Cache those
+    // aggressively so a warm launch can reuse ArkWeb's compiled script and
+    // avoid re-reading hundreds of megabytes of rawfile payloads. The entry
+    // document still has a unique launch query and stays uncached, so an update
+    // always discovers the new hashed bundle.
+    const cacheControl =
+      path.startsWith("_expo/static/") || path.startsWith("assets/")
+        ? "public, max-age=31536000, immutable"
+        : "no-cache";
+    response.setResponseHeader([{ headerKey: "Cache-Control", headerValue: cacheControl }]);
     response.setResponseData(body);
     return response;
   }
@@ -192,10 +201,10 @@ struct Index {
       Web({ src: this.entryUrl, controller: this.controller })
         .javaScriptAccess(true)
         .domStorageAccess(true)
-        // The app is served from this hap's rawfile, so the HTTP cache can only
-        // ever hand back the bundle of a previous install: an updated hap kept
-        // running its old JavaScript after an install until this was disabled.
-        .cacheMode(CacheMode.None)
+        // Hashed assets are safe to cache; the entry document remains no-cache
+        // and carries a per-launch URL, so an updated hap cannot keep running
+        // JavaScript from the previous install.
+        .cacheMode(CacheMode.Default)
         // Copy buttons in the web app write here instead of through ArkWeb's
         // gated clipboard API. See ClipboardBridge.
         .javaScriptProxy({

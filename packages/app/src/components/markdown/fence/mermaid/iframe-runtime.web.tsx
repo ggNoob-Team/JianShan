@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiagramColorScheme, MermaidRenderRequest } from "./render-model";
-import { mermaidRuntimeHtml } from "./runtime/html.gen";
 import { parseMermaidRuntimeMessage, type MermaidRuntimeRenderMessage } from "./runtime/messages";
 import { MermaidRuntimeRequestDriver } from "./runtime/request-driver";
 
@@ -27,6 +26,20 @@ export function MermaidIframeRuntime({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const driverRef = useRef<MermaidRuntimeRequestDriver | null>(null);
   driverRef.current ??= new MermaidRuntimeRequestDriver();
+  const [runtimeHtml, setRuntimeHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { mermaidRuntimeHtml } = await import("./runtime/html.gen");
+      if (!cancelled) {
+        setRuntimeHtml(mermaidRuntimeHtml);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sendRequest = useCallback((current: MermaidRenderRequest | null) => {
     const target = iframeRef.current?.contentWindow;
@@ -68,6 +81,10 @@ export function MermaidIframeRuntime({
 
   // `inert` (not just tabIndex) because the Modal focus trap focuses descendants
   // programmatically; a focused iframe swallows every keystroke, including Escape.
+  if (!runtimeHtml) {
+    return <div style={iframeStyle} />;
+  }
+
   return (
     <iframe
       ref={iframeRef}
@@ -75,7 +92,7 @@ export function MermaidIframeRuntime({
       aria-hidden
       inert
       sandbox="allow-scripts"
-      srcDoc={mermaidRuntimeHtml}
+      srcDoc={runtimeHtml}
       tabIndex={-1}
       style={iframeStyle}
     />

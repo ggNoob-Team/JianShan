@@ -2,7 +2,8 @@ import { useMemo } from "react";
 
 import { useLocalSearchParams } from "expo-router";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
-import SettingsScreen from "@/screens/settings-screen";
+import { RouteSuspense } from "@/components/route-suspense";
+import { LazySettingsScreen } from "@/screens/settings-screen-lazy";
 
 export default function PluginSettingsRoute() {
   const { serverId, pluginId, screenId } = useLocalSearchParams<{
@@ -16,7 +17,9 @@ export default function PluginSettingsRoute() {
   );
   return (
     <HostRouteBootstrapBoundary>
-      <SettingsScreen view={view} />
+      <RouteSuspense>
+        <LazySettingsScreen view={view} />
+      </RouteSuspense>
     </HostRouteBootstrapBoundary>
   );
 }

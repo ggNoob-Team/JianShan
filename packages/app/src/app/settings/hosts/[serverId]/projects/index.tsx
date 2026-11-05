@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { HostRouteBootstrapBoundary } from "@/components/host-route-bootstrap-boundary";
-import SettingsScreen from "@/screens/settings-screen";
+import { RouteSuspense } from "@/components/route-suspense";
+import { LazySettingsScreen } from "@/screens/settings-screen-lazy";
 import { normalizeProjectSettingsRouteId } from "@/utils/host-routes";
 
 export default function SettingsHostProjectsRoute() {
@@ -14,7 +15,9 @@ export default function SettingsHostProjectsRoute() {
 
   return (
     <HostRouteBootstrapBoundary>
-      <SettingsScreen view={view} />
+      <RouteSuspense>
+        <LazySettingsScreen view={view} />
+      </RouteSuspense>
     </HostRouteBootstrapBoundary>
   );
 }
