@@ -1,9 +1,9 @@
 npmRebuild: false
 appId: sh.paseo.desktop
-productName: Paseo
-executableName: Paseo
+productName: JianShan
+executableName: JianShan
 protocols:
-  - name: Paseo agent link
+  - name: JianShan agent link
     schemes:
       - paseo
 afterPack: ./scripts/after-pack.js
@@ -61,7 +61,7 @@ linux:
   icon: assets
   artifactName: "Paseo-${version}-${arch}.${ext}"
   maintainer: "Mohamed Boudra <hello@moboudra.com>"
-  vendor: "Paseo"
+  vendor: "JianShan"
   extraResources:
     - from: bin/paseo
       to: bin/paseo
@@ -78,7 +78,7 @@ rpm:
   afterInstall: scripts/linux-sandbox/after-install.tpl
 appImage:
   # A nonempty argument list replaces builder's hardcoded --no-sandbox default.
-  executableArgs: ["--class=Paseo"]
+  executableArgs: ["--class=JianShan"]
   # Keep the AppImage filename stable across versions (no ${version}) so
   # electron-updater overwrites the file in place instead of renaming it to a new
   # versioned path. A rename orphans the old binary, breaks desktop shortcuts, and

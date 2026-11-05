@@ -69,7 +69,7 @@ function resolveSecretFile(params) {
 
 const variants = {
   production: {
-    name: "Paseo",
+    name: "见山",
     packageId: "sh.paseo",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_PROD",
@@ -81,7 +81,7 @@ const variants = {
     }),
   },
   development: {
-    name: "Paseo Debug",
+    name: "见山 Debug",
     packageId: "sh.paseo.debug",
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_DEBUG",
@@ -167,7 +167,7 @@ export default {
         "expo-media-library",
         {
           photosPermission:
-            "Allow Paseo to access your photos so you can attach recent images to a message.",
+            "Allow JianShan to access your photos so you can attach recent images to a message.",
           savePhotosPermission: false,
           granularPermissions: ["photo"],
         },

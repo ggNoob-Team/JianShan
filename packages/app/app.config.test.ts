@@ -77,4 +77,15 @@ describe("Android app config", () => {
       )?.$["tools:node"],
     ).toBe("remove");
   });
+
+  it("uses the JianShan display name without changing compatibility identifiers", async () => {
+    const { exp } = await getPrebuildConfigAsync(__dirname, {
+      platforms: ["android", "ios", "web"],
+    });
+
+    expect(exp.name).toBe("见山");
+    expect(exp.scheme).toBe("paseo");
+    expect(exp.android?.package).toBe("sh.paseo");
+    expect(exp.ios?.bundleIdentifier).toBe("sh.paseo");
+  });
 });

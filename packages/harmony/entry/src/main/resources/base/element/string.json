@@ -2,23 +2,27 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "po HarmonyOS shell"
+      "value": "见山 HarmonyOS shell"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "po"
+      "value": "见山"
     },
     {
       "name": "EntryAbility_label",
-      "value": "po"
+      "value": "见山"
+    },
+    {
+      "name": "app_name",
+      "value": "见山"
     },
     {
       "name": "mic_reason",
-      "value": "po uses the microphone for voice input to your agents."
+      "value": "见山 uses the microphone for voice input to your agents."
     },
     {
       "name": "camera_reason",
-      "value": "Paseo uses the camera to scan a pairing QR code."
+      "value": "见山 uses the camera to scan a pairing QR code."
     }
   ]
 }

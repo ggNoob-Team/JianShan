@@ -1,7 +1,7 @@
 {
   app: {
     bundleName: "sh.paseo.app",
-    vendor: "paseo",
+    vendor: "JianShan",
     versionCode: 13024,
     versionName: "0.13.24",
     icon: "$media:app_icon",

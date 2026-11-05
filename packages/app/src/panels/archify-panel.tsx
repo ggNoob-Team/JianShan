@@ -89,7 +89,7 @@ async function ensureArchifySkill(input: {
   if (!input.skillManagement) return;
   const status = await input.client.getAgentSkillsStatus();
   if (!status.available.includes("paseo-archify")) {
-    throw new Error("This Paseo host does not include the paseo-archify skill.");
+    throw new Error("This JianShan host does not include the paseo-archify skill.");
   }
   if (status.selection.mode === "custom" && !status.selection.skills.includes("paseo-archify")) {
     const saved = await input.client.saveAgentSkillsSelection({
@@ -97,7 +97,7 @@ async function ensureArchifySkill(input: {
       skills: [...status.selection.skills, "paseo-archify"],
     });
     if (saved.confirmationRequired) {
-      throw new Error("Paseo needs confirmation before updating the managed skill selection.");
+      throw new Error("JianShan needs confirmation before updating the managed skill selection.");
     }
   }
   await input.client.reconcileAgentSkills();

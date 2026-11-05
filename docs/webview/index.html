@@ -592,10 +592,10 @@
 
       <div class="overview">
         <div class="overview-item p0">
-          <b>4</b><span>下一步 P0<br />形成可验证的闭环</span>
+          <b>5</b><span>下一步 P0<br />形成可验证的闭环</span>
         </div>
         <div class="overview-item">
-          <b>20</b><span>计划中 / 未开发<br />P0 4 · P1 7 · P2 7 · 暂缓 2</span>
+          <b>21</b><span>计划中 / 未开发<br />P0 5 · P1 7 · P2 7 · 暂缓 2</span>
         </div>
         <div class="overview-item bug">
           <b>1</b><span>待复现 Bug<br />需要入口与复现证据</span>
@@ -613,8 +613,8 @@
         <b style="color: var(--plan)">探索</b>=产品方向，尚不足以直接开发；
         <b style="color: var(--bug)">Bug</b>=需要修复或复现；<b style="color: var(--pain)">痛点</b
         >=真实摩擦，尚未整理成确定需求。<br />
-        优先级只看 P0 → P1 → P2。P0 先解决笔记闭环、链接打开、角色归属、个人首页；P1 做代码 /
-        需求可视化、会话收纳、个人知识库、本地意图目录、团队 daemon 以及消息 / 实时聊天；P2
+        优先级只看 P0 → P1 → P2。P0 先解决品牌改名、笔记闭环、链接打开、角色归属、个人首页；P1
+        做代码 / 需求可视化、会话收纳、个人知识库、本地意图目录、团队 daemon 以及消息 / 实时聊天；P2
         才是任务闭环、分布式 Agent、通用办公、通用 Agent 与新书。<br />
         下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android GitHub 直链
         <code>https://github.com/ggNoob-Team/paseo/releases/download/v0.13.4/paseo-latest.apk</code>
@@ -623,7 +623,7 @@
 
       <div class="tabs" id="tabs">
         <button class="tab backlog on" data-tab="backlog">
-          计划中 / 未开发<span class="c">20</span>
+          计划中 / 未开发<span class="c">21</span>
         </button>
         <button class="tab bug" data-tab="bugs">Bug<span class="c">1</span></button>
         <button class="tab pain" data-tab="pains">痛点想法<span class="c">1</span></button>
@@ -687,8 +687,77 @@
 
       <div class="pane on" id="pane-backlog">
         <section class="filter-section">
-          <h2>下一步 · P0 <span class="n">4 项 · 下一批开发队列，先做能形成闭环的部分</span></h2>
+          <h2>下一步 · P0 <span class="n">5 项 · 下一批开发队列，先做能形成闭环的部分</span></h2>
           <div class="grid">
+            <div class="card req" data-tag="release">
+              <div class="t">
+                品牌改名：Paseo → 见山（Jianshan）<span class="tag g-release">品牌发布</span
+                ><span class="badge b-plan">计划中</span
+                ><span class="badge b-p0">P0 · 最高优先级</span>
+              </div>
+              <div class="d">
+                将产品品牌从 Paseo 统一改为「见山 /
+                Jianshan」。当前系统正在运行，必须采用“品牌名先换、技术身份后迁”的方式推进，不能直接全局替换，
+                也不能让旧安装、旧二维码、旧链接、旧配置和当前会话失效。
+              </div>
+              <div class="rq">
+                <span class="k">第一批范围</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      App、桌面端、HarmonyOS 的应用显示名、窗口标题、通知标题、欢迎页、About
+                      和系统文案统一改为「见山」。
+                    </li>
+                    <li>
+                      门户、下载页、README、产品介绍、图标、启动页、分享图和新截图使用「见山 /
+                      Jianshan」。
+                    </li>
+                    <li>
+                      中英文 i18n 的 <code>appName</code> 与用户可见 Paseo
+                      品牌词统一替换；技术说明中确需保留的兼容名称单独标注。
+                    </li>
+                    <li>
+                      第一批不改 App ID、包名、npm scope、协议、数据目录、环境变量、CLI
+                      命令和发布附件名。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">暂时冻结</span>
+                <div class="v">
+                  <code>sh.paseo*</code
+                  >、<code>@getpaseo/*</code>、<code>paseo://</code>、<code>PASEO_HOME</code>、
+                  <code>~/.paseo</code
+                  >、<code>.dev/paseo-home</code>、<code>paseo.json</code>、旧域名、旧二维码、
+                  旧发布附件名和当前仓库目录全部保留。它们属于安装身份、状态或兼容契约，不是简单文案。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">兼容迁移</span>
+                <div class="v">
+                  第二阶段新增 <code>jianshan</code> CLI、<code>jianshan://</code> scheme 和
+                  <code>JIANSHAN_HOME</code>
+                  等别名，同时保留旧入口；新域名与旧域名并行，旧二维码继续可用。 App ID、包名、npm
+                  scope、数据目录和发布链路迁移必须单独做迁移版本，不与普通功能开发混在一起。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">验收</span>
+                <div class="v">
+                  旧安装可继续启动和升级；会话、配置、登录态、笔记和主机配对不丢失；旧二维码与旧链接仍可用；通知和所有主要界面显示「见山」；
+                  Android、iOS、HarmonyOS、Web、Windows、macOS 均完成首次安装与升级验证；旧
+                  <code>paseo</code> CLI 和配置继续工作。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">建议顺序</span>
+                <div class="v">
+                  用户可见名称 → 兼容别名 → 技术和安装身份迁移 → 旧名称清理。每一步都要可回滚。
+                </div>
+              </div>
+            </div>
+
             <div class="card req" data-tag="collab">
               <div class="t">
                 角色二维码与会话工作量归属<span class="tag g-collab">协作</span
@@ -1839,6 +1908,11 @@
       </div>
 
       <footer>
+        更新于 <code>2026-11-05 16:41 CST</code> · 新增最高优先级 P0「品牌改名：Paseo →
+        见山（Jianshan）」。采用“品牌名先换、技术身份后迁”：先改用户可见名称，再提供 CLI / scheme /
+        环境变量兼容别名，最后单独迁移 App ID、包名、npm
+        scope、数据目录和发布链路；旧安装、旧二维码、旧链接、旧配置和旧 CLI 必须保持可用。计划中 /
+        未开发 20 → 21，P0 4 → 5。<br />
         更新于 <code>2026-11-04 17:49 CST</code> · APK 更新到 <code>0.13.22</code> arm64
         （<code>f7d2ca7…</code>，77,235,915 字节），已上传 GitHub Release
         <code>v0.13.4</code>；下载页 APK 按钮改为 GitHub latest 直链，桌面端下载同步到
@@ -1863,7 +1937,7 @@
         项待复现。<br />
         角色口径已定：不同角色看到同一套 Paseo
         内容，二维码只标识当前操作角色，不做会话隔离；会话可转让，工作量按操作时的角色分段统计。<br />
-        当前统计：P0 4 · P1 7 · P2 7 · 暂缓 2 · 待复现 Bug 1 · 痛点 1 · 已实现 16。
+        当前统计：P0 5 · P1 7 · P2 7 · 暂缓 2 · 待复现 Bug 1 · 痛点 1 · 已实现 16。
         <details>
           <summary>历史变更记录（旧口径，仅留档）</summary>
           <div class="history">

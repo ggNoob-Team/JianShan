@@ -2,7 +2,7 @@
   "name": "@getpaseo/desktop",
   "version": "0.13.0-beta.1",
   "private": true,
-  "description": "Paseo desktop app (Electron wrapper)",
+  "description": "JianShan desktop app (Electron wrapper)",
   "homepage": "https://paseo.sh",
   "license": "Apache-2.0",
   "author": {
@@ -47,5 +47,5 @@
     "vitest": "^4.1.6",
     "wait-on": "8.0.5"
   },
-  "desktopName": "Paseo.desktop"
+  "desktopName": "JianShan.desktop"
 }
