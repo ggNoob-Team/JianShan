@@ -793,15 +793,17 @@ export const zhCN: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "浏览器仅桌面端可用",
-        subtitle: "在 Electron 中打开此 workspace 以使用内置浏览器。",
+        title: "浏览器不可用",
+        subtitle: "此版本无法显示该浏览器标签页。",
       },
       session: "浏览器会话 {{browserId}}",
+      embedNotice: "如果页面一直空白，说明该网站不允许嵌入显示，请在系统浏览器中打开。",
       controls: {
         back: "后退",
         forward: "前进",
         stopLoading: "停止加载",
         refresh: "刷新",
+        openInBrowser: "在系统浏览器中打开",
         browserUrl: "浏览器 URL",
         enterUrl: "输入 URL",
         openDevTools: "打开浏览器开发者工具",
@@ -2473,6 +2475,18 @@ export const zhCN: TranslationResources = {
     general: {
       title: "通用",
       sending: "发送",
+      linkOpening: {
+        title: "链接",
+        label: "默认打开方式",
+        descriptions: {
+          system: "在系统默认浏览器中打开外部链接",
+          webview: "在工作区浏览器标签页中打开外部链接",
+        },
+        options: {
+          system: "系统浏览器",
+          webview: "Paseo 标签页",
+        },
+      },
       quickInput: {
         title: "启动",
         label: "启动时打开快速输入",

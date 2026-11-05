@@ -69,13 +69,22 @@ it explicitly.
 
 ## Links
 
-The shell owns one `Web` component and draws no browser chrome, so a page loaded
-into it would have no address bar, no back button, and no way to close it. Links
-leave the app instead: `window.open` reaches `onWindowNew`, which refuses the new
-window and hands the URL to the system browser, and `onLoadIntercept` does the
-same for anything that still tries to navigate the component itself to an
-`http(s)` page. The web app keeps its own history, so the system back key walks
-that history instead of reloading the bundle.
+External links follow Settings > General > Default link opening. The system
+browser choice uses the normal `window.open` path. The Paseo tab choice creates
+a workspace browser tab; on HarmonyOS that tab embeds the page in a sandboxed
+`iframe`, because the shell owns the single top-level `Web` component.
+
+The shell still protects its own document: `window.open` reaches `onWindowNew`,
+which refuses the new window and hands the URL to the system browser, and
+`onLoadIntercept` does the same for main-frame `http(s)` navigations. The web app
+keeps its own history, so the system back key walks that history instead of
+reloading the bundle.
+
+An embedded site may refuse framing with `X-Frame-Options` or
+`Content-Security-Policy: frame-ancestors`; the browser tab shows a notice and an
+Open in system browser action for that case. Remote iframe history is
+cross-origin, so address-bar Back and Forward are unavailable on HarmonyOS. Use
+the system-browser setting when full history controls matter.
 
 ## Clipboard
 

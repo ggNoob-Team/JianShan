@@ -796,15 +796,18 @@ export const en = {
     },
     browser: {
       unavailable: {
-        title: "Browser is desktop-only",
-        subtitle: "Open this workspace in Electron to use the built-in browser.",
+        title: "Browser unavailable",
+        subtitle: "This browser tab is not available in this build.",
       },
       session: "Browser session {{browserId}}",
+      embedNotice:
+        "If the page stays blank, the site does not allow embedding. Open it in your system browser.",
       controls: {
         back: "Back",
         forward: "Forward",
         stopLoading: "Stop loading",
         refresh: "Refresh",
+        openInBrowser: "Open in system browser",
         browserUrl: "Browser URL",
         enterUrl: "Enter URL",
         openDevTools: "Open browser dev tools",
@@ -2631,6 +2634,18 @@ export const en = {
     general: {
       title: "General",
       sending: "Sending",
+      linkOpening: {
+        title: "Links",
+        label: "Default link opening",
+        descriptions: {
+          system: "Open external links in the system browser",
+          webview: "Open external links in a workspace browser tab",
+        },
+        options: {
+          system: "System browser",
+          webview: "Paseo tab",
+        },
+      },
       quickInput: {
         title: "Startup",
         label: "Open quick input on launch",

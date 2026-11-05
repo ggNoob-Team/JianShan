@@ -106,6 +106,31 @@ describe("loadAppSettingsFromStorage", () => {
     );
   });
 
+  it("defaults links to the system browser and preserves an explicit webview choice", async () => {
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+
+    expect((await loadAppSettingsFromStorage(deps)).linkOpenBehavior).toBe("system");
+
+    await saveAppSettings({
+      queryClient,
+      updates: { linkOpenBehavior: "webview" },
+      deps,
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).linkOpenBehavior).toBe("webview");
+  });
+
+  it("falls back to the system browser for malformed link opening values", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ linkOpenBehavior: "future-browser" }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).linkOpenBehavior).toBe("system");
+  });
+
   it("keeps valid settings when another build wrote unknown fields or enum values", async () => {
     const stored = {
       theme: "dark",

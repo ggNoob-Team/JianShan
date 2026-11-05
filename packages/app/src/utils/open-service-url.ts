@@ -5,7 +5,7 @@ import {
   type ServiceUrlBehavior,
 } from "@/hooks/use-settings";
 import { i18n } from "@/i18n/i18next";
-import { openExternalUrl } from "@/utils/open-external-url";
+import { openExternalUrl, openInSystemBrowser } from "@/utils/open-external-url";
 
 export interface OpenServiceUrlOptions {
   openInApp?: (url: string) => void;
@@ -13,8 +13,12 @@ export interface OpenServiceUrlOptions {
 
 export async function openServiceUrl(url: string, options?: OpenServiceUrlOptions): Promise<void> {
   const openInApp = options?.openInApp;
-  if (!openInApp || !isElectronRuntime()) {
+  if (!isElectronRuntime()) {
     await openExternalUrl(url);
+    return;
+  }
+  if (!openInApp) {
+    await openInSystemBrowser(url);
     return;
   }
 
@@ -23,7 +27,7 @@ export async function openServiceUrl(url: string, options?: OpenServiceUrlOption
     openInApp(url);
     return;
   }
-  await openExternalUrl(url);
+  await openInSystemBrowser(url);
 }
 
 async function resolveBehavior(url: string): Promise<Exclude<ServiceUrlBehavior, "ask">> {

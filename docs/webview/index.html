@@ -793,8 +793,7 @@
             <div class="card req" data-tag="session">
               <div class="t">
                 打开链接的方式设置 + WebView Tab 化<span class="tag g-session">会话</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-live">部分已做</span
-                ><span class="badge b-p0">P0</span>
+                ><span class="badge b-live">已实现</span><span class="badge b-p0">P0</span>
               </div>
               <div class="d">
                 打开链接时按设置走：系统浏览器，或 App 内 WebView。选 WebView
@@ -813,13 +812,22 @@
                 </div>
               </div>
               <div class="rq">
-                <span class="k">待做</span>
+                <span class="k">实现</span>
                 <div class="v">
                   <ul>
                     <li>
-                      增加全局“系统浏览器 / App WebView”设置，并让笔记、聊天、PR 等链接统一遵守。
+                      通用设置新增“默认打开方式”，外部链接统一在系统浏览器或工作区 WebView Tab
+                      中打开。
                     </li>
-                    <li>移动端补齐 WebView Tab，不再进入孤立页面；返回路径与 Tab 恢复要可用。</li>
+                    <li>
+                      移动端 WebView Tab 支持地址栏、前进 / 后退、刷新、系统浏览器兜底与 Android
+                      返回键历史，Tab 和 URL 随工作区恢复。
+                    </li>
+                    <li>
+                      HarmonyOS 使用嵌入式
+                      iframe；拒绝嵌入的站点可在系统浏览器中打开，跨域页面不提供 WebView 历史前进 /
+                      后退。
+                    </li>
                   </ul>
                 </div>
               </div>

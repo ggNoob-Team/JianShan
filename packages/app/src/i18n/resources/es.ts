@@ -814,15 +814,18 @@ export const es: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "El navegador es solo para escritorio",
-        subtitle: "Abra este espacio de trabajo en Electron para usar el navegador integrado.",
+        title: "Navegador no disponible",
+        subtitle: "Esta pestaña del navegador no está disponible en esta compilación.",
       },
       session: "Sesión de navegador{{browserId}}",
+      embedNotice:
+        "Si la página sigue en blanco, el sitio no permite incrustarse. Ábrelo en el navegador del sistema.",
       controls: {
         back: "Atrás",
         forward: "Adelante",
         stopLoading: "dejar de cargar",
         refresh: "Refrescar",
+        openInBrowser: "Abrir en el navegador del sistema",
         browserUrl: "NavegadorURL",
         enterUrl: "IngreseURL",
         openDevTools: "Abrir herramientas de desarrollo del navegador",
@@ -2563,6 +2566,18 @@ export const es: TranslationResources = {
     general: {
       title: "General",
       sending: "Envío",
+      linkOpening: {
+        title: "Enlaces",
+        label: "Apertura predeterminada de enlaces",
+        descriptions: {
+          system: "Abrir enlaces externos en el navegador del sistema",
+          webview: "Abrir enlaces externos en una pestaña del navegador del espacio de trabajo",
+        },
+        options: {
+          system: "Navegador del sistema",
+          webview: "Pestaña de Paseo",
+        },
+      },
       quickInput: {
         title: "Inicio",
         label: "Abrir entrada rápida al iniciar",

@@ -80,6 +80,7 @@ import {
   openWorkspaceTargetBeside,
 } from "@/workspace-tabs/open-beside";
 import { openWorkspacePullRequest } from "@/workspace-tabs/open-supporting-view";
+import { registerWorkspaceUrlOpener } from "@/workspace-tabs/url-opener";
 import { traceInstant } from "@/performance/native-trace";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import {
@@ -205,7 +206,11 @@ import {
 import { findAdjacentPane } from "@/utils/split-navigation";
 import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/layout";
 import { getIsElectron, isNative, isWeb } from "@/constants/platform";
-import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
+import {
+  buildHostRootRoute,
+  buildHostWorkspaceRoute,
+  buildSettingsHostRoute,
+} from "@/utils/host-routes";
 import { useWorkspaceTerminals } from "@/screens/workspace/terminals/use-workspace-terminals";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import {
@@ -1016,6 +1021,7 @@ function WorkspaceScreenContent({
   isRouteFocused,
 }: WorkspaceScreenContentProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const _insets = useSafeAreaInsets();
   const toast = useToast();
   const isMobile = useIsCompactFormFactor();
@@ -1836,7 +1842,7 @@ function WorkspaceScreenContent({
 
   const handleCreateBrowserTab = useCallback(
     (input?: { paneId?: string }) => {
-      if (!persistenceKey || !getIsElectron()) {
+      if (!persistenceKey) {
         return;
       }
       const { browserId } = createWorkspaceBrowser();
@@ -1897,8 +1903,8 @@ function WorkspaceScreenContent({
 
   const handleOpenUrlInBrowserTab = useCallback(
     (url: string) => {
-      if (!persistenceKey || !getIsElectron()) {
-        return;
+      if (!persistenceKey) {
+        return false;
       }
       const { browserId } = createWorkspaceBrowser({ initialUrl: url });
       openWorkspaceTabFocused(
@@ -1906,8 +1912,47 @@ function WorkspaceScreenContent({
         { kind: "browser", browserId },
         FOCUSED_PANE_PLACEMENT,
       );
+      return true;
     },
     [openWorkspaceTabFocused, persistenceKey],
+  );
+
+  const isRouteFocusedRef = useRef(isRouteFocused);
+  isRouteFocusedRef.current = isRouteFocused;
+  const workspaceUrlOpenerCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!isRouteFocused || !persistenceKey) {
+      return;
+    }
+    workspaceUrlOpenerCleanupRef.current?.();
+    workspaceUrlOpenerCleanupRef.current = registerWorkspaceUrlOpener({
+      workspaceKey: persistenceKey,
+      openUrl: (url) => {
+        if (!handleOpenUrlInBrowserTab(url)) {
+          return false;
+        }
+        if (!isRouteFocusedRef.current) {
+          router.navigate(
+            buildHostWorkspaceRoute(normalizedServerId, normalizedWorkspaceId) as Href,
+          );
+        }
+        return true;
+      },
+    });
+  }, [
+    handleOpenUrlInBrowserTab,
+    isRouteFocused,
+    normalizedServerId,
+    normalizedWorkspaceId,
+    persistenceKey,
+    router,
+  ]);
+  useEffect(
+    () => () => {
+      workspaceUrlOpenerCleanupRef.current?.();
+      workspaceUrlOpenerCleanupRef.current = null;
+    },
+    [],
   );
 
   useDesktopBrowserNewTabRequests({
@@ -3302,7 +3347,7 @@ function WorkspaceScreenContent({
     () => createTerminalMutation.isPending || pendingTerminalCreateInput !== null,
     [createTerminalMutation.isPending, pendingTerminalCreateInput],
   );
-  const showCreateBrowserTab = getIsElectron();
+  const showCreateBrowserTab = Boolean(persistenceKey);
   const newTabLauncher = useMemo<NewTabLauncher>(
     () => ({
       showChanges: isGitCheckout,

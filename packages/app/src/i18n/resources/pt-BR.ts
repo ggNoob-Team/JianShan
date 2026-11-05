@@ -811,15 +811,18 @@ export const ptBR: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "O navegador é exclusivo do desktop",
-        subtitle: "Abra este workspace no Electron para usar o navegador integrado.",
+        title: "Navegador indisponível",
+        subtitle: "Esta aba do navegador não está disponível nesta versão.",
       },
       session: "Sessão do navegador {{browserId}}",
+      embedNotice:
+        "Se a página continuar em branco, o site não permite incorporação. Abra-o no navegador do sistema.",
       controls: {
         back: "Voltar",
         forward: "Avançar",
         stopLoading: "Parar carregamento",
         refresh: "Atualizar",
+        openInBrowser: "Abrir no navegador do sistema",
         browserUrl: "URL do navegador",
         enterUrl: "Inserir URL",
         openDevTools: "Abrir ferramentas de desenvolvedor do navegador",
@@ -2546,6 +2549,18 @@ export const ptBR: TranslationResources = {
     general: {
       title: "Geral",
       sending: "Envio",
+      linkOpening: {
+        title: "Links",
+        label: "Abertura padrão de links",
+        descriptions: {
+          system: "Abrir links externos no navegador do sistema",
+          webview: "Abrir links externos em uma aba do navegador do workspace",
+        },
+        options: {
+          system: "Navegador do sistema",
+          webview: "Aba do Paseo",
+        },
+      },
       quickInput: {
         title: "Inicialização",
         label: "Abrir entrada rápida ao iniciar",

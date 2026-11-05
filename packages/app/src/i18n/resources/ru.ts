@@ -807,16 +807,18 @@ export const ru: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "Встроенный браузер доступен только в настольном приложении",
-        subtitle:
-          "Откройте это рабочее пространство в Electron, чтобы использовать встроенный браузер.",
+        title: "Браузер недоступен",
+        subtitle: "Эта вкладка браузера недоступна в этой сборке.",
       },
       session: "Сеанс браузера {{browserId}}",
+      embedNotice:
+        "Если страница остается пустой, сайт не разрешает встраивание. Откройте его в системном браузере.",
       controls: {
         back: "Назад",
         forward: "Вперед",
         stopLoading: "Остановить загрузку",
         refresh: "Обновить",
+        openInBrowser: "Открыть в системном браузере",
         browserUrl: "URL браузера",
         enterUrl: "Введите URL",
         openDevTools: "Открыть инструменты разработчика браузера",
@@ -2543,6 +2545,18 @@ export const ru: TranslationResources = {
     general: {
       title: "Основные",
       sending: "Отправка",
+      linkOpening: {
+        title: "Ссылки",
+        label: "Открытие ссылок по умолчанию",
+        descriptions: {
+          system: "Открывать внешние ссылки в системном браузере",
+          webview: "Открывать внешние ссылки во вкладке браузера рабочей области",
+        },
+        options: {
+          system: "Системный браузер",
+          webview: "Вкладка Paseo",
+        },
+      },
       quickInput: {
         title: "Запуск",
         label: "Открывать быстрый ввод при запуске",

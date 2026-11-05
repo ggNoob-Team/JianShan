@@ -813,15 +813,18 @@ export const fr: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "Le navigateur est réservé à l’app de bureau",
-        subtitle: "Ouvrez cet espace de travail dans Electron pour utiliser le navigateur intégré.",
+        title: "Navigateur indisponible",
+        subtitle: "Cet onglet de navigateur n’est pas disponible dans cette version.",
       },
       session: "Session de navigateur {{browserId}}",
+      embedNotice:
+        "Si la page reste vide, le site n’autorise pas l’intégration. Ouvrez-le dans le navigateur du système.",
       controls: {
         back: "Retour",
         forward: "Suivant",
         stopLoading: "Arrêter le chargement",
         refresh: "Actualiser",
+        openInBrowser: "Ouvrir dans le navigateur du système",
         browserUrl: "URL du navigateur",
         enterUrl: "Saisir une URL",
         openDevTools: "Ouvrir les outils de développement du navigateur",
@@ -2563,6 +2566,18 @@ export const fr: TranslationResources = {
     general: {
       title: "Général",
       sending: "Envoi",
+      linkOpening: {
+        title: "Liens",
+        label: "Ouverture par défaut des liens",
+        descriptions: {
+          system: "Ouvrir les liens externes dans le navigateur du système",
+          webview: "Ouvrir les liens externes dans un onglet de navigateur de l’espace de travail",
+        },
+        options: {
+          system: "Navigateur du système",
+          webview: "Onglet Paseo",
+        },
+      },
       quickInput: {
         title: "Démarrage",
         label: "Ouvrir la saisie rapide au lancement",

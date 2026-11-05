@@ -797,15 +797,17 @@ export const ar: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "المتصفح مخصص لسطح المكتب فقط",
-        subtitle: "افتح مساحة العمل هذه في Electron لاستخدام المتصفح المدمج.",
+        title: "المتصفح غير متاح",
+        subtitle: "علامة تبويب المتصفح هذه غير متاحة في هذا الإصدار.",
       },
       session: "جلسة المتصفح{{browserId}}",
+      embedNotice: "إذا ظلت الصفحة فارغة، فالموقع لا يسمح بالتضمين. افتحه في متصفح النظام.",
       controls: {
         back: "خلف",
         forward: "إلى الأمام",
         stopLoading: "توقف عن التحميل",
         refresh: "ينعش",
+        openInBrowser: "فتح في متصفح النظام",
         browserUrl: "متصفح URL",
         enterUrl: "أدخل URL",
         openDevTools: "افتح أدوات تطوير المتصفح",
@@ -2536,6 +2538,18 @@ export const ar: TranslationResources = {
     general: {
       title: "عام",
       sending: "الإرسال",
+      linkOpening: {
+        title: "الروابط",
+        label: "الفتح الافتراضي للروابط",
+        descriptions: {
+          system: "فتح الروابط الخارجية في متصفح النظام",
+          webview: "فتح الروابط الخارجية في علامة تبويب متصفح مساحة العمل",
+        },
+        options: {
+          system: "متصفح النظام",
+          webview: "علامة تبويب Paseo",
+        },
+      },
       quickInput: {
         title: "بدء التشغيل",
         label: "فتح الإدخال السريع عند التشغيل",

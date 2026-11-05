@@ -806,15 +806,18 @@ export const ja: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "ブラウザはデスクトップ専用です",
-        subtitle: "組み込みブラウザを使用するには、このワークスペースをElectronで開いてください。",
+        title: "ブラウザーを利用できません",
+        subtitle: "このビルドではこのブラウザータブを表示できません。",
       },
       session: "ブラウザセッション{{browserId}}",
+      embedNotice:
+        "ページが白いままの場合は、このサイトが埋め込みを許可していません。システムブラウザーで開いてください。",
       controls: {
         back: "戻る",
         forward: "進む",
         stopLoading: "読み込みを停止",
         refresh: "更新",
+        openInBrowser: "システムブラウザーで開く",
         browserUrl: "ブラウザURL",
         enterUrl: "URLを入力",
         openDevTools: "ブラウザ開発ツールを開く",
@@ -2529,6 +2532,18 @@ export const ja: TranslationResources = {
     general: {
       title: "一般",
       sending: "送信",
+      linkOpening: {
+        title: "リンク",
+        label: "デフォルトの開き方",
+        descriptions: {
+          system: "外部リンクをシステムブラウザーで開きます",
+          webview: "外部リンクをワークスペースのブラウザータブで開きます",
+        },
+        options: {
+          system: "システムブラウザー",
+          webview: "Paseo タブ",
+        },
+      },
       quickInput: {
         title: "起動",
         label: "起動時にクイック入力を開く",

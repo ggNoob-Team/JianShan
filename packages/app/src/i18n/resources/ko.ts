@@ -801,15 +801,18 @@ export const ko: TranslationResources = {
     },
     browser: {
       unavailable: {
-        title: "브라우저는 데스크톱 전용입니다",
-        subtitle: "내장 브라우저를 사용하려면 이 워크스페이스를 Electron에서 여세요.",
+        title: "브라우저를 사용할 수 없음",
+        subtitle: "이 빌드에서는 이 브라우저 탭을 표시할 수 없습니다.",
       },
       session: "브라우저 세션 {{browserId}}",
+      embedNotice:
+        "페이지가 계속 비어 있으면 이 사이트에서 포함을 허용하지 않는 것입니다. 시스템 브라우저에서 여세요.",
       controls: {
         back: "뒤로",
         forward: "앞으로",
         stopLoading: "로딩 중지",
         refresh: "새로고침",
+        openInBrowser: "시스템 브라우저에서 열기",
         browserUrl: "브라우저 URL",
         enterUrl: "URL 입력",
         openDevTools: "브라우저 개발자 도구 열기",
@@ -2517,6 +2520,18 @@ export const ko: TranslationResources = {
     general: {
       title: "일반",
       sending: "전송",
+      linkOpening: {
+        title: "링크",
+        label: "기본 열기 방식",
+        descriptions: {
+          system: "외부 링크를 시스템 브라우저에서 엽니다",
+          webview: "외부 링크를 작업 공간 브라우저 탭에서 엽니다",
+        },
+        options: {
+          system: "시스템 브라우저",
+          webview: "Paseo 탭",
+        },
+      },
       quickInput: {
         title: "시작",
         label: "실행 시 빠른 입력 열기",
