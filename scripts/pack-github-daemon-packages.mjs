@@ -130,7 +130,7 @@ function transformManifest(packageDir, spec, version) {
   delete manifest.devDependencies;
   manifest.repository = {
     type: "git",
-    url: "https://github.com/ggNoob-Team/paseo.git",
+    url: "https://github.com/ggNoob-Team/JianShan.git",
   };
   manifest.publishConfig = {
     registry: "https://npm.pkg.github.com",

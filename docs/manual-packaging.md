@@ -33,7 +33,7 @@ CLI equivalent:
 
 ```bash
 gh workflow run desktop-release.yml \
-  -R ggNoob-Team/paseo \
+  -R ggNoob-Team/JianShan \
   --ref main \
   -f tag=v0.9.0-beta.2 \
   -f platform=windows \
@@ -68,7 +68,7 @@ CLI equivalent:
 
 ```bash
 gh workflow run desktop-release.yml \
-  -R ggNoob-Team/paseo \
+  -R ggNoob-Team/JianShan \
   --ref main \
   -f tag=v0.9.0-beta.2 \
   -f platform=macos \
@@ -104,7 +104,7 @@ CLI equivalent:
 
 ```bash
 gh workflow run android-apk-build.yml \
-  -R ggNoob-Team/paseo \
+  -R ggNoob-Team/JianShan \
   --ref main \
   -f version=0.9.0-beta.2 \
   -f architectures=arm64-v8a
@@ -161,7 +161,7 @@ CLI equivalent:
 
 ```bash
 gh workflow run deploy-app.yml \
-  -R ggNoob-Team/paseo \
+  -R ggNoob-Team/JianShan \
   --ref main
 ```
 

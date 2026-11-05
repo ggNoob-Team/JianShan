@@ -9,7 +9,7 @@ publish_dir="${PASEO_APK_PUBLISH_DIR:-$artifacts_dir/published}"
 web_root="${PASEO_APK_WEB_ROOT:-/www/wwwroot/paseo.zxyz.app}"
 web_link_name="${PASEO_APK_WEB_LINK:-apk}"
 site_url="${PASEO_APK_SITE_URL:-https://paseo.zxyz.app}"
-github_url="${PASEO_APK_GITHUB_URL:-https://github.com/ggNoob-Team/paseo/releases/latest/download/paseo-latest.apk}"
+github_url="${PASEO_APK_GITHUB_URL:-https://github.com/ggNoob-Team/JianShan/releases/latest/download/paseo-latest.apk}"
 source_apk=""
 skip_verify=false
 
