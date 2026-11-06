@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.13.24 - 2026-11-06
+
+JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup, and a composer that stays put.
+
+### Added
+
+- Added QR-code pairing on HarmonyOS, so a phone can scan a host invitation directly.
+- Added an option to open links in workspace WebView tabs without leaving the current flow.
+- Renamed the visible client and startup identity to JianShan, with a new startup mark and HarmonyOS icon.
+- Kept the quick-input composer pinned to the bottom while editing.
+
+### Improved
+
+- Split the startup bundle and loaded icons and KaTeX on demand to reduce first-screen work.
+- Cached HarmonyOS shell assets to speed up repeat launches.
+- Bounded workspace hydration to two seconds so an offline host no longer leaves the app stuck on the splash screen.
+- Updated the download site to serve the latest APK from GitHub Releases.
+
+### Fixed
+
+- Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
+
 ## 0.13.0-beta.1 - 2026-10-22
 
 Foldable phone layouts, agents that delegate work to other machines, plugin file panels, and plugin translations.
