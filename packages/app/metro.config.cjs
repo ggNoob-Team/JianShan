@@ -77,6 +77,23 @@ function resolveWithCustomWebOverlay(context, moduleName, platform) {
 }
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === "lucide-react-native/internal-context") {
+    return {
+      type: "sourceFile",
+      filePath: path.join(appNodeModulesRoot, "lucide-react-native/dist/esm/context.mjs"),
+    };
+  }
+  if (
+    moduleName === "./katex.js" &&
+    /[/\\]react-native-enriched-markdown[/\\]lib[/\\]module[/\\]web[/\\]EnrichedMarkdownText\.js$/.test(
+      context.originModulePath,
+    )
+  ) {
+    return {
+      type: "sourceFile",
+      filePath: path.join(appSrcRoot, "components/markdown/katex-loader.web.ts"),
+    };
+  }
   if (
     isWatchdogBuild &&
     platform === "android" &&
