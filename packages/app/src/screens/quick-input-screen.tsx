@@ -239,7 +239,7 @@ export function QuickInputScreen() {
   const showHost = hosts.length > 1;
   const useTwoColumns = width >= 900;
   const visibleResults = expanded ? ranking.results : ranking.results.slice(0, 5);
-  const bottomStyle = useMemo(() => ({ paddingBottom: insets.bottom + 24 }), [insets.bottom]);
+  const footerStyle = useMemo(() => ({ paddingBottom: insets.bottom + 16 }), [insets.bottom]);
 
   useEffect(() => {
     if (!awaitingSlowRoute) {
@@ -490,74 +490,10 @@ export function QuickInputScreen() {
       />
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, bottomStyle]}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         testID="quick-input-screen"
       >
-        <View style={styles.hero}>
-          <View style={[styles.inputShell, isSearching && styles.inputShellActive]}>
-            <ThemedSearch size={18} uniProps={mutedIconMapping} />
-            <View style={styles.modelSelectorWrap} testID="quick-input-model-selector">
-              <CombinedModelSelector
-                providers={modelForm.modelSelectorProviders}
-                selectedProvider={modelForm.selectedProvider ?? ""}
-                selectedModel={modelForm.selectedModel}
-                onSelect={handleModelSelect}
-                isLoading={modelForm.isAllModelsLoading}
-                disabled={sending}
-                onOpen={modelForm.refetchProviderModelsIfStale}
-                onClose={() => inputRef.current?.focus()}
-                onRetryProvider={modelForm.refreshProviderModels}
-                isRetryingProvider={modelForm.isProviderModelsRefreshing}
-                serverId={modelForm.selectedServerId}
-                desktopPlacement="bottom-start"
-                desktopMinWidth={360}
-                toolbar={{ glyphSize: 16, showCaret: true }}
-              />
-            </View>
-            <View style={styles.inputDivider} />
-            <ThemedTextInput
-              ref={inputRef}
-              initialValue={query}
-              onChangeText={(value) => {
-                setQuery(value);
-                setSendError(null);
-              }}
-              onSubmitEditing={handleEnter}
-              onKeyPress={handleKeyPress}
-              placeholder={t("quickInput.placeholder")}
-              accessibilityLabel={t("quickInput.placeholder")}
-              autoFocus
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType={isSearching ? "go" : "search"}
-              style={styles.input}
-              testID="quick-input-field"
-            />
-            <Button
-              size="xs"
-              variant="default"
-              disabled={!isSearching || !activeResult || awaitingSlowRoute}
-              onPress={handleEnter}
-              accessibilityLabel={t("quickInput.actions.open")}
-              testID="quick-input-submit"
-              leftIcon={(color: string) => <ArrowRight size={14} color={color} />}
-            />
-          </View>
-          <Text style={styles.hint}>
-            {isSearching ? t("quickInput.searchHint") : t("quickInput.idleHint")}
-          </Text>
-          {awaitingSlowRoute ? (
-            <SlowRouteProgress progress={slowRoute.progress} seconds={slowRouteElapsedSeconds} />
-          ) : null}
-          {sendError ? (
-            <View style={styles.errorBanner} accessibilityRole="alert">
-              <ThemedTriangleAlert size={16} uniProps={mutedIconMapping} />
-              <Text style={styles.errorText}>{t(`quickInput.errors.${sendError}`)}</Text>
-            </View>
-          ) : null}
-        </View>
-
         {isLoading && sessions.length === 0 ? (
           <View style={styles.loading}>
             <ThemedLoadingSpinner size="small" />
@@ -663,6 +599,71 @@ export function QuickInputScreen() {
           </View>
         ) : null}
       </ScrollView>
+      <View style={[styles.composer, footerStyle]}>
+        <View style={styles.composerContent}>
+          {awaitingSlowRoute ? (
+            <SlowRouteProgress progress={slowRoute.progress} seconds={slowRouteElapsedSeconds} />
+          ) : null}
+          {sendError ? (
+            <View style={styles.errorBanner} accessibilityRole="alert">
+              <ThemedTriangleAlert size={16} uniProps={mutedIconMapping} />
+              <Text style={styles.errorText}>{t(`quickInput.errors.${sendError}`)}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.hint}>
+            {isSearching ? t("quickInput.searchHint") : t("quickInput.idleHint")}
+          </Text>
+          <View style={[styles.inputShell, isSearching && styles.inputShellActive]}>
+            <ThemedSearch size={18} uniProps={mutedIconMapping} />
+            <View style={styles.modelSelectorWrap} testID="quick-input-model-selector">
+              <CombinedModelSelector
+                providers={modelForm.modelSelectorProviders}
+                selectedProvider={modelForm.selectedProvider ?? ""}
+                selectedModel={modelForm.selectedModel}
+                onSelect={handleModelSelect}
+                isLoading={modelForm.isAllModelsLoading}
+                disabled={sending}
+                onOpen={modelForm.refetchProviderModelsIfStale}
+                onClose={() => inputRef.current?.focus()}
+                onRetryProvider={modelForm.refreshProviderModels}
+                isRetryingProvider={modelForm.isProviderModelsRefreshing}
+                serverId={modelForm.selectedServerId}
+                desktopPlacement="bottom-start"
+                desktopMinWidth={360}
+                toolbar={{ glyphSize: 16, showCaret: true }}
+              />
+            </View>
+            <View style={styles.inputDivider} />
+            <ThemedTextInput
+              ref={inputRef}
+              initialValue={query}
+              onChangeText={(value) => {
+                setQuery(value);
+                setSendError(null);
+              }}
+              onSubmitEditing={handleEnter}
+              onKeyPress={handleKeyPress}
+              placeholder={t("quickInput.placeholder")}
+              accessibilityLabel={t("quickInput.placeholder")}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType={isSearching ? "go" : "search"}
+              style={styles.input}
+              testID="quick-input-field"
+            />
+            <Button
+              size="xs"
+              variant="default"
+              disabled={!isSearching || !activeResult || awaitingSlowRoute}
+              onPress={handleEnter}
+              accessibilityLabel={t("quickInput.actions.open")}
+              testID="quick-input-submit"
+              leftIcon={(color: string) => <ArrowRight size={14} color={color} />}
+            />
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -957,9 +958,21 @@ const styles = StyleSheet.create((theme) => ({
       md: theme.spacing[6],
     },
     paddingTop: theme.spacing[4],
+    paddingBottom: theme.spacing[4],
     gap: theme.spacing[4],
   },
-  hero: {
+  composer: {
+    paddingTop: theme.spacing[3],
+    paddingHorizontal: {
+      xs: theme.spacing[3],
+      md: theme.spacing[6],
+    },
+    backgroundColor: theme.colors.surface0,
+  },
+  composerContent: {
+    width: "100%",
+    maxWidth: 1200,
+    alignSelf: "center",
     gap: theme.spacing[2],
   },
   inputShell: {
