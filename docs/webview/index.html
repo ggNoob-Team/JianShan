@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" href="data:," />
     <title>Paseo 二开 · 功能索引</title>
     <style>
@@ -55,6 +58,21 @@
         color: var(--faint);
         font-weight: 400;
         margin-top: 8px;
+      }
+      .build-stamp {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 12px;
+        padding: 4px 10px;
+        border: 1px solid rgba(34, 211, 167, 0.35);
+        border-radius: 999px;
+        background: rgba(34, 211, 167, 0.08);
+        color: var(--live);
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: 400;
+        letter-spacing: 0;
       }
       .meta {
         font-size: 12px;
@@ -346,6 +364,11 @@
         border-color: rgba(251, 113, 133, 0.45);
         background: rgba(251, 113, 133, 0.1);
       }
+      .g-device {
+        color: #2dd4bf;
+        border-color: rgba(45, 212, 191, 0.45);
+        background: rgba(45, 212, 191, 0.1);
+      }
       .tagbar {
         display: flex;
         align-items: center;
@@ -588,20 +611,23 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Paseo 二开 · 功能索引<small>PASEO FORK · FEATURES &amp; REQUIREMENTS</small></h1>
+      <h1>
+        Paseo 二开 · 功能索引<small>PASEO FORK · FEATURES &amp; REQUIREMENTS</small
+        ><span class="build-stamp">线上版本 · 2026-11-07 19:49 CST</span>
+      </h1>
 
       <div class="overview">
         <div class="overview-item p0">
-          <b>5</b><span>下一步 P0<br />形成可验证的闭环</span>
+          <b>4</b><span>下一步 P0<br />形成可验证的闭环</span>
         </div>
         <div class="overview-item">
-          <b>21</b><span>计划中 / 未开发<br />P0 5 · P1 7 · P2 7 · 暂缓 2</span>
+          <b>21</b><span>计划中 / 未开发<br />P0 4 · P1 9 · P2 6 · 暂缓 2</span>
         </div>
         <div class="overview-item bug">
           <b>1</b><span>待复现 Bug<br />需要入口与复现证据</span>
         </div>
         <div class="overview-item live">
-          <b>16</b><span>已实现<br />按主题归组</span>
+          <b>18</b><span>已实现<br />按主题归组</span>
         </div>
       </div>
 
@@ -613,12 +639,12 @@
         <b style="color: var(--plan)">探索</b>=产品方向，尚不足以直接开发；
         <b style="color: var(--bug)">Bug</b>=需要修复或复现；<b style="color: var(--pain)">痛点</b
         >=真实摩擦，尚未整理成确定需求。<br />
-        优先级只看 P0 → P1 → P2。P0 先解决品牌改名、笔记闭环、链接打开、角色归属、个人首页；P1
-        做代码 / 需求可视化、会话收纳、个人知识库、本地意图目录、团队 daemon 以及消息 / 实时聊天；P2
-        才是任务闭环、分布式 Agent、通用办公、通用 Agent 与新书。<br />
-        下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android GitHub 直链
-        <code>https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.4/paseo-latest.apk</code>
-        · 桌面端 GitHub Release v0.13.4。
+        优先级只看 P0 → P1 → P2。P0 先解决品牌改名、笔记闭环、角色归属、个人首页；P1 做代码 /
+        需求可视化、会话收纳、个人知识库、本地意图目录、团队 daemon、设备 / 环境感知以及消息 /
+        实时聊天；P2 才是任务闭环、分布式 Agent、通用办公、通用 Agent 与新书。<br />
+        下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android 固定直链
+        <code>https://paseo.zxyz.app/apk/paseo-latest.apk</code> · 桌面端 Windows GitHub Release
+        v0.13.5（macOS 最新 v0.13.4）· 鸿蒙 AppGallery 邀请测试。
       </div>
 
       <div class="tabs" id="tabs">
@@ -627,9 +653,9 @@
         </button>
         <button class="tab bug" data-tab="bugs">Bug<span class="c">1</span></button>
         <button class="tab pain" data-tab="pains">痛点想法<span class="c">1</span></button>
-        <button class="tab live" data-tab="done">已实现<span class="c">16</span></button>
+        <button class="tab live" data-tab="done">已实现<span class="c">18</span></button>
         <button class="tab download" data-tab="download">
-          下载<span class="c">WIN · MAC · APK</span>
+          下载<span class="c">WIN · MAC · APK · HMOS</span>
         </button>
       </div>
 
@@ -640,6 +666,7 @@
         <button class="tagf" data-tagf="task">任务</button>
         <button class="tagf" data-tagf="collab">协作</button>
         <button class="tagf" data-tagf="message">消息</button>
+        <button class="tagf" data-tagf="device">设备</button>
         <button class="tagf" data-tagf="session">会话</button>
         <button class="tagf" data-tagf="workspace">工作区</button>
         <button class="tagf" data-tagf="voice">语音</button>
@@ -687,18 +714,34 @@
 
       <div class="pane on" id="pane-backlog">
         <section class="filter-section">
-          <h2>下一步 · P0 <span class="n">5 项 · 下一批开发队列，先做能形成闭环的部分</span></h2>
+          <h2>下一步 · P0 <span class="n">4 项 · 下一批开发队列，先做能形成闭环的部分</span></h2>
           <div class="grid">
             <div class="card req" data-tag="release">
               <div class="t">
                 品牌改名：Paseo → 见山（Jianshan）<span class="tag g-release">品牌发布</span
-                ><span class="badge b-plan">计划中</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-live">部分已做</span
                 ><span class="badge b-p0">P0 · 最高优先级</span>
               </div>
               <div class="d">
                 将产品品牌从 Paseo 统一改为「见山 /
                 Jianshan」。当前系统正在运行，必须采用“品牌名先换、技术身份后迁”的方式推进，不能直接全局替换，
                 也不能让旧安装、旧二维码、旧链接、旧配置和当前会话失效。
+              </div>
+              <div class="rq">
+                <span class="k">已做</span>
+                <div class="v">
+                  App 显示名与调试名改为「见山 / 见山
+                  Debug」，中英文及全部语言资源的用户可见品牌词已替换；桌面端产品名和执行名改为
+                  JianShan，HarmonyOS 应用名与权限说明改为见山，启动标识和 HarmonyOS
+                  图标也已替换；部分下载与更新地址已指向 JianShan。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">未完成</span>
+                <div class="v">
+                  门户与部分文档仍混用 Paseo；CLI、URL scheme、环境变量、App ID、包名、npm
+                  scope、数据目录、安装包文件名和自动更新兼容层尚未迁移；兼容别名与全平台升级验证尚未完成。
+                </div>
               </div>
               <div class="rq">
                 <span class="k">第一批范围</span>
@@ -838,6 +881,8 @@
                       App
                       启动后刷新一次；新增、编辑、删除后刷新一次；保留下拉刷新，不在每次展开时重拉。
                     </li>
+                    <li>笔记列表支持上下拖动排序；排序结果持久化，刷新或重开 App 后保持。</li>
+                    <li>标题、正文和备注可编辑；编辑完成后列表与详情显示最新内容。</li>
                     <li>
                       笔记渲染来源锚点，能跳回会话、消息、文件 + 行、图片或 PR；主操作是“回去”。
                     </li>
@@ -848,91 +893,13 @@
               <div class="rq">
                 <span class="k">验收</span>
                 <div class="v">
-                  重复展开抽屉不产生网络请求；新增一条后返回能看到且只刷新一次；从笔记可准确回到来源；待处理可清空。
+                  重复展开抽屉不产生网络请求；新增一条后返回能看到且只刷新一次；笔记上下拖动后顺序保存并在重开后保持；标题、正文和备注编辑后正确保存；从笔记可准确回到来源；待处理可清空。
                 </div>
               </div>
               <div class="rq">
                 <span class="k">后置</span>
                 <div class="v">
                   个人笔记收件箱、跨项目全文检索与思维导图统一放到「个人知识库」。
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="session">
-              <div class="t">
-                打开链接的方式设置 + WebView Tab 化<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span><span class="badge b-p0">P0</span>
-              </div>
-              <div class="d">
-                打开链接时按设置走：系统浏览器，或 App 内 WebView。选 WebView
-                时不要新开孤立界面，而是像打开本地 HTML 文件一样，在工作区顶部新增一个 Tab。
-              </div>
-              <div class="rq">
-                <span class="k">已做</span>
-                <div class="v">
-                  <ul>
-                    <li>普通外部链接已经统一通过 <code>openExternalUrl</code> 调用系统浏览器。</li>
-                    <li>
-                      Electron 已有工作区 Browser Tab、地址栏和前进 / 后退；工作区脚本 URL
-                      也能选择在 App 内打开。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">实现</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      通用设置新增“默认打开方式”，外部链接统一在系统浏览器或工作区 WebView Tab
-                      中打开。
-                    </li>
-                    <li>
-                      移动端 WebView Tab 支持地址栏、前进 / 后退、刷新、系统浏览器兜底与 Android
-                      返回键历史，Tab 和 URL 随工作区恢复。
-                    </li>
-                    <li>
-                      HarmonyOS 使用嵌入式
-                      iframe；拒绝嵌入的站点可在系统浏览器中打开，跨域页面不提供 WebView 历史前进 /
-                      后退。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">需求</span>
-                <div class="v">
-                  <ul>
-                    <li>设置项：默认打开方式 = App WebView / 系统浏览器。</li>
-                    <li>系统浏览器：调用系统默认浏览器，复用现有 openExternalUrl 路径。</li>
-                    <li>
-                      App WebView：复用工作区 Tab 系统（顶部多 Tab），和打开本地 HTML
-                      文件的行为一致。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">开放问题</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      WebView Tab 是否允许继续导航？当前本地 HTML preview 是
-                      viewer，会拦截后续导航。
-                    </li>
-                    <li>设置粒度是全局，还是按来源（笔记 / 聊天 / PR）分别配置。</li>
-                    <li>Tab 的 URL 是否要持久化，重开工作区是否恢复。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">相关</span>
-                <div class="v">
-                  本地 HTML 文件当前已经会新增 file Tab（<code>openWorkspaceFileFromExplorer</code>
-                  /
-                  <code>WorkspaceFileTabTarget</code>）。Browser Tab
-                  的桌面基础已经存在，但尚未成为所有链接的统一默认打开方式。
                 </div>
               </div>
             </div>
@@ -970,7 +937,7 @@
           </div>
         </section>
         <section class="filter-section">
-          <h2>近期 · P1 <span class="n">7 项 · P0 落地后接续，依赖已明确</span></h2>
+          <h2>近期 · P1 <span class="n">9 项 · P0 落地后接续，包含分布式 Agent 核心架构</span></h2>
           <div class="grid">
             <div class="card req" data-tag="archify">
               <div class="t">
@@ -1155,6 +1122,261 @@
               </div>
             </div>
 
+            <div class="card req" data-tag="device">
+              <div class="t">
+                设备与环境感知（Device Context）<span class="tag g-device">设备</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
+              </div>
+              <div class="d">
+                服务器和 Agent
+                必须知道当前是谁、在哪台设备、在哪个界面发起操作，才能判断哪些动作可以在该设备完成。不能把手机、平板、Web、Mac、Windows
+                和 HarmonyOS 都当成同一个无差别客户端。
+              </div>
+              <div class="rq">
+                <span class="k">至少感知</span>
+                <div class="v">
+                  <ul>
+                    <li>设备类型、设备 ID、操作系统、客户端版本、在线状态和网络延迟。</li>
+                    <li>
+                      当前活动上下文：输入来自手机还是 Mac、当前在工作区 / 输入框 / 终端 / 浏览器 /
+                      设置页，以及当前项目与会话。
+                    </li>
+                    <li>输入方式：触屏、硬件键盘、语音、扫码、相机和文件选择器是否可用。</li>
+                    <li>
+                      执行能力：浏览器自动化、本地
+                      Codex、终端、文件系统、桌面应用、通知、相机和系统分享等。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">用途</span>
+                <div class="v">
+                  Agent 根据设备和当前上下文选择动作：手机负责输入、确认、扫码和查看；Mac / Windows
+                  可以执行本地浏览器、Codex、终端和文件操作；服务器负责统一推理、编排和记录。设备切换时上下文要实时更新。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">边界</span>
+                <div class="v">
+                  默认只上报能力与活动元数据，不上报完整屏幕、剪贴板和文件内容；敏感能力需要单独授权。设备状态必须有时效，失联或切后台后不能继续被视为可执行节点。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">与分布式 Agent 的关系</span>
+                <div class="v">
+                  这是分布式 Agent
+                  的前置能力：服务器需要先知道哪台设备在线、有什么能力、当前是否适合执行，才能把任务路由到本地
+                  Agent。
+                </div>
+              </div>
+            </div>
+
+            <div class="card req" data-tag="agent">
+              <div class="t">
+                分布式 Agent（服务器编排 + 本地执行）<span class="tag g-agent">Agent</span
+                ><span class="badge b-plan">计划中</span
+                ><span class="badge b-todo">P1 · 核心架构</span
+                ><span class="badge b-live">部分基础</span>
+              </div>
+              <div class="d">
+                手机 / 平板只是输入和控制终端，Paseo 与核心 Agent
+                跑在服务器；但有些自动化必须使用本地电脑上的
+                Codex、终端、文件和桌面环境。目标是让服务器 Agent
+                能把指定步骤委派给已配对电脑上的本地
+                Agent，执行过程和结果回到同一个会话，不再要求用户手动打开电脑上的 Codex。
+              </div>
+              <div class="rq">
+                <span class="k">当前已有基础（2026-11-06）</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      服务器 daemon 上的 Agent 可调用 <code>browser_*</code> 工具；工具定义与编排在
+                      daemon，模型仍是服务器侧 Agent。
+                    </li>
+                    <li>
+                      本地 Electron 客户端连接后注册为 browser automation host；daemon 的 broker
+                      把命令发给已连接客户端。
+                    </li>
+                    <li>
+                      <code>browser_new_tab</code> 当前选择“最近注册的浏览器宿主”，后续命令按
+                      browserId 固定回原宿主；新 Tab 和点击都在该客户端的本地 Electron WebView
+                      中执行。
+                    </li>
+                    <li>
+                      本地浏览器保留本地 Cookie / 登录态；daemon
+                      只传输自动化命令和结果，不传输整屏视频。
+                    </li>
+                    <li>
+                      这不是本地 Codex：本地客户端承担浏览器执行器，服务器侧 Agent / Codex
+                      负责思考。多客户端并发时也还没有显式“选择在哪台电脑执行”的产品入口。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">还需要</span>
+                <div class="v">
+                  明确目标主机、把本地 Codex / 终端 /
+                  文件和桌面动作纳入能力注册，增加逐能力授权、任务确认、超时与断线恢复，形成完整的本地
+                  Agent Worker。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">目标形态</span>
+                <div class="v">
+                  以服务器为主、本地为辅：服务器维护主会话、核心推理、任务编排和最终答复；本地 Agent
+                  Worker 作为可发现的在线执行节点，向服务器注册自己、当前环境与可用能力。服务器创建
+                  Agent 或分配任务时，能看到本机 Agent 是否在线，并让本地 Agent 执行
+                  Codex、浏览器、终端、文件和桌面自动化；结果回到同一会话。
+                  本地不是另一个大脑，而是服务器 Agent 可以调度的“本地手脚”。
+                </div>
+              </div>
+
+              <div class="rq">
+                <span class="k">完整模块划分</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      <b>设备与状态感知：</b>设备类型、系统、客户端版本、在线 /
+                      延迟、当前工作区与会话、输入来源和当前活动界面。
+                    </li>
+                    <li>
+                      <b>身份、配对与信任：</b>设备稳定身份、公钥、配对、撤销、用户 /
+                      角色权限，以及服务器和本地 Worker 的双向身份校验。
+                    </li>
+                    <li>
+                      <b>本地 Agent 注册与能力发现：</b>Agent ID、Provider、Codex
+                      能力、工作区、工具目录、负载、心跳和在线状态。
+                    </li>
+                    <li>
+                      <b>本地 Agent 生命周期：</b
+                      >创建、启动、暂停、恢复、停止、重启、查询状态和终止，并定义完整状态机。
+                    </li>
+                    <li>
+                      <b>目标与短期状态：</b>当前
+                      objective、成功标准、约束、计划、当前步骤、进度、阻塞、待审批、截止时间和
+                      revision；服务器可查询、订阅、修改和取消。
+                    </li>
+                    <li>
+                      <b>任务路由与调度：</b
+                      >按设备能力、在线状态、工作区、权限、负载和用户选择指定执行节点，处理排队、并发和资源锁。
+                    </li>
+                    <li>
+                      <b>通讯协议：</b
+                      >控制面支持注册、启动、目标分配和审批；事件面支持步骤、日志、工具结果、错误、心跳和完成通知；具备请求
+                      ID、幂等、顺序、超时和取消。
+                    </li>
+                    <li>
+                      <b>上下文与会话同步：</b
+                      >服务器保留主会话；本地只接收任务所需上下文并回传执行轨迹、结果和检查点，避免两套割裂记忆。
+                    </li>
+                    <li>
+                      <b>执行能力与工具目录：</b>本地 Codex、浏览器、终端、文件、Git、桌面应用、MCP
+                      / Skills 和系统能力都通过结构化工具暴露。
+                    </li>
+                    <li>
+                      <b>权限、审批与审计：</b
+                      >按设备、工作区、任务和工具授权；读写与危险动作分级确认；本地凭证不离开设备；全程留痕。
+                    </li>
+                    <li>
+                      <b>故障恢复与离线语义：</b>心跳、重连、任务租约、检查点、幂等、fencing
+                      token，明确服务器或本地掉线时任务暂停、继续还是取消。
+                    </li>
+                    <li>
+                      <b>控制界面：</b>设备与本地 Agent 状态、目标 / 当前步骤 /
+                      阻塞、执行节点选择、暂停 / 取消 / 接管、审批和断线提示。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">优先级提升原因</span>
+                <div class="v">
+                  它决定后续办公入口、通用
+                  Agent、本地自动化和多设备协作能不能成立，不再只是远期功能。P1 MVP
+                  先完成“一台服务器 + 一个本地 Agent Worker + 一个本地 Codex +
+                  目标状态回传”的闭环；多设备调度、离线自治和跨设备迁移后置。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">典型场景</span>
+                <div class="v">
+                  用户在平板上提出“自动申请飞书 API key”。服务器 Agent
+                  负责理解任务、编排步骤和保持会话；其中需要在本机 Codex / 浏览器 /
+                  本地凭证完成的部分，自动交给指定电脑执行，并把确认、日志和结果实时回传。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">运行模型</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      <b>服务器为主：</b>负责核心推理、任务分解、主会话、上下文、路由和最终答复。
+                    </li>
+                    <li>
+                      <b>本地为辅：</b>本地 Agent Worker
+                      负责执行只能在本机完成的工具调用与命令，并把结果交回服务器。
+                    </li>
+                    <li>
+                      两者通过同一任务 ID、会话 ID 和工具调用 ID 关联；用户只看到一条连续会话。
+                    </li>
+                    <li>
+                      一个用户可以配对多台电脑，由服务器根据能力、在线状态或用户选择指定执行节点。
+                    </li>
+                    <li>
+                      服务器必须通过「设备与环境感知」知道本地 Agent
+                      的在线状态、工具能力、当前工作区和适合执行的动作。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">通讯建议</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      优先复用现有 connected-host、routed session 和 relay / E2E
+                      通道；本地节点主动向服务器或 relay 建立持久连接，避免要求公网入站端口。
+                    </li>
+                    <li>
+                      本地节点注册 hostId、工作区、可用 Agent /
+                      工具、版本和心跳；服务器维护在线状态与能力表。
+                    </li>
+                    <li>
+                      服务器下发带幂等键的任务请求：目标节点、工作区、工具、参数、超时和权限范围；本地持续回传
+                      progress、stdout / stderr、确认请求和最终结果。
+                    </li>
+                    <li>
+                      断线后任务进入可恢复状态；重连时按序号补发结果，不能因为网络抖动重复执行写操作。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">安全边界</span>
+                <div class="v">
+                  本地凭证不离开本机；命令限制在授权工作区；写文件、安装、部署、读取敏感信息和对外提交必须确认；
+                  服务器不能因为能下发任务就获得电脑的无限权限。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">MVP 验收</span>
+                <div class="v">
+                  服务器上的 Agent 能把一个明确任务委派给一台在线电脑，由本地 Codex
+                  执行，手机端实时看到执行状态并收到结果； 支持取消、超时、失联恢复和危险操作确认。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">开放问题</span>
+                <div class="v">
+                  主会话最终存在服务器还是本地；本地执行者是 Paseo Agent、Codex
+                  子进程还是两者组合；多台电脑如何选择；
+                  离线任务是否排队；服务器与本地之间哪些内容需要端到端加密。
+                </div>
+              </div>
+            </div>
+
             <div class="card req" data-tag="message">
               <div class="t">
                 消息系统（持久化消息中心）<span class="tag g-message">消息</span
@@ -1233,7 +1455,7 @@
           </div>
         </section>
         <section class="filter-section">
-          <h2>以后 · P2 <span class="n">7 项 · 产品方向或依赖前序能力，尚不进入当前开发</span></h2>
+          <h2>以后 · P2 <span class="n">6 项 · 产品方向或依赖前序能力，尚不进入当前开发</span></h2>
           <div class="grid">
             <div class="card req" data-tag="agent">
               <div class="t">
@@ -1270,88 +1492,6 @@
                     <li>一个 Agent 的开发应该改成 <b>入口 + 背景 + 模型</b>。</li>
                     <li>本地的服务器系统可以封装成一个"智能包"，像一个<b>超级 Skills</b>。</li>
                   </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="agent">
-              <div class="t">
-                分布式 Agent（服务器编排 + 本地执行）<span class="tag g-agent">Agent</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P2</span
-                ><span class="badge b-live">部分基础</span>
-              </div>
-              <div class="d">
-                手机 / 平板只是输入和控制终端，Paseo 与核心 Agent
-                跑在服务器；但有些自动化必须使用本地电脑上的
-                Codex、终端、文件和桌面环境。目标是让服务器 Agent
-                能把指定步骤委派给已配对电脑上的本地
-                Agent，执行过程和结果回到同一个会话，不再要求用户手动打开电脑上的 Codex。
-              </div>
-              <div class="rq">
-                <span class="k">典型场景</span>
-                <div class="v">
-                  用户在平板上提出“自动申请飞书 API key”。服务器 Agent
-                  负责理解任务、编排步骤和保持会话；其中需要在本机 Codex / 浏览器 /
-                  本地凭证完成的部分，自动交给指定电脑执行，并把确认、日志和结果实时回传。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">运行模型</span>
-                <div class="v">
-                  <ul>
-                    <li>服务器 Agent 负责核心推理、任务分解、上下文和最终答复。</li>
-                    <li>本地 Agent Worker 负责执行只能在本机完成的工具调用与命令。</li>
-                    <li>
-                      两者通过同一任务 ID、会话 ID 和工具调用 ID 关联；用户只看到一条连续会话。
-                    </li>
-                    <li>
-                      一个用户可以配对多台电脑，由服务器根据能力、在线状态或用户选择指定执行节点。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">通讯建议</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      优先复用现有 connected-host、routed session 和 relay / E2E
-                      通道；本地节点主动向服务器或 relay 建立持久连接，避免要求公网入站端口。
-                    </li>
-                    <li>
-                      本地节点注册 hostId、工作区、可用 Agent /
-                      工具、版本和心跳；服务器维护在线状态与能力表。
-                    </li>
-                    <li>
-                      服务器下发带幂等键的任务请求：目标节点、工作区、工具、参数、超时和权限范围；本地持续回传
-                      progress、stdout / stderr、确认请求和最终结果。
-                    </li>
-                    <li>
-                      断线后任务进入可恢复状态；重连时按序号补发结果，不能因为网络抖动重复执行写操作。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">安全边界</span>
-                <div class="v">
-                  本地凭证不离开本机；命令限制在授权工作区；写文件、安装、部署、读取敏感信息和对外提交必须确认；
-                  服务器不能因为能下发任务就获得电脑的无限权限。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">MVP 验收</span>
-                <div class="v">
-                  服务器上的 Agent 能把一个明确任务委派给一台在线电脑，由本地 Codex
-                  执行，手机端实时看到执行状态并收到结果； 支持取消、超时、失联恢复和危险操作确认。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">开放问题</span>
-                <div class="v">
-                  主会话最终存在服务器还是本地；本地执行者是 Paseo Agent、Codex
-                  子进程还是两者组合；多台电脑如何选择；
-                  离线任务是否排队；服务器与本地之间哪些内容需要端到端加密。
                 </div>
               </div>
             </div>
@@ -1715,7 +1855,7 @@
           </div>
         </section>
         <section class="filter-section">
-          <h2>客户端体验 <span class="n">3 项 · 已能使用</span></h2>
+          <h2>客户端体验 <span class="n">4 项 · 已能使用</span></h2>
           <div class="grid">
             <div class="card" data-tag="session">
               <div class="t">
@@ -1757,10 +1897,40 @@
                 packages/app/src/screens/settings/host-page.tsx · bfe62df40
               </div>
             </div>
+
+            <div class="card" data-tag="session">
+              <div class="t">
+                链接打开方式 + 工作区 WebView Tab<span class="tag g-session">会话</span
+                ><span class="badge b-live">已实现</span>
+              </div>
+              <div class="d">
+                通用设置可选择默认使用系统浏览器或工作区
+                WebView；外部链接不再进入孤立页面，而是在工作区顶部新增可恢复的 Tab。
+              </div>
+              <div class="rq">
+                <span class="k">能力</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      系统浏览器与工作区 WebView 两种默认方式；聊天、笔记、PR 等外部链接统一遵守。
+                    </li>
+                    <li>WebView Tab 提供地址栏、前进 / 后退、刷新、错误提示和系统浏览器兜底。</li>
+                    <li>Android 返回键优先走进网页历史；Tab 与 URL 随工作区恢复。</li>
+                    <li>HarmonyOS 使用嵌入式 iframe；拒绝嵌入的站点转系统浏览器。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="src">
+                packages/app/src/utils/open-external-url.ts ·
+                packages/app/src/screens/settings/general/link-opening-section.tsx ·
+                packages/app/src/desktop/browser/pane ·
+                packages/app/src/workspace-tabs/url-opener.ts · 26294f90f
+              </div>
+            </div>
           </div>
         </section>
         <section class="filter-section">
-          <h2>平台与发布 <span class="n">4 项 · 已能使用，个别真机效果仍需复核</span></h2>
+          <h2>平台与发布 <span class="n">5 项 · 已能使用，个别真机效果仍需复核</span></h2>
           <div class="grid">
             <div class="card" data-tag="release">
               <div class="t">
@@ -1824,30 +1994,49 @@
                 6de34d420
               </div>
             </div>
+
+            <div class="card" data-tag="release">
+              <div class="t">
+                鸿蒙二维码配对扫描<span class="tag g-release">构建发布</span
+                ><span class="badge b-live">已实现</span>
+              </div>
+              <div class="d">
+                HarmonyOS
+                原生外壳接入系统扫码能力：申请相机权限后打开系统扫码界面，把配对二维码内容转交给 App
+                的配对流程；不再要求用户手动复制链接。
+              </div>
+              <div class="src">
+                packages/harmony/entry/src/main/ets/pages/Index.ets ·
+                packages/harmony/entry/src/main/module.json5 · packages/app/src/app/pair-scan.tsx ·
+                packages/app/src/utils/harmony-shell.ts · 90746b640
+              </div>
+            </div>
           </div>
         </section>
       </div>
       <div class="pane" id="pane-download">
         <section>
-          <h2>桌面端 <span class="n">WINDOWS / MACOS · GITHUB RELEASE V0.13.4</span></h2>
+          <h2>桌面端 <span class="n">WINDOWS V0.13.5 / MACOS V0.13.4 · GITHUB RELEASE</span></h2>
           <div class="grid">
             <div class="card">
               <div class="t">Windows 安装包<span class="badge b-live">EXE</span></div>
-              <div class="d">Paseo-Setup-0.13.4-x64.exe · 约 139 MB · Windows 10/11（x64）</div>
+              <div class="d">
+                Paseo-Setup-0.13.5.exe · 约 286 MB · Windows 10/11（x64 + arm64 通用安装器）
+              </div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.4/Paseo-Setup-0.13.4-x64.exe"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.5/Paseo-Setup-0.13.5.exe"
                   >下载 Windows 版</a
                 >
               </div>
               <div class="src">
-                GitHub Release v0.13.4 ·
+                GitHub Release v0.13.5 ·
                 <a
-                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.13.4"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.13.5"
                   style="color: var(--accent, #38bdf8)"
                   >Release 页面</a
-                >还有 Windows arm64 安装器、通用安装器与 zip
+                >还有 x64 / arm64 单独安装器与 zip
               </div>
             </div>
             <div class="card">
@@ -1861,9 +2050,31 @@
                 >
               </div>
               <div class="src">
-                首次打开若提示「无法验证开发者 / 已损坏」：右键 → 打开，或终端执行 sudo xattr -cr
-                /Applications/Paseo.app
+                macOS 最新为 v0.13.4（本次只重打了 Windows）· 首次打开若提示「无法验证开发者 /
+                已损坏」：右键 → 打开，或终端执行 sudo xattr -cr /Applications/Paseo.app
               </div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2>HarmonyOS <span class="n">APPGALLERY · 邀请测试</span></h2>
+          <div class="grid">
+            <div class="card">
+              <div class="t">鸿蒙安装包<span class="badge b-live">HARMONYOS</span></div>
+              <div class="d">
+                通过华为 AppGallery
+                邀请测试安装。请在鸿蒙设备上登录华为账号，按邀请页提示加入测试并安装。
+              </div>
+              <div class="card-actions">
+                <a
+                  class="primary-button"
+                  href="https://appgallery.huawei.com/link/invite-test-wap?taskId=17a8a16f0694f0c917d52dc0d5c85ce5"
+                  target="_blank"
+                  rel="noreferrer"
+                  >前往 AppGallery 加入测试</a
+                >
+              </div>
+              <div class="src">AppGallery 邀请测试 · 需华为账号 · 当前不是公开商店版本</div>
             </div>
           </div>
         </section>
@@ -1877,15 +2088,13 @@
                 <a
                   class="primary-button"
                   id="apk-download"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.4/paseo-latest.apk"
+                  href="https://paseo.zxyz.app/apk/paseo-latest.apk"
                   download
                   >下载 APK</a
                 >
               </div>
               <div class="src">
-                GitHub Release 固定直链
-                https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.4/paseo-latest.apk ·
-                版本信息 /apk/latest.json
+                固定直链 https://paseo.zxyz.app/apk/paseo-latest.apk · 版本信息 /apk/latest.json
               </div>
             </div>
             <div class="card">
@@ -1908,6 +2117,31 @@
       </div>
 
       <footer>
+        更新于 <code>2026-11-07 19:49 CST</code> · 笔记工作台 P0
+        范围补充：笔记列表支持上下拖动排序，排序结果持久化；标题、正文和备注可编辑。未新增需求项，计划中
+        21、P0 4 保持不变。<br />
+        更新于 <code>2026-11-06 16:53 CST</code> · 「分布式 Agent（服务器编排 + 本地执行）」由 P2
+        提升到 P1 核心架构，并补全 12 个模块：设备与状态感知、身份与信任、本地 Agent
+        注册与能力发现、生命周期、目标与短期状态、任务路由与调度、通讯协议、上下文与会话同步、执行能力与工具目录、权限审批与审计、故障恢复与离线语义、控制界面。P1
+        MVP 收敛为一台服务器 + 一个本地 Agent Worker + 一个本地 Codex + 目标状态回传；P1 8 → 9，P2 7
+        → 6。<br />
+        更新于 <code>2026-11-06 16:21 CST</code> · 新增 P1「设备与环境感知（Device
+        Context）」：服务器需要知道当前输入来自手机还是 Mac、设备类型 / 系统 /
+        客户端版本、当前工作区和界面、输入方式以及可执行能力；设备切换要实时更新，敏感能力单独授权。分布式
+        Agent 目标形态同步明确为“服务器为主、本地为辅”：服务器维护主会话和编排，本地 Agent Worker
+        注册在线状态与能力，执行 Codex、浏览器、终端、文件和桌面动作，结果回到同一会话。计划中 /
+        未开发 20 → 21，P1 7 → 8。<br />
+        更新于 <code>2026-11-06 16:17 CST</code> · 下载 Tab 新增鸿蒙 AppGallery 邀请测试入口。<br />
+        更新于 <code>2026-11-06 15:59 CST</code> ·
+        需求进度同步：品牌改名已标记「部分已做」（显示名、桌面产品名、HarmonyOS 名称 /
+        图标、部分更新与下载地址已完成；技术身份和兼容别名未完成）；「链接打开方式 + 工作区 WebView
+        Tab」及「鸿蒙二维码配对扫描」移入已实现。计划中 / 未开发 21 → 20，P0 5 → 4，已实现 16 →
+        18。分布式 Agent 卡片补充当前状态：服务器侧 Agent 下发 browser 工具，本地 Electron
+        客户端作为 browser automation host 执行，当前不是本地 Codex，也不是整屏远程代理。<br />
+        更新于 <code>2026-11-07 20:35 CST</code> · Windows 桌面端用最新代码（app 0.13.24，
+        <code>64bdf55a9</code>）重打并发布 <code>v0.13.5</code>：通用安装器
+        <code>Paseo-Setup-0.13.5.exe</code>（x64 + arm64）以及 x64 / arm64 单独安装器与 zip 已上传
+        GitHub Release；下载页 Windows 链接同步到 v0.13.5，macOS 仍为 v0.13.4，APK 改为固定直链。<br />
         更新于 <code>2026-11-05 16:41 CST</code> · 新增最高优先级 P0「品牌改名：Paseo →
         见山（Jianshan）」。采用“品牌名先换、技术身份后迁”：先改用户可见名称，再提供 CLI / scheme /
         环境变量兼容别名，最后单独迁移 App ID、包名、npm
@@ -1937,7 +2171,7 @@
         项待复现。<br />
         角色口径已定：不同角色看到同一套 Paseo
         内容，二维码只标识当前操作角色，不做会话隔离；会话可转让，工作量按操作时的角色分段统计。<br />
-        当前统计：P0 5 · P1 7 · P2 7 · 暂缓 2 · 待复现 Bug 1 · 痛点 1 · 已实现 16。
+        当前统计：P0 4 · P1 9 · P2 6 · 暂缓 2 · 待复现 Bug 1 · 痛点 1 · 已实现 18。
         <details>
           <summary>历史变更记录（旧口径，仅留档）</summary>
           <div class="history">
