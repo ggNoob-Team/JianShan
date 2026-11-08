@@ -13,6 +13,7 @@ import { getConnectionAuthFailureReason } from "@/utils/test-daemon-connection";
 import { PairingTargetTracker } from "./pair-link-credentials";
 import { Button } from "@/components/ui/button";
 import type { EditingTextInputHandle } from "@/components/ui/text-input";
+import { hostConnectionLabel } from "@/utils/host-connection-label";
 
 const FLEX_ONE_STYLE = { flex: 1 } as const;
 
@@ -30,6 +31,23 @@ function parsedHostLabel(input: string): string {
 const styles = StyleSheet.create((theme) => ({
   helper: {
     color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+  },
+  connectionSummary: {
+    gap: theme.spacing[1],
+    padding: theme.spacing[4],
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface2,
+  },
+  connectionSummaryLabel: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+  },
+  connectionSummaryValue: {
+    color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
   },
   field: {
@@ -112,6 +130,11 @@ function PairLinkModalContent({
   const [pairing] = useState(() => passwordRequired?.pairing ?? beginLinkPairing(targetServerId));
   const initialUrl = passwordRequired?.link;
   const isMobile = useIsCompactFormFactor();
+  const targetHost = useMemo(
+    () => daemons.find((daemon) => daemon.serverId === targetServerId),
+    [daemons, targetServerId],
+  );
+  const existingConnections = targetHost?.connections ?? [];
 
   const offerUrlRef = useRef(initialUrl ?? "");
   const targetTracker = useRef(new PairingTargetTracker(initialUrl));
@@ -218,6 +241,22 @@ function PairLinkModalContent({
       testID="pair-link-modal"
     >
       <Text style={styles.helper}>{t("pairing.link.helper")}</Text>
+
+      {existingConnections.length > 0 ? (
+        <View style={styles.connectionSummary} testID="pair-link-current-connections">
+          <Text style={styles.connectionSummaryLabel}>{t("settings.host.connections.title")}</Text>
+          {existingConnections.map((connection) => (
+            <Text
+              key={`${connection.type}:${connection.id}`}
+              selectable
+              style={styles.connectionSummaryValue}
+              testID="pair-link-current-connection"
+            >
+              {hostConnectionLabel(connection)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
       <View style={styles.field}>
         <Text style={styles.label}>{t("pairing.link.label")}</Text>
