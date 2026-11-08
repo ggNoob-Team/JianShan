@@ -98,19 +98,22 @@ version_label="${version_label%-android-*.apk}"
 
 mkdir -p "$publish_dir"
 cp "$source_apk" "$publish_dir/paseo-latest.apk"
-chmod 644 "$publish_dir/paseo-latest.apk"
+cp "$source_apk" "$publish_dir/$apk_name"
+chmod 644 "$publish_dir/paseo-latest.apk" "$publish_dir/$apk_name"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256="$(sha256sum "$publish_dir/paseo-latest.apk" | awk '{print $1}')"
+  sha256="$(sha256sum "$publish_dir/$apk_name" | awk '{print $1}')"
 else
-  sha256="$(shasum -a 256 "$publish_dir/paseo-latest.apk" | awk '{print $1}')"
+  sha256="$(shasum -a 256 "$publish_dir/$apk_name" | awk '{print $1}')"
 fi
-size_bytes="$(stat -c %s "$publish_dir/paseo-latest.apk" 2>/dev/null || stat -f %z "$publish_dir/paseo-latest.apk")"
-size_label="$(du -h "$publish_dir/paseo-latest.apk" | awk '{print $1}')"
+size_bytes="$(stat -c %s "$publish_dir/$apk_name" 2>/dev/null || stat -f %z "$publish_dir/$apk_name")"
+size_label="$(du -h "$publish_dir/$apk_name" | awk '{print $1}')"
 published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 built_at="$(stat -c %y "$source_apk" 2>/dev/null | cut -d '.' -f 1 || true)"
-download_path="/$web_link_name/paseo-latest.apk"
+download_path="/$web_link_name/$apk_name"
 download_url="$site_url$download_path"
+fixed_download_path="/$web_link_name/paseo-latest.apk"
+fixed_download_url="$site_url$fixed_download_path"
 
 node - "$publish_dir/history.json" "$publish_dir/latest.json" <<NODE
 const fs = require("node:fs");
@@ -139,6 +142,8 @@ fs.writeFileSync(
       builtAt: ${built_at@Q} || null,
       downloadPath: ${download_path@Q},
       siteDownloadUrl: ${download_url@Q},
+      fixedDownloadPath: ${fixed_download_path@Q},
+      fixedDownloadUrl: ${fixed_download_url@Q},
       downloadUrl: ${github_url@Q},
       githubDownloadUrl: ${github_url@Q},
     },
@@ -158,6 +163,7 @@ log "version: $version_label"
 log "size: $size_label"
 log "sha256: $sha256"
 log "site: $download_url"
+log "fixed: $fixed_download_url"
 log "github: $github_url"
 
 if [[ "$skip_verify" != true ]]; then

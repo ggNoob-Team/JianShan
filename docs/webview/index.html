@@ -2326,6 +2326,14 @@
               String(info.sha256 || "").slice(0, 12) +
               "…";
             if (info.sizeLabel) button.textContent = "下载 APK（" + info.sizeLabel + "）";
+            // Use the versioned file and key the URL by checksum: the fixed
+            // paseo-latest.apk URL is cached for hours and browsers reuse the
+            // previous download entry when the filename matches.
+            var cacheKey = info.sha256 ? String(info.sha256).slice(0, 16) : version;
+            button.setAttribute(
+              "href",
+              (info.downloadPath || "/apk/paseo-latest.apk") + "?v=" + encodeURIComponent(cacheKey),
+            );
             var sha = document.getElementById("apk-sha");
             if (sha) sha.textContent = info.sha256 || "未知";
             var built = document.getElementById("apk-built");
