@@ -234,6 +234,7 @@ export function upsertHostConnectionInProfiles(input: {
   label?: string;
   clientName?: string;
   connection: HostConnection;
+  replaceConnectionId?: string;
   password?: string;
   now?: string;
 }): HostProfile[] {
@@ -281,10 +282,11 @@ export function upsertHostConnectionInProfiles(input: {
 
   const matchedProfiles = matchingIndexes.map((index) => existing[index]);
   const prev = matchedProfiles.find((daemon) => daemon.serverId === serverId) ?? matchedProfiles[0];
-  const nextConnections = upsertHostConnectionById(
-    matchedProfiles.flatMap((daemon) => daemon.connections),
-    normalizedConnection,
-  );
+  const candidateConnections = matchedProfiles.flatMap((daemon) => daemon.connections);
+  const remainingConnections = input.replaceConnectionId
+    ? candidateConnections.filter((connection) => connection.id !== input.replaceConnectionId)
+    : candidateConnections;
+  const nextConnections = upsertHostConnectionById(remainingConnections, normalizedConnection);
   const nextLifecycle = prev.lifecycle;
   const nextLabel = prev.label === prev.serverId ? derivedLabel : prev.label;
   const nextClientName = clientName ?? prev.clientName;

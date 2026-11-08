@@ -346,6 +346,41 @@ describe("upsertHostConnectionInProfiles", () => {
     expect(profile.password).toBe("new-secret");
     expect(profile.preferredConnectionId).toBe(replacement.id);
   });
+
+  it("replaces the requested connection and prefers its replacement", () => {
+    const direct: HostConnection = {
+      id: "direct:example.test:6767",
+      type: "directTcp",
+      endpoint: "example.test:6767",
+    };
+    const oldRelay: HostConnection = {
+      id: "relay:old-relay.example:443",
+      type: "relay",
+      relayEndpoint: "old-relay.example:443",
+      daemonPublicKeyB64: "old-key",
+    };
+    const newRelay: HostConnection = {
+      id: "relay:new-relay.example:443",
+      type: "relay",
+      relayEndpoint: "new-relay.example:443",
+      daemonPublicKeyB64: "new-key",
+    };
+    const existing: HostProfile = {
+      ...makeHost("srv_known"),
+      connections: [direct, oldRelay],
+      preferredConnectionId: oldRelay.id,
+    };
+
+    const [profile] = upsertHostConnectionInProfiles({
+      profiles: [existing],
+      serverId: "srv_known",
+      connection: newRelay,
+      replaceConnectionId: oldRelay.id,
+    });
+
+    expect(profile.connections).toEqual([direct, newRelay]);
+    expect(profile.preferredConnectionId).toBe(newRelay.id);
+  });
 });
 
 describe("resolveActiveHostServerId", () => {
