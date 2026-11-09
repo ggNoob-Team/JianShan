@@ -1499,7 +1499,7 @@ function createToolCatalog(
     {
       title: "Inspect local runtime",
       description:
-        "Inspect a daemon's local execution capabilities and available workspaces. Call this before running a local job to verify the target device and workspace.",
+        "Inspect a daemon's local execution capabilities and available workspaces. For open-ended device work such as building, installing, and testing, prefer creating a local agent on that host and give it the goal, constraints, and success criteria; let it decide the commands. Use local jobs only for a specific deterministic command the caller already knows it needs.",
       inputSchema: {},
     },
     async () => {
@@ -1835,7 +1835,7 @@ function createToolCatalog(
     {
       title: "Create agent",
       description:
-        "Create an agent. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
+        "Create an agent. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Pass a remote host's serverId and workspaceId to run the agent there. For remote device work, delegate the outcome, constraints, and success criteria rather than prescribing command-by-command steps; the local agent can inspect and use that machine's tools. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
       inputSchema: createAgentInputSchema,
       outputSchema: {
         agentId: z.string(),
