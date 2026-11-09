@@ -171,6 +171,47 @@ test("routed authority is bounded by the caller, with isolated simultaneous sess
   await remote.dispose();
 });
 
+test("a remote client inspects and runs a local job through a connected host", async () => {
+  const b = await daemon();
+  const a = await daemon();
+  const owner = await api(a);
+  await owner.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
+  const serverId = (await online(owner.paseo)).hosts[0]!.serverId!;
+  const remote = await owner.paseo.hosts.client(serverId);
+  cleanup.push(() => remote.dispose());
+  const workspace = await remote.workspaces.create({
+    source: { kind: "directory", path: b.staticDir },
+  });
+
+  const runtime = await remote.localJobs.inspect();
+  expect(runtime).toMatchObject({
+    capabilities: ["local.jobs"],
+    workspaces: [
+      {
+        workspaceId: workspace.id,
+        cwd: b.staticDir,
+      },
+    ],
+  });
+
+  const started = await remote.localJobs.start({
+    workspaceId: workspace.id,
+    command: process.execPath,
+    args: ["-e", "process.stdout.write('remote local job output')"],
+  });
+  const finished = await remote.localJobs.wait({ jobId: started.jobId, timeoutMs: 5_000 });
+
+  expect(finished).toMatchObject({
+    error: null,
+    job: {
+      jobId: started.jobId,
+      status: "succeeded",
+      exitCode: 0,
+    },
+  });
+  expect(finished.job?.outputTail.join("\n")).toContain("remote local job output");
+});
+
 test("SDK host clients preserve ordinary permission RPC errors", async () => {
   const b = await daemon();
   const a = await daemon();

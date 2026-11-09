@@ -3332,6 +3332,116 @@ export const CaptureTerminalRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const LocalJobStatusSchema = z.enum(["running", "succeeded", "failed", "canceled"]);
+
+export const LocalJobSnapshotSchema = z.object({
+  jobId: z.string(),
+  workspaceId: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  status: LocalJobStatusSchema,
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+  exitCode: z.number().int().nullable(),
+  signal: z.number().int().nullable(),
+  outputTail: z.array(z.string().max(4000)).max(200),
+  error: z.string().nullable(),
+});
+
+export const LocalRuntimeWorkspaceSchema = z.object({
+  workspaceId: z.string(),
+  cwd: z.string(),
+  title: z.string().nullable(),
+});
+
+export const LocalRuntimeSnapshotSchema = z.object({
+  platform: z.string(),
+  arch: z.string(),
+  capabilities: z.array(z.literal("local.jobs")),
+  workspaces: z.array(LocalRuntimeWorkspaceSchema).max(256),
+});
+
+export const LocalRuntimeInspectRequestSchema = z.object({
+  type: z.literal("local.runtime.inspect.request"),
+  requestId: z.string(),
+});
+
+export const LocalRuntimeInspectResponseSchema = z.object({
+  type: z.literal("local.runtime.inspect.response"),
+  payload: z.object({
+    requestId: z.string(),
+    runtime: LocalRuntimeSnapshotSchema,
+  }),
+});
+
+export const LocalJobStartRequestSchema = z.object({
+  type: z.literal("local.job.start.request"),
+  requestId: z.string(),
+  workspaceId: z.string(),
+  command: z.string().min(1).max(1024),
+  args: z.array(z.string().max(4096)).max(128).default([]),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(30 * 60 * 1000)
+    .optional(),
+});
+
+export const LocalJobStartResponseSchema = z.object({
+  type: z.literal("local.job.start.response"),
+  payload: z.object({
+    requestId: z.string(),
+    job: LocalJobSnapshotSchema,
+  }),
+});
+
+export const LocalJobGetRequestSchema = z.object({
+  type: z.literal("local.job.get.request"),
+  requestId: z.string(),
+  jobId: z.string(),
+});
+
+export const LocalJobGetResponseSchema = z.object({
+  type: z.literal("local.job.get.response"),
+  payload: z.object({
+    requestId: z.string(),
+    job: LocalJobSnapshotSchema.nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const LocalJobCancelRequestSchema = z.object({
+  type: z.literal("local.job.cancel.request"),
+  requestId: z.string(),
+  jobId: z.string(),
+});
+
+export const LocalJobCancelResponseSchema = z.object({
+  type: z.literal("local.job.cancel.response"),
+  payload: z.object({
+    requestId: z.string(),
+    job: LocalJobSnapshotSchema.nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const LocalJobWaitRequestSchema = z.object({
+  type: z.literal("local.job.wait.request"),
+  requestId: z.string(),
+  jobId: z.string(),
+  timeoutMs: z.number().int().positive().max(60_000).optional(),
+});
+
+export const LocalJobWaitResponseSchema = z.object({
+  type: z.literal("local.job.wait.response"),
+  payload: z.object({
+    requestId: z.string(),
+    job: LocalJobSnapshotSchema.nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
 export const HubExecutionAgentCreateRequestSchema = z.object({
   type: z.literal("hub.execution.agent.create.request"),
   requestId: z.string(),
@@ -3892,6 +4002,11 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   TerminalInputSchema,
   KillTerminalRequestSchema,
   CaptureTerminalRequestSchema,
+  LocalRuntimeInspectRequestSchema,
+  LocalJobStartRequestSchema,
+  LocalJobGetRequestSchema,
+  LocalJobCancelRequestSchema,
+  LocalJobWaitRequestSchema,
   ChatCreateRequestSchema,
   ChatListRequestSchema,
   ChatInspectRequestSchema,
@@ -4100,6 +4215,7 @@ export const ServerInfoStatusPayloadSchema = z
         providersSnapshot: z.boolean().optional(),
         connectedHosts: z.boolean().optional(),
         hostMultiplexing: z.boolean().optional(),
+        localJobs: z.boolean().optional(),
         usageSources: z.boolean().optional(),
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
         providersSnapshotCwd: z.boolean().optional(),
@@ -7783,6 +7899,11 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   SubscribeTerminalResponseSchema,
   KillTerminalResponseSchema,
   CaptureTerminalResponseSchema,
+  LocalRuntimeInspectResponseSchema,
+  LocalJobStartResponseSchema,
+  LocalJobGetResponseSchema,
+  LocalJobCancelResponseSchema,
+  LocalJobWaitResponseSchema,
   TerminalStreamExitSchema,
   TerminalAttentionRequiredSchema,
   ChatCreateResponseSchema,
@@ -8262,6 +8383,19 @@ export type KillTerminalRequest = z.infer<typeof KillTerminalRequestSchema>;
 export type KillTerminalResponse = z.infer<typeof KillTerminalResponseSchema>;
 export type CaptureTerminalRequest = z.infer<typeof CaptureTerminalRequestSchema>;
 export type CaptureTerminalResponse = z.infer<typeof CaptureTerminalResponseSchema>;
+export type LocalJobStatus = z.infer<typeof LocalJobStatusSchema>;
+export type LocalJobSnapshot = z.infer<typeof LocalJobSnapshotSchema>;
+export type LocalRuntimeSnapshot = z.infer<typeof LocalRuntimeSnapshotSchema>;
+export type LocalRuntimeInspectRequest = z.infer<typeof LocalRuntimeInspectRequestSchema>;
+export type LocalRuntimeInspectResponse = z.infer<typeof LocalRuntimeInspectResponseSchema>;
+export type LocalJobStartRequest = z.infer<typeof LocalJobStartRequestSchema>;
+export type LocalJobStartResponse = z.infer<typeof LocalJobStartResponseSchema>;
+export type LocalJobGetRequest = z.infer<typeof LocalJobGetRequestSchema>;
+export type LocalJobGetResponse = z.infer<typeof LocalJobGetResponseSchema>;
+export type LocalJobCancelRequest = z.infer<typeof LocalJobCancelRequestSchema>;
+export type LocalJobCancelResponse = z.infer<typeof LocalJobCancelResponseSchema>;
+export type LocalJobWaitRequest = z.infer<typeof LocalJobWaitRequestSchema>;
+export type LocalJobWaitResponse = z.infer<typeof LocalJobWaitResponseSchema>;
 export type TerminalStreamExit = z.infer<typeof TerminalStreamExitSchema>;
 
 // ============================================================================

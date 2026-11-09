@@ -29,7 +29,7 @@ import { SessionDelivery, type OwnedSubscription } from "./session/owned-subscri
 import { v4 as uuidv4 } from "uuid";
 import { lstat, mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
 import { basename, join, resolve, sep } from "path";
-import { homedir } from "node:os";
+import { arch, homedir, platform } from "node:os";
 import { CLIENT_CAPS, type ClientCapability } from "@getpaseo/protocol/client-capabilities";
 import { formatPluginSourceReference } from "@getpaseo/protocol/plugin-source-reference";
 import {
@@ -58,6 +58,7 @@ import type {
 import { TerminalSessionController } from "../terminal/terminal-session-controller.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
+import type { LocalJobService } from "./local-jobs/local-job-service.js";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
 import { matchesAgentHistoryQuery } from "./agent-history-search.js";
@@ -462,6 +463,7 @@ type AgentMcpTransportFactory = () => Promise<unknown>;
 
 export interface SessionOptions {
   connectedHosts?: ConnectedHosts;
+  localJobService?: LocalJobService | null;
   sourceId?: string;
   routed?: boolean;
   browserToolsBroker?: BrowserToolsBroker | null;
@@ -750,6 +752,7 @@ export class Session {
       ),
   );
   private readonly browserToolsBroker: SessionOptions["browserToolsBroker"];
+  private readonly localJobService: SessionOptions["localJobService"];
   private readonly clientId: string;
   private clientName: string | null;
   private readonly authorization: SessionAuthorization;
@@ -920,6 +923,7 @@ export class Session {
       getWebSocketRuntimeMetrics,
     } = options;
     this.browserToolsBroker = options.browserToolsBroker;
+    this.localJobService = options.localJobService;
     this.clientId = clientId;
     this.clientName = normalizeSessionClientName(clientName);
     this.authorization = new SessionAuthorization(permissions);
@@ -2453,11 +2457,131 @@ export class Session {
     return undefined;
   }
 
+  private dispatchLocalJobMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
+      case "local.runtime.inspect.request":
+        return this.handleLocalRuntimeInspectRequest(msg);
+      case "local.job.start.request":
+        return this.handleLocalJobStartRequest(msg);
+      case "local.job.get.request":
+        this.handleLocalJobGetRequest(msg);
+        return undefined;
+      case "local.job.cancel.request":
+        return this.handleLocalJobCancelRequest(msg);
+      case "local.job.wait.request":
+        return this.handleLocalJobWaitRequest(msg);
+      default:
+        return undefined;
+    }
+  }
+
+  private async handleLocalRuntimeInspectRequest(
+    msg: Extract<SessionInboundMessage, { type: "local.runtime.inspect.request" }>,
+  ): Promise<void> {
+    const workspaces = await this.workspaceRegistry.list();
+    this.emit({
+      type: "local.runtime.inspect.response",
+      payload: {
+        requestId: msg.requestId,
+        runtime: {
+          platform: platform(),
+          arch: arch(),
+          capabilities: this.localJobService ? ["local.jobs"] : [],
+          workspaces: workspaces
+            .filter((workspace) => workspace.archivedAt === null)
+            .map((workspace) => ({
+              workspaceId: workspace.workspaceId,
+              cwd: workspace.cwd,
+              title: workspace.title ?? workspace.displayName,
+            })),
+        },
+      },
+    });
+  }
+
+  private async handleLocalJobStartRequest(
+    msg: Extract<SessionInboundMessage, { type: "local.job.start.request" }>,
+  ): Promise<void> {
+    if (!this.localJobService) {
+      throw new SessionRequestError("local_jobs_unavailable", "Local jobs are unavailable");
+    }
+    const workspace = await this.workspaceRegistry.get(msg.workspaceId);
+    if (!workspace || workspace.archivedAt !== null) {
+      throw new SessionRequestError(
+        "workspace_not_found",
+        `Workspace not found: ${msg.workspaceId}`,
+      );
+    }
+    const job = await this.localJobService.start({
+      workspaceId: workspace.workspaceId,
+      cwd: workspace.cwd,
+      command: msg.command,
+      args: msg.args,
+      ...(msg.timeoutMs === undefined ? {} : { timeoutMs: msg.timeoutMs }),
+    });
+    this.emit({
+      type: "local.job.start.response",
+      payload: { requestId: msg.requestId, job },
+    });
+  }
+
+  private handleLocalJobGetRequest(
+    msg: Extract<SessionInboundMessage, { type: "local.job.get.request" }>,
+  ): void {
+    if (!this.localJobService) {
+      throw new SessionRequestError("local_jobs_unavailable", "Local jobs are unavailable");
+    }
+    const job = this.localJobService.get(msg.jobId);
+    this.emit({
+      type: "local.job.get.response",
+      payload: {
+        requestId: msg.requestId,
+        job,
+        error: job ? null : `Unknown local job: ${msg.jobId}`,
+      },
+    });
+  }
+
+  private async handleLocalJobCancelRequest(
+    msg: Extract<SessionInboundMessage, { type: "local.job.cancel.request" }>,
+  ): Promise<void> {
+    if (!this.localJobService) {
+      throw new SessionRequestError("local_jobs_unavailable", "Local jobs are unavailable");
+    }
+    const job = await this.localJobService.cancel(msg.jobId);
+    this.emit({
+      type: "local.job.cancel.response",
+      payload: {
+        requestId: msg.requestId,
+        job,
+        error: job ? null : `Unknown local job: ${msg.jobId}`,
+      },
+    });
+  }
+
+  private async handleLocalJobWaitRequest(
+    msg: Extract<SessionInboundMessage, { type: "local.job.wait.request" }>,
+  ): Promise<void> {
+    if (!this.localJobService) {
+      throw new SessionRequestError("local_jobs_unavailable", "Local jobs are unavailable");
+    }
+    const job = await this.localJobService.wait(msg.jobId, msg.timeoutMs ?? 30_000);
+    this.emit({
+      type: "local.job.wait.response",
+      payload: {
+        requestId: msg.requestId,
+        job,
+        error: job ? null : `Unknown local job: ${msg.jobId}`,
+      },
+    });
+  }
+
   // eslint-disable-next-line complexity
   private async dispatchInboundMessage(msg: SessionInboundMessage, source?: object): Promise<void> {
     const promise =
       this.connectedHostSession?.dispatch(msg) ??
       this.dispatchSubscriptionMessage(msg, source) ??
+      this.dispatchLocalJobMessage(msg) ??
       this.dispatchVoiceAndControlMessage(msg) ??
       this.dispatchAgentObservationMessage(msg, source) ??
       this.dispatchHubExecutionMessage(msg) ??

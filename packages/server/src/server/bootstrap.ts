@@ -1440,6 +1440,10 @@ export async function createPaseoDaemon(
       if (!wsServer) throw new Error("Daemon is not accepting host operations");
       return wsServer.toolHosts();
     },
+    localJobs: () => {
+      if (!wsServer) throw new Error("Daemon is not accepting local jobs");
+      return wsServer.localJobs();
+    },
     agentManager,
     agentStorage,
     terminalManager,
