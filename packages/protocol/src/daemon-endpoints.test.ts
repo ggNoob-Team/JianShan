@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import {
   buildDaemonWebSocketUrl,
@@ -26,6 +26,22 @@ describe("connection URI parsing", () => {
       useTls: false,
     });
     expect(serializeConnectionUri(parsed)).toBe("tcp://localhost:6767");
+  });
+
+  test("does not depend on URL parsing for tcp URIs", () => {
+    vi.stubGlobal("URL", undefined);
+    try {
+      const parsed = parseConnectionUri("tcp://localhost:6767?ssl=true");
+      expect(parsed).toEqual({
+        host: "localhost",
+        port: 6767,
+        isIpv6: false,
+        useTls: true,
+      });
+      expect(serializeConnectionUri(parsed)).toBe("tcp://localhost:6767?ssl=true");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   test("round-trips an SSL-enabled tcp host and port", () => {

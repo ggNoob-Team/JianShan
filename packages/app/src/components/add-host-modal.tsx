@@ -233,7 +233,7 @@ interface InitialHostState {
 
 function resolveInitialHostState(host: HostProfile | undefined): InitialHostState {
   const emptyDraft: DirectConnectionDraft = {
-    host: "",
+    host: "localhost",
     port: "6767",
     useTls: false,
     password: host?.password ?? "",

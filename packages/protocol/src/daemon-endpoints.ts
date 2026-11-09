@@ -175,58 +175,93 @@ export function parseConnectionUri(input: string): ParsedConnectionUri {
     throw new Error("Connection URI is required");
   }
 
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
+  const match = /^([a-z][a-z0-9+.-]*):\/\/(.*)$/i.exec(trimmed);
+  if (!match) {
     throw new Error("Invalid connection URI");
   }
 
-  if (parsed.protocol !== "tcp:") {
+  if (match[1].toLowerCase() !== "tcp") {
     throw new Error("Connection URI protocol must be tcp:");
   }
-  if (!parsed.hostname) {
-    throw new Error("Connection URI host is required");
-  }
-  if (!parsed.port) {
-    throw new Error("Connection URI port is required");
-  }
-  if (parsed.username || parsed.password) {
+
+  const remainder = match[2];
+  const authorityEnd = remainder.search(/[/?#]/);
+  const authority = (authorityEnd < 0 ? remainder : remainder.slice(0, authorityEnd)).trim();
+  if (authority.includes("@")) {
     throw new Error("Connection URI userinfo is not supported");
   }
+  if (!authority) {
+    throw new Error("Connection URI host is required");
+  }
 
-  const isIpv6 = parsed.hostname.startsWith("[") && parsed.hostname.endsWith("]");
-  const host = isIpv6 ? parsed.hostname.slice(1, -1) : parsed.hostname;
-  const password = parsed.searchParams.get("password") || undefined;
+  let host: string;
+  let portText: string;
+  let isIpv6: boolean;
+  if (authority.startsWith("[")) {
+    const closingBracket = authority.indexOf("]");
+    if (closingBracket < 0) {
+      throw new Error("Invalid connection URI");
+    }
+    host = authority.slice(1, closingBracket).trim();
+    const portPart = authority.slice(closingBracket + 1);
+    if (!portPart.startsWith(":")) {
+      throw new Error("Connection URI port is required");
+    }
+    portText = portPart.slice(1).trim();
+    isIpv6 = true;
+  } else {
+    const separator = authority.lastIndexOf(":");
+    if (separator < 0) {
+      throw new Error("Connection URI port is required");
+    }
+    host = authority.slice(0, separator).trim();
+    portText = authority.slice(separator + 1).trim();
+    isIpv6 = false;
+  }
+  if (!host) {
+    throw new Error("Connection URI host is required");
+  }
+  if (!portText) {
+    throw new Error("Connection URI port is required");
+  }
+
+  const hashIndex = remainder.indexOf("#");
+  const withoutHash = hashIndex < 0 ? remainder : remainder.slice(0, hashIndex);
+  const queryIndex = withoutHash.indexOf("?");
+  const params = new URLSearchParams(queryIndex < 0 ? "" : withoutHash.slice(queryIndex + 1));
+  const password = params.get("password") || undefined;
 
   return {
     host,
-    port: parsePort(parsed.port, "Invalid connection URI"),
+    port: parsePort(portText, "Invalid connection URI"),
     isIpv6,
-    useTls: parsed.searchParams.get("ssl") === "true",
+    useTls: params.get("ssl") === "true",
     ...(password ? { password } : {}),
   };
 }
 
 export function serializeConnectionUri(parts: ConnectionUriParts): string {
-  return createConnectionUri(parts).toString();
+  return serializeConnectionUriParts(parts, false);
 }
 
 export function serializeConnectionUriForStorage(parts: ParsedConnectionUri): string {
-  const url = createConnectionUri(parts);
-  if (parts.password) {
-    url.searchParams.set("password", parts.password);
-  }
-  return url.toString();
+  return serializeConnectionUriParts(parts, true);
 }
 
-function createConnectionUri(parts: ConnectionUriParts): URL {
+function serializeConnectionUriParts(
+  parts: ConnectionUriParts & { password?: string },
+  includePassword: boolean,
+): string {
   const hostPart = parts.isIpv6 ? `[${parts.host}]` : parts.host;
-  const url = new URL(`tcp://${hostPart}:${parts.port}`);
+  const params = new URLSearchParams();
   if (parts.useTls) {
-    url.searchParams.set("ssl", "true");
+    params.set("ssl", "true");
   }
-  return url;
+  if (includePassword && parts.password) {
+    params.set("password", parts.password);
+  }
+  const query = params.toString();
+  return `tcp://${hostPart}:${parts.port}${query ? `?${query}` : ""}`;
 }
 
 export function normalizeLoopbackToLocalhost(endpoint: string): string {
