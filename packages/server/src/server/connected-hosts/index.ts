@@ -53,7 +53,7 @@ export class ConnectedHosts {
   private rows: Saved[] = [];
   private readonly live = new Map<string, Live>();
   private readonly routes = new Set<Route>();
-  private readonly listeners = new Set<() => void>();
+  private readonly listeners = new Map<() => void, HostActor>();
   private queue: Promise<unknown> = Promise.resolve();
   private readonly ready: Promise<void>;
   private closed = false;
@@ -80,19 +80,30 @@ export class ConnectedHosts {
       this.start(row);
     }
   }
-  async list(): Promise<HostDirectory> {
+  async listAll(): Promise<HostDirectory> {
     await this.ready;
     return {
       self: { ...this.self },
       hosts: this.rows.map(({ connection: _secret, ...row }) => structuredClone(row)),
     };
   }
-  observe(changed: () => void): () => void {
-    this.listeners.add(changed);
+  async listFor(actor: HostActor): Promise<HostDirectory> {
+    await this.ready;
+    return {
+      self: { ...this.self },
+      hosts: this.rows
+        .filter((row) => actor.manageSources || row.source.id === actor.sourceId)
+        .map(({ connection: _secret, ...row }) => structuredClone(row)),
+    };
+  }
+  observe(actor: HostActor, changed: () => void): () => void {
+    this.listeners.set(changed, actor);
     return () => this.listeners.delete(changed);
   }
-  private changed(): void {
-    for (const listener of this.listeners) listener();
+  private changed(row?: Saved): void {
+    for (const [listener, actor] of this.listeners) {
+      if (!row || actor.manageSources || row.source.id === actor.sourceId) listener();
+    }
   }
   private async persist(rows: Saved[]): Promise<void> {
     await mkdir(this.home, { recursive: true });
@@ -157,7 +168,7 @@ export class ConnectedHosts {
       await this.persist([...this.rows, row]);
       this.rows.push(row);
       this.start(row);
-      this.changed();
+      this.changed(row);
       return this.summary(row);
     });
   }
@@ -203,7 +214,7 @@ export class ConnectedHosts {
       Object.assign(previous, row);
       this.rows = rows.map((entry) => (entry === row ? previous : entry));
       if (restart) this.start(previous);
-      this.changed();
+      this.changed(previous);
       return this.summary(previous);
     });
   }
@@ -219,7 +230,7 @@ export class ConnectedHosts {
       await this.persist(rows);
       this.stop(id, "host_unknown");
       this.rows = rows;
-      this.changed();
+      this.changed(row);
     });
   }
   private require(id: string): Saved {
@@ -302,7 +313,7 @@ export class ConnectedHosts {
           if (stopped || client.getLastServerInfoMessage() !== info || !client.isConnected) return;
           Object.assign(row, next);
           live.accepted = true;
-          this.changed();
+          this.changed(row);
         });
       } catch (error) {
         if (stopped) return;
@@ -312,7 +323,7 @@ export class ConnectedHosts {
           message: "Host connection failed",
         };
         row.nextRetryAt = null;
-        this.changed();
+        this.changed(row);
         await client.close();
       }
     };
@@ -345,7 +356,7 @@ export class ConnectedHosts {
         client.setReconnectEnabled(false);
         void client.close();
       }
-      this.changed();
+      this.changed(row);
     });
     void client.connect().catch(() => {});
   }
@@ -353,6 +364,7 @@ export class ConnectedHosts {
     serverId: string;
     scopeId: string;
     sourceId: string;
+    manageSources: boolean;
     originSessionId: string;
     permissions: readonly DaemonPermission[];
     signal: AbortSignal;
@@ -360,7 +372,11 @@ export class ConnectedHosts {
     ended(code: string, message: string): void;
   }): Promise<{ send(data: string | Uint8Array): void; close(): void }> {
     await this.ready;
-    const row = this.rows.find((entry) => entry.serverId === input.serverId);
+    const row = this.rows.find(
+      (entry) =>
+        entry.serverId === input.serverId &&
+        (input.manageSources || entry.source.id === input.sourceId),
+    );
     if (!row) throw new HostError("host_unknown", `Unknown host ${input.serverId}`, input.serverId);
     if (!row.enabled)
       throw new HostError(

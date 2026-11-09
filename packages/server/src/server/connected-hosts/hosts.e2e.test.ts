@@ -171,6 +171,90 @@ test("routed authority is bounded by the caller, with isolated simultaneous sess
   await remote.dispose();
 });
 
+test("host registrations are scoped to their authenticated source", async () => {
+  const { ConnectedHosts } = await import("./index.js");
+  const home = await mkdtemp(join(tmpdir(), "hosts-source-scope-"));
+  cleanup.push(() => rm(home, { recursive: true, force: true }));
+  await writeFile(
+    join(home, "hosts.json"),
+    JSON.stringify([
+      {
+        registrationId: "saved-owner",
+        serverId: "srv-owner",
+        label: "Private workstation",
+        source: { id: "principal-a", key: "stable" },
+        metadata: {},
+        enabled: false,
+        status: "disabled",
+        targetDescription: "127.0.0.1:1",
+        lastOnlineAt: null,
+        nextRetryAt: null,
+        error: null,
+        connection: "127.0.0.1:1",
+      },
+    ]),
+  );
+  const registry = new ConnectedHosts(home, { serverId: "self", label: "self" });
+  cleanup.push(() => registry.close());
+
+  expect(await registry.listFor({ sourceId: "principal-a", manageSources: false })).toMatchObject({
+    hosts: [{ registrationId: "saved-owner" }],
+  });
+  expect(await registry.listFor({ sourceId: "principal-b", manageSources: false })).toMatchObject({
+    hosts: [],
+  });
+  expect(await registry.listFor({ sourceId: "admin", manageSources: true })).toMatchObject({
+    hosts: [{ registrationId: "saved-owner" }],
+  });
+
+  let ownerNotifications = 0;
+  let otherNotifications = 0;
+  const stopOwner = registry.observe(
+    { sourceId: "principal-a", manageSources: false },
+    () => ownerNotifications++,
+  );
+  const stopOther = registry.observe(
+    { sourceId: "principal-b", manageSources: false },
+    () => otherNotifications++,
+  );
+  await registry.update(
+    "saved-owner",
+    { label: "Renamed" },
+    { sourceId: "principal-a", manageSources: false },
+  );
+  expect(ownerNotifications).toBe(1);
+  expect(otherNotifications).toBe(0);
+  stopOwner();
+  stopOther();
+
+  await expect(
+    registry.openRoute({
+      serverId: "srv-owner",
+      scopeId: "owner-scope",
+      sourceId: "principal-a",
+      manageSources: false,
+      originSessionId: "owner-session",
+      permissions: ["workspace.read"],
+      signal: new AbortController().signal,
+      frame: () => {},
+      ended: () => {},
+    }),
+  ).rejects.toMatchObject({ code: "host_disabled", serverId: "srv-owner" });
+  await expect(
+    registry.openRoute({
+      serverId: "srv-owner",
+      scopeId: "foreign-scope",
+      sourceId: "principal-b",
+      manageSources: false,
+      originSessionId: "foreign-session",
+      permissions: ["workspace.read"],
+      signal: new AbortController().signal,
+      frame: () => {},
+      ended: () => {},
+    }),
+  ).rejects.toMatchObject({ code: "host_unknown", serverId: "srv-owner" });
+});
+
 test("a remote client inspects and runs a local job through a connected host", async () => {
   const b = await daemon();
   const a = await daemon();
