@@ -50,6 +50,7 @@ import {
   type WorkspaceSetupSnapshot,
   type WorkspaceDescriptorPayload,
   type AgentActor,
+  type WSHelloMessage,
 } from "./messages.js";
 import type {
   TerminalManager,
@@ -469,6 +470,7 @@ export interface SessionOptions {
   browserToolsBroker?: BrowserToolsBroker | null;
   clientId: string;
   clientName?: string;
+  clientType?: WSHelloMessage["clientType"];
   permissions: readonly DaemonPermission[];
   appVersion?: string | null;
   clientCapabilities?: Record<string, unknown> | null;
@@ -755,6 +757,7 @@ export class Session {
   private readonly localJobService: SessionOptions["localJobService"];
   private readonly clientId: string;
   private clientName: string | null;
+  private clientType: WSHelloMessage["clientType"];
   private readonly authorization: SessionAuthorization;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
@@ -866,6 +869,7 @@ export class Session {
     const {
       clientId,
       clientName,
+      clientType,
       permissions,
       appVersion,
       clientCapabilities,
@@ -926,6 +930,7 @@ export class Session {
     this.localJobService = options.localJobService;
     this.clientId = clientId;
     this.clientName = normalizeSessionClientName(clientName);
+    this.clientType = normalizeSessionClientType(clientType);
     this.authorization = new SessionAuthorization(permissions);
 
     this.appVersion = appVersion ?? null;
@@ -1327,6 +1332,20 @@ export class Session {
 
   updateClientName(clientName: string | undefined): void {
     this.clientName = clientName ?? null;
+  }
+
+  updateClientType(clientType: WSHelloMessage["clientType"]): void {
+    this.clientType = clientType;
+  }
+
+  private assertCanCreateSession(): void {
+    if (this.clientType !== "mobile" || this.clientName) {
+      return;
+    }
+    throw new SessionRequestError(
+      "client_name_required",
+      "Client name is required before creating a session. Pair this client again with a name.",
+    );
   }
 
   private currentActor(): AgentActor {
@@ -4514,6 +4533,7 @@ export class Session {
         )
       : undefined;
     try {
+      this.assertCanCreateSession();
       const creation = await this.createRequestedAgent(
         request,
         progress ? (snapshot) => progress.emit(this.creationUpdate(snapshot)) : undefined,
@@ -4555,6 +4575,9 @@ export class Session {
         )
       : undefined;
     try {
+      if (request.agent) {
+        this.assertCanCreateSession();
+      }
       if (
         request.agent &&
         !this.authorization.allowsPermission("workspace.write") &&
@@ -4665,6 +4688,7 @@ export class Session {
 
   private async handleCreateAgentRequest(msg: CreateAgentRequestMessage): Promise<void> {
     try {
+      this.assertCanCreateSession();
       let agent: AgentSnapshotPayload;
       if (msg.idempotencyKey !== undefined) {
         if (msg.initialPrompt !== undefined) {
@@ -9573,6 +9597,12 @@ function hostSource(options: SessionOptions): string {
 
 function normalizeSessionClientName(clientName: string | undefined): string | null {
   return clientName ?? null;
+}
+
+function normalizeSessionClientType(
+  clientType: WSHelloMessage["clientType"] | undefined,
+): WSHelloMessage["clientType"] {
+  return clientType ?? "cli";
 }
 
 function sessionLogContext(clientId: string, clientName: string | null, sessionId: string) {

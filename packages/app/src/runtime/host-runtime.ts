@@ -972,6 +972,10 @@ export class HostRuntimeController {
     }
     this.updateSnapshot({ probeByConnectionId: new Map(probeByConnectionId) });
 
+    const preferredConnectionId = findConnectionById(
+      this.host,
+      this.host.preferredConnectionId,
+    )?.id;
     let remaining = connectionsToProbe.length;
     let probeAuthFailure: "password_required" | "incorrect_password" | null = null;
     let activationLock: Promise<void> | null = null;
@@ -987,6 +991,16 @@ export class HostRuntimeController {
       connectionId: string,
       client: DaemonClient,
     ): Promise<boolean> => {
+      const preferredProbe = preferredConnectionId
+        ? probeByConnectionId.get(preferredConnectionId)
+        : null;
+      if (
+        preferredConnectionId &&
+        connectionId !== preferredConnectionId &&
+        preferredProbe?.status === "pending"
+      ) {
+        return false;
+      }
       while (!this.snapshot.activeConnectionId) {
         if (!activationLock) {
           activationLock = this.switchToConnection({
@@ -1004,6 +1018,19 @@ export class HostRuntimeController {
       return false;
     };
 
+    const selectNextConnection = (): string | null => {
+      const preferredProbe = preferredConnectionId
+        ? probeByConnectionId.get(preferredConnectionId)
+        : null;
+      if (preferredConnectionId && preferredProbe?.status === "available") {
+        return preferredConnectionId;
+      }
+      return selectBestConnection({
+        candidates: buildConnectionCandidates(this.host),
+        probeByConnectionId,
+      });
+    };
+
     const finalizeProbeCycle = async (): Promise<void> => {
       if (remaining > 0 || !this.isCurrentProbeRequest(requestVersion)) {
         return;
@@ -1015,10 +1042,7 @@ export class HostRuntimeController {
         : null;
 
       if (!currentActiveConnectionId || !findConnectionById(this.host, currentActiveConnectionId)) {
-        const nextConnectionId = selectBestConnection({
-          candidates: buildConnectionCandidates(this.host),
-          probeByConnectionId,
-        });
+        const nextConnectionId = selectNextConnection();
         if (nextConnectionId) {
           await this.switchToConnection({
             connectionId: nextConnectionId,
@@ -1036,10 +1060,7 @@ export class HostRuntimeController {
       }
 
       if (this.isConnectionUnavailable(currentActiveConnectionId, activeProbe)) {
-        const nextConnectionId = selectBestConnection({
-          candidates: buildConnectionCandidates(this.host),
-          probeByConnectionId,
-        });
+        const nextConnectionId = selectNextConnection();
         if (nextConnectionId && nextConnectionId !== currentActiveConnectionId) {
           await this.switchToConnection({
             connectionId: nextConnectionId,
@@ -2116,6 +2137,7 @@ export class HostRuntimeStore {
     label?: string;
     clientName?: string;
     password?: string;
+    replaceConnectionId?: string;
   }): Promise<HostProfile> {
     const relayEndpoint = normalizeHostPort(input.relayEndpoint);
     const useTls = input.useTls ?? false;
@@ -2128,6 +2150,7 @@ export class HostRuntimeStore {
       serverId: input.serverId,
       label: input.label,
       clientName: input.clientName,
+      replaceConnectionId: input.replaceConnectionId,
       connection: {
         id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
         type: "relay",
@@ -2182,13 +2205,17 @@ export class HostRuntimeStore {
           if (!(await this.confirmLink(offer))) return { status: "cancelled" };
           approvedOffer = offer;
         }
-        const preservedLabel = targetServerId
-          ? this.hosts.find((host) => host.serverId === targetServerId)?.label
+        const targetHost = targetServerId
+          ? this.hosts.find((host) => host.serverId === targetServerId)
           : undefined;
+        const preservedLabel = targetHost?.label;
+        const replaceConnectionId =
+          targetHost?.preferredConnectionId ?? targetHost?.connections[0]?.id;
         const result = await this.probeAndUpsertOffer(
           offer,
           password ?? linkPassword,
           preservedLabel,
+          replaceConnectionId,
         );
         return { status: "connected", ...result };
       },
@@ -2220,6 +2247,7 @@ export class HostRuntimeStore {
     offer: ConnectionOffer,
     label?: string,
     password?: string,
+    replaceConnectionId?: string,
   ): Promise<HostProfile> {
     const connection = relayConnectionFromOffer(offer);
     return this.upsertRelayConnection({
@@ -2230,6 +2258,7 @@ export class HostRuntimeStore {
       label,
       clientName: offer.clientName,
       password,
+      replaceConnectionId,
     });
   }
 
@@ -2237,6 +2266,7 @@ export class HostRuntimeStore {
     offer: ConnectionOffer,
     password: string | undefined,
     preservedLabel?: string,
+    replaceConnectionId?: string,
   ): Promise<{ profile: HostProfile; serverId: string; hostname: string | null }> {
     const connection = relayConnectionFromOffer(offer);
     const probeHost: HostProfile = {
@@ -2257,6 +2287,7 @@ export class HostRuntimeStore {
       offer,
       preservedLabel ?? hostname ?? undefined,
       password,
+      replaceConnectionId,
     );
     return { profile, serverId: offer.serverId, hostname };
   }
@@ -2384,6 +2415,7 @@ export class HostRuntimeStore {
     label?: string;
     clientName?: string;
     password?: string;
+    replaceConnectionId?: string;
     connection: HostConnection;
     existingClient?: DaemonClient;
   }): Promise<HostProfile> {
@@ -2394,6 +2426,7 @@ export class HostRuntimeStore {
       label: input.label,
       clientName: input.clientName,
       connection: input.connection,
+      replaceConnectionId: input.replaceConnectionId,
       password: input.password,
       now,
     });

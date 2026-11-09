@@ -165,6 +165,7 @@ interface WebSocketConnectionIdentity {
   hubDaemonId?: string;
   clientId?: string;
   clientName?: string;
+  clientType?: WSHelloMessage["clientType"];
   sessionId?: string;
   appVersion?: string;
 }
@@ -481,6 +482,7 @@ interface SocketSessionOptions {
   sourceId?: string;
   clientId: string;
   clientName?: string;
+  clientType: WSHelloMessage["clientType"];
   appVersion: string | null;
   clientCapabilities: Record<string, unknown> | null;
   permissions: readonly DaemonPermission[];
@@ -1494,6 +1496,7 @@ export class VoiceAssistantWebSocketServer {
     ws: WebSocketLike;
     clientId: string;
     clientName?: string;
+    clientType: WSHelloMessage["clientType"];
     appVersion: string | null;
     clientCapabilities: Record<string, unknown> | null;
     connectionLogger: pino.Logger;
@@ -1504,6 +1507,7 @@ export class VoiceAssistantWebSocketServer {
       ws,
       clientId,
       clientName,
+      clientType,
       appVersion,
       clientCapabilities,
       connectionLogger,
@@ -1515,6 +1519,7 @@ export class VoiceAssistantWebSocketServer {
     const session = this.createSocketSession({
       clientId,
       clientName,
+      clientType,
       appVersion,
       clientCapabilities,
       permissions: admission.permissions,
@@ -1606,6 +1611,7 @@ export class VoiceAssistantWebSocketServer {
       browserToolsBroker: this.browserToolsBroker,
       clientId: options.clientId,
       clientName: options.clientName,
+      clientType: options.clientType,
       appVersion: options.appVersion,
       clientCapabilities: options.clientCapabilities,
       permissions: options.permissions,
@@ -1773,6 +1779,7 @@ export class VoiceAssistantWebSocketServer {
     pending.admission = admitted;
     pending.identity.clientId = clientId;
     pending.identity.clientName = message.clientName;
+    pending.identity.clientType = message.clientType;
     if (message.appVersion) {
       pending.identity.appVersion = message.appVersion;
     }
@@ -1789,6 +1796,7 @@ export class VoiceAssistantWebSocketServer {
       ws,
       clientId,
       clientName: message.clientName,
+      clientType: message.clientType,
       appVersion: message.appVersion ?? null,
       clientCapabilities: message.capabilities ?? null,
       connectionLogger,
@@ -1921,6 +1929,7 @@ export class VoiceAssistantWebSocketServer {
     existing.session.setPermissions(pending.admission!.permissions);
     existing.session.setRouted(message.routed === true);
     existing.session.updateClientName(message.clientName);
+    existing.session.updateClientType(message.clientType);
     this.assignHostSource(existing, message, pending.admission!.principalId);
     const newAppVersion = message.appVersion ?? null;
     if (newAppVersion && newAppVersion !== existing.appVersion) {
@@ -3071,6 +3080,7 @@ function toConnectionLogFields(identity: WebSocketConnectionIdentity): Record<st
     ...(identity.hubDaemonId ? { hubDaemonId: identity.hubDaemonId } : {}),
     ...(identity.clientId ? { clientId: identity.clientId } : {}),
     ...(identity.clientName ? { clientName: identity.clientName } : {}),
+    ...(identity.clientType ? { clientType: identity.clientType } : {}),
     ...(identity.sessionId ? { sessionId: identity.sessionId } : {}),
     ...(identity.appVersion ? { appVersion: identity.appVersion } : {}),
   };

@@ -341,6 +341,17 @@ declares `ohos.permission.CAMERA` and grants ArkWeb's camera request. The
 OpenHarmony CameraKit metadata API returns only a barcode's bounding box, not
 its payload, so it is not used for pairing.
 
+Every mobile client needs a client name before it can create a session. Generate
+the pairing link with a name:
+
+```bash
+paseo daemon pair --relay --name "Harmony phone"
+```
+
+Pairing through a link without a name still connects the host, but session
+creation fails with `client_name_required`. Re-pair the client with a named link
+to fix it.
+
 ## Known gaps
 
 - No push notifications. `packages/app/src/push-notifications/index.web.ts` is a no-op.

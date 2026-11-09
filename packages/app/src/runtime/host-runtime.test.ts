@@ -703,6 +703,60 @@ class BrowserClientLifecycle {
 }
 
 describe("HostRuntimeController", () => {
+  it("waits for the preferred connection when another connection probes first", async () => {
+    const oldRelay: HostConnection = {
+      id: "relay:old-relay.example:443",
+      type: "relay",
+      relayEndpoint: "old-relay.example:443",
+      daemonPublicKeyB64: "old-key",
+    };
+    const preferredRelay: HostConnection = {
+      id: "relay:new-relay.example:443",
+      type: "relay",
+      relayEndpoint: "new-relay.example:443",
+      daemonPublicKeyB64: "new-key",
+    };
+    const host = makeHost({
+      connections: [oldRelay, preferredRelay],
+      preferredConnectionId: preferredRelay.id,
+    });
+    const preferredProbe = createDeferred<void>();
+    const controller = new HostRuntimeController({
+      host,
+      deps: {
+        createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
+        connectToDaemon: async ({ host: hostProfile, connection }) => {
+          if (connection.id === preferredRelay.id) {
+            await preferredProbe.promise;
+          }
+          return {
+            client: makeConnectedProbeClient(
+              connection.id === oldRelay.id ? 5 : 100,
+            ) as unknown as DaemonClient,
+            serverId: hostProfile.serverId,
+            hostname: null,
+          };
+        },
+        getClientId: async () => "cid_preferred_connection",
+      },
+    });
+
+    const start = controller.start({ autoProbe: false });
+    await vi.waitFor(() => {
+      expect(controller.getSnapshot().probeByConnectionId.get(oldRelay.id)).toEqual({
+        status: "available",
+        latencyMs: 5,
+      });
+    });
+    expect(controller.getSnapshot().activeConnectionId).not.toBe(oldRelay.id);
+
+    preferredProbe.resolve();
+    await start;
+
+    expect(controller.getSnapshot().activeConnectionId).toBe(preferredRelay.id);
+    await controller.stop();
+  });
+
   it("publishes an old host and mounts observations through the client interface", async () => {
     const host = makeHost();
     const client = new FakeDaemonClient();
@@ -4029,6 +4083,59 @@ describe("HostRuntimeStore", () => {
       updatedHost?.connections.find((connection) => connection.type === "relay"),
     ).toMatchObject({ daemonPublicKeyB64: "pk_updated" });
     store.syncHosts([]);
+  });
+
+  it("replaces the previous relay when updating a saved host from a pairing link", async () => {
+    const storage = createMemoryHostRuntimeStorage({ "@paseo:e2e": "1" });
+    const store = createPairingStore({ storage });
+    answerHostConfirmations(store, true);
+    await store.boot();
+
+    await store.beginLinkPairing().submit(
+      encodeOfferUrl(
+        makeOffer({
+          relay: { endpoint: "old-relay.example:443", useTls: false },
+        }),
+      ),
+    );
+    await store.beginLinkPairing("srv_offer").submit(
+      encodeOfferUrl(
+        makeOffer({
+          relay: { endpoint: "new-relay.example:443", useTls: false },
+        }),
+      ),
+    );
+
+    const updatedHost = store.getHosts().find((host) => host.serverId === "srv_offer");
+    expect(updatedHost?.connections).toEqual([
+      {
+        id: "relay:new-relay.example:443",
+        type: "relay",
+        relayEndpoint: "new-relay.example:443",
+        useTls: false,
+        daemonPublicKeyB64: "pk_test_offer",
+      },
+    ]);
+    expect(updatedHost?.preferredConnectionId).toBe("relay:new-relay.example:443");
+
+    store.syncHosts([]);
+    const restarted = createPairingStore({ storage });
+    await restarted.boot();
+    await waitForHostOnline(restarted, "srv_offer");
+
+    expect(restarted.getHosts().find((host) => host.serverId === "srv_offer")).toMatchObject({
+      connections: [
+        {
+          id: "relay:new-relay.example:443",
+          relayEndpoint: "new-relay.example:443",
+        },
+      ],
+      preferredConnectionId: "relay:new-relay.example:443",
+    });
+    expect(restarted.getSnapshot("srv_offer")?.activeConnectionId).toBe(
+      "relay:new-relay.example:443",
+    );
+    restarted.syncHosts([]);
   });
 
   it("rejects a different host's pairing link in update mode", async () => {

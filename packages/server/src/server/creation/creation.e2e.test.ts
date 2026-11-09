@@ -142,7 +142,10 @@ test("creation progresses before agent readiness and continues after the disconn
   }
 }, 60000);
 
-async function connectCreationPeer(port: number) {
+async function connectCreationPeer(
+  port: number,
+  identity: { clientType?: "mobile" | "browser" | "cli"; clientName?: string } = {},
+) {
   const timeout = 30_000;
   const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   const frames: SessionOutboundMessage[] = [];
@@ -157,8 +160,9 @@ async function connectCreationPeer(port: number) {
   socket.send(
     JSON.stringify({
       type: "hello",
-      clientType: "browser",
+      clientType: identity.clientType ?? "browser",
       clientId: randomUUID(),
+      ...(identity.clientName ? { clientName: identity.clientName } : {}),
       protocolVersion: 1,
       appVersion: "0.8.0",
     }),
@@ -269,6 +273,119 @@ test.each(["create_agent_request", "agent.create.request"] as const)(
   60000,
 );
 
+const CLIENT_NAME_REQUIRED_MESSAGE =
+  "Client name is required before creating a session. Pair this client again with a name.";
+
+test.each([
+  {
+    type: "agent.create.request" as const,
+    request: (directory: string) => ({
+      type: "agent.create.request" as const,
+      requestId: "unnamed-modern-agent",
+      idempotencyKey: "unnamed-modern-agent",
+      config: { provider: "codex" as const, cwd: directory },
+      initialPrompt: "Create without a client name",
+    }),
+  },
+  {
+    type: "workspace.create.request" as const,
+    request: (directory: string) => ({
+      type: "workspace.create.request" as const,
+      requestId: "unnamed-workspace-agent",
+      idempotencyKey: "unnamed-workspace-agent",
+      source: { kind: "directory" as const, path: directory },
+      agent: {
+        config: { provider: "codex" as const, cwd: directory },
+        initialPrompt: "Create without a client name",
+      },
+    }),
+  },
+  {
+    type: "create_agent_request" as const,
+    request: (directory: string) => ({
+      type: "create_agent_request" as const,
+      requestId: "unnamed-legacy-agent",
+      config: { provider: "codex" as const, cwd: directory },
+      initialPrompt: "Create without a client name",
+    }),
+  },
+])("$type rejects an unnamed mobile client before creating anything", async ({ type, request }) => {
+  const directory = await mkdtemp(join(tmpdir(), "creation-unnamed-mobile-"));
+  let sessions = 0;
+  const daemon = await createCreationDaemon({
+    agentClients: createTestAgentClients({
+      beforeCreateSession: async (config) => {
+        if (!config.internal) sessions++;
+      },
+    }),
+  });
+  const peer = await connectCreationPeer(daemon.port, { clientType: "mobile" });
+  try {
+    const response = await peer.request(request(directory));
+
+    if (type === "agent.create.request") {
+      expect(response).toMatchObject({
+        type: "agent.create.response",
+        payload: { error: CLIENT_NAME_REQUIRED_MESSAGE },
+      });
+    } else if (type === "workspace.create.request") {
+      expect(response).toMatchObject({
+        type: "workspace.create.response",
+        payload: { error: CLIENT_NAME_REQUIRED_MESSAGE, errorCode: "client_name_required" },
+      });
+    } else {
+      expect(response).toMatchObject({
+        type: "status",
+        payload: {
+          status: "agent_create_failed",
+          error: CLIENT_NAME_REQUIRED_MESSAGE,
+          errorCode: "client_name_required",
+        },
+      });
+    }
+    expect(sessions).toBe(0);
+  } finally {
+    peer.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+});
+
+test("a named mobile client can still create an agent", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "creation-named-mobile-"));
+  let sessions = 0;
+  const daemon = await createCreationDaemon({
+    agentClients: createTestAgentClients({
+      beforeCreateSession: async (config) => {
+        if (!config.internal) sessions++;
+      },
+    }),
+  });
+  const peer = await connectCreationPeer(daemon.port, {
+    clientType: "mobile",
+    clientName: "Harmony Phone",
+  });
+  try {
+    const response = await peer.request({
+      type: "agent.create.request",
+      requestId: "named-mobile-agent",
+      idempotencyKey: "named-mobile-agent",
+      config: { provider: "codex", cwd: directory },
+      initialPrompt: "Create with a client name",
+    });
+
+    expect(response).toMatchObject({
+      type: "agent.create.response",
+      payload: { error: null, agent: { createdBy: { clientName: "Harmony Phone" } } },
+    });
+    expect(sessions).toBe(1);
+  } finally {
+    peer.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+});
+
 test("legacy keyed creation preserves checkout error codes", async () => {
   const directory = await mkdtemp(join(tmpdir(), "creation-checkout-error-"));
   execFileSync("git", ["init", "-b", "main", directory], { stdio: "pipe" });
@@ -376,13 +493,21 @@ test.each(["agent", "workspace"] as const)(
         },
         { type: "assistant_message", text: `[System Error] ${rejection}` },
       ];
+      const withoutActor = <T extends { actor?: unknown }>(item: T) => {
+        const { actor: _actor, ...rest } = item;
+        return rest;
+      };
       expect(
-        (await client.fetchAgentTimeline(created.id)).entries.map((entry) => entry.item),
+        (await client.fetchAgentTimeline(created.id)).entries.map((entry) =>
+          withoutActor(entry.item),
+        ),
       ).toEqual(expectedTimeline);
-      expect(streamed).toEqual(expectedTimeline);
+      expect(streamed.map(withoutActor)).toEqual(expectedTimeline);
       expect((await submit()).id).toBe(created.id);
       expect(
-        (await client.fetchAgentTimeline(created.id)).entries.map((entry) => entry.item),
+        (await client.fetchAgentTimeline(created.id)).entries.map((entry) =>
+          withoutActor(entry.item),
+        ),
       ).toEqual(expectedTimeline);
       expect((await client.fetchAgents()).entries).toHaveLength(1);
       expect({ sessions, prompts }).toEqual({ sessions: 1, prompts: 1 });
