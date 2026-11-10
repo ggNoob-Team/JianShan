@@ -1736,9 +1736,18 @@ export const es: TranslationResources = {
           "La gestión del demonio integrado se pausó, pero JianShan no pudo detener el demonio.",
         updateFailed: "No se puede actualizar la gestión de demonios integrada.",
       },
+      startAtLogin: {
+        title: "Iniciar al iniciar sesión en Windows",
+        hint: "Inicia el demonio integrado al iniciar sesión",
+      },
       keepRunning: {
         title: "Mantener el demonio en ejecución después de salir",
         hint: "Daemonsigue ejecutándose cuando sales de JianShan",
+      },
+      admin: {
+        title: "Consola de administración local",
+        hint: "Inicia sesión con la clave que muestra `paseo admin key`",
+        open: "Abrir consola",
       },
       logs: {
         title: "Archivo de registro",

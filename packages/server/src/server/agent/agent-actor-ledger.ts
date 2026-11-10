@@ -16,6 +16,9 @@ const AgentActorLedgerEntrySchema = z
     actor: AgentActorSchema,
     recordedAt: z.string(),
     providerMessageId: z.string().min(1).optional(),
+    turnId: z.string().min(1).optional(),
+    outcome: z.enum(["accepted", "rejected"]).optional(),
+    characters: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -35,6 +38,8 @@ export interface RecordAgentActorInput {
   actor: AgentActor;
   recordedAt: string;
   providerMessageId?: string;
+  turnId?: string;
+  outcome?: "accepted" | "rejected";
 }
 
 export interface AgentActorLedger {
@@ -128,6 +133,12 @@ export class InMemoryAgentActorLedger implements AgentActorLedger {
       if (!existing.providerMessageId && input.providerMessageId) {
         existing.providerMessageId = input.providerMessageId;
       }
+      if (!existing.turnId && input.turnId) {
+        existing.turnId = input.turnId;
+      }
+      if (existing.outcome === undefined && input.outcome) {
+        existing.outcome = input.outcome;
+      }
       return existing;
     }
     const entry: AgentActorLedgerEntry = {
@@ -135,7 +146,10 @@ export class InMemoryAgentActorLedger implements AgentActorLedger {
       textDigest: digestAgentActorText(input.text),
       actor: input.actor,
       recordedAt: input.recordedAt,
+      characters: input.text.length,
       ...(input.providerMessageId ? { providerMessageId: input.providerMessageId } : {}),
+      ...(input.turnId ? { turnId: input.turnId } : {}),
+      ...(input.outcome ? { outcome: input.outcome } : {}),
     };
     entries.push(entry);
     this.entriesByAgent.set(agentId, entries);

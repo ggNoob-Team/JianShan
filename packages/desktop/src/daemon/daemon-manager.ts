@@ -12,6 +12,7 @@ import {
   readLocalCredentialForTarget,
   type DaemonInstance,
 } from "@getpaseo/server/daemon-control";
+import { readAdminServerInfo } from "@getpaseo/server/admin";
 import {
   copyAttachmentFileToManagedStorage,
   deleteManagedAttachmentFile,
@@ -84,6 +85,7 @@ export interface DesktopDaemonStatus {
   desktopManaged: boolean;
   ownedByDesktop: boolean;
   startedAt: string | null;
+  adminUrl: string | null;
   error: string | null;
 }
 
@@ -193,8 +195,15 @@ function statusFromDaemonProbe(
       payload.pid === ownedLaunch.instance.pid &&
       payload.startedAt === ownedLaunch.instance.startedAt,
     ),
+    adminUrl: null,
     error: null,
   };
+}
+
+async function attachAdminUrl(status: DesktopDaemonStatus, home: string) {
+  if (status.status !== "running") return status;
+  const admin = await readAdminServerInfo(home).catch(() => null);
+  return { ...status, adminUrl: admin?.url ?? null };
 }
 
 function resolveDesktopAppVersion(): string {
@@ -238,7 +247,7 @@ export async function resolveDesktopDaemonStatus(): Promise<DesktopDaemonStatus>
       home,
       "--json",
     ])) as Record<string, unknown>;
-    return statusFromDaemonProbe(payload, home);
+    return await attachAdminUrl(statusFromDaemonProbe(payload, home), home);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logDesktopDaemonLifecycle("resolveStatus failed", { error: errorMessage });
@@ -253,6 +262,7 @@ export async function resolveDesktopDaemonStatus(): Promise<DesktopDaemonStatus>
       desktopManaged: false,
       ownedByDesktop: false,
       startedAt: null,
+      adminUrl: null,
       error: errorMessage,
     };
   }
@@ -378,6 +388,23 @@ async function getCliDaemonStatus(): Promise<string> {
   return await runExternalCliTextCommand(["daemon", "status", "--home", getPaseoHome()]);
 }
 
+export async function syncDesktopDaemonStartAtLogin(
+  enabled: boolean,
+  options: { isPackaged?: boolean; platform?: NodeJS.Platform } = {},
+): Promise<boolean> {
+  if (!(options.isPackaged ?? app.isPackaged) || (options.platform ?? process.platform) !== "win32")
+    return false;
+  await runExternalCliJsonCommand([
+    "daemon",
+    "autostart",
+    enabled ? "enable" : "disable",
+    "--home",
+    getPaseoHome(),
+    "--json",
+  ]);
+  return true;
+}
+
 async function getLocalDaemonVersion(): Promise<{ version: string | null; error: string | null }> {
   const status = await resolveDesktopDaemonStatus();
   if (status.status !== "running") {
@@ -400,8 +427,24 @@ async function resolveRequestedReleaseChannel(
 // ---------------------------------------------------------------------------
 
 export function createDaemonCommandHandlers(): Record<string, DesktopCommandHandler> {
+  const settingsStore = getDesktopSettingsStore();
   return {
-    ...createDesktopSettingsCommandHandlers({ settingsStore: getDesktopSettingsStore() }),
+    ...createDesktopSettingsCommandHandlers({ settingsStore }),
+    patch_desktop_settings: async (args) => {
+      const settings = await settingsStore.patch(args);
+      const startAtLogin =
+        typeof args === "object" &&
+        args !== null &&
+        typeof args.daemon === "object" &&
+        args.daemon !== null &&
+        typeof (args.daemon as Record<string, unknown>).startAtLogin === "boolean"
+          ? (args.daemon as Record<string, boolean>).startAtLogin
+          : null;
+      if (startAtLogin !== null) {
+        await syncDesktopDaemonStartAtLogin(startAtLogin);
+      }
+      return settings;
+    },
     desktop_get_runtime_info: () => ({
       appVersion: resolveDesktopAppVersion(),
       runningUnderARM64Translation: isRunningUnderARM64Translation(),

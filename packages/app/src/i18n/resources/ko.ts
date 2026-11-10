@@ -1699,9 +1699,18 @@ export const ko: TranslationResources = {
           "내장 데몬 관리가 일시 중지되었지만 JianShan가 데몬을 중지하지 못했습니다.",
         updateFailed: "내장 데몬 관리를 업데이트할 수 없습니다.",
       },
+      startAtLogin: {
+        title: "Windows 로그인 시 시작",
+        hint: "로그인하면 내장 데몬을 시작합니다",
+      },
       keepRunning: {
         title: "종료 후에도 데몬 계속 실행",
         hint: "JianShan를 종료해도 데몬이 계속 실행됩니다",
+      },
+      admin: {
+        title: "로컬 관리 콘솔",
+        hint: "`paseo admin key`에 표시된 키로 로그인하세요",
+        open: "콘솔 열기",
       },
       logs: {
         title: "로그 파일",

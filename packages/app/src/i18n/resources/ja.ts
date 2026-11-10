@@ -1707,9 +1707,18 @@ export const ja: TranslationResources = {
           "組み込みデーモン管理は一時停止されましたが、JianShanがデーモンを停止できませんでした。",
         updateFailed: "組み込みデーモン管理を更新できません。",
       },
+      startAtLogin: {
+        title: "Windows へのサインイン時に起動",
+        hint: "サインイン時に組み込みデーモンを起動します",
+      },
       keepRunning: {
         title: "終了後もデーモンを実行し続ける",
         hint: "JianShanを終了してもデーモンは実行し続けます",
+      },
+      admin: {
+        title: "ローカル管理コンソール",
+        hint: "`paseo admin key` に表示されるキーでサインインします",
+        open: "コンソールを開く",
       },
       logs: {
         title: "ログファイル",

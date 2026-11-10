@@ -31,6 +31,10 @@ vi.mock("./entrypoints.js", () => ({
   resolveExternalCliEntrypoint: mocks.resolveExternalCliEntrypoint,
 }));
 
+vi.mock("../../integrations/cli-install/index.js", () => ({
+  getBundledCliShimPath: () => "/app/bin/paseo",
+}));
+
 function mockExternalCliOutput(input: {
   stdout: string;
   stderr?: string;
@@ -75,7 +79,7 @@ describe("external CLI", () => {
       ["runner.js", "node-script", "cli.js"],
       {
         envMode: "internal",
-        env: { PASEO_NODE_ENV: "production" },
+        env: { PASEO_NODE_ENV: "production", PASEO_CLI: "/app/bin/paseo" },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );

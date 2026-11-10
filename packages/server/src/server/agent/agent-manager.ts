@@ -74,6 +74,7 @@ import {
   type AgentActorLedger,
   type RecordAgentActorInput,
 } from "./agent-actor-ledger.js";
+import { type AgentUsageLedger, type RecordAgentUsageInput } from "./agent-usage-ledger.js";
 import {
   AGENT_STREAM_COALESCE_DEFAULT_WINDOW_MS,
   AgentStreamCoalescer,
@@ -124,6 +125,16 @@ function submittedPromptText(prompt: AgentPromptInput): string {
     .flatMap((block) => (block.type === "text" && !("mimeType" in block) ? [block.text] : []))
     .join("\n")
     .trim();
+}
+
+function hasUsage(usage: AgentUsage | undefined): usage is AgentUsage {
+  return Boolean(
+    usage &&
+    (usage.inputTokens !== undefined ||
+      usage.cachedInputTokens !== undefined ||
+      usage.outputTokens !== undefined ||
+      usage.totalCostUsd !== undefined),
+  );
 }
 
 export class AgentManagerShuttingDownError extends Error {
@@ -336,6 +347,7 @@ export interface AgentManagerOptions {
   timelineStore?: InMemoryAgentTimelineStore;
   durableTimelineStore?: AgentTimelineStore;
   actorLedger?: AgentActorLedger;
+  usageLedger?: AgentUsageLedger;
   terminalManager?: TerminalManager | null;
   mcpBaseUrl?: string;
   mcpAuthToken?: string;
@@ -559,6 +571,7 @@ interface WriteLabelsResult {
 interface AgentMetadataPatch {
   title?: string;
   labels?: AgentLabelPatch;
+  createdBy?: AgentActor;
 }
 
 const SYSTEM_ERROR_PREFIX = "[System Error]";
@@ -763,6 +776,18 @@ export class AgentManager {
   private readonly registry?: AgentStorage;
   private readonly durableTimelineStore?: AgentTimelineStore;
   private readonly actorLedger?: AgentActorLedger;
+  private readonly usageLedger?: AgentUsageLedger;
+  private readonly turnAttributions = new Map<
+    string,
+    {
+      actor: AgentActor;
+      clientMessageId?: string;
+      provider: string;
+      model: string | null;
+      startedAt: string;
+      usage?: AgentUsage;
+    }
+  >();
   private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
   private readonly backgroundTasks = new Set<Promise<void>>();
   private readonly agentRegistrationTasks = new Set<Promise<void>>();
@@ -794,6 +819,7 @@ export class AgentManager {
     this.registry = options?.registry;
     this.durableTimelineStore = options?.durableTimelineStore;
     this.actorLedger = options.actorLedger;
+    this.usageLedger = options.usageLedger;
     this.onAgentAttention = options?.onAgentAttention;
     this.onWorkspaceStateMayHaveChanged = options?.onWorkspaceStateMayHaveChanged;
     this.mcpBaseUrl = options?.mcpBaseUrl ?? null;
@@ -2211,6 +2237,7 @@ export class AgentManager {
       ...record,
       ...(patch.title ? { title: patch.title } : {}),
       ...(patch.labels ? { labels: applyLabelPatch(record.labels, patch.labels) } : {}),
+      ...(patch.createdBy ? { createdBy: patch.createdBy } : {}),
       updatedAt: this.nextStoredUpdatedAt(record),
     };
     await registry.upsert(nextRecord);
@@ -2420,6 +2447,7 @@ export class AgentManager {
     updates: {
       title?: string;
       labels?: Record<string, string>;
+      createdBy?: AgentActor;
     },
   ): Promise<void> {
     await this.runLifecycleMutation(agentId, () =>
@@ -2432,6 +2460,7 @@ export class AgentManager {
     updates: {
       title?: string;
       labels?: Record<string, string>;
+      createdBy?: AgentActor;
     },
   ): Promise<void> {
     const liveAgent = this.getAgent(agentId);
@@ -2441,6 +2470,12 @@ export class AgentManager {
       }
       if (updates.labels) {
         await this.writeLabels(agentId, updates.labels);
+      }
+      if (updates.createdBy) {
+        liveAgent.createdBy = updates.createdBy;
+        this.touchUpdatedAt(liveAgent);
+        await this.persistSnapshot(liveAgent);
+        this.emitState(liveAgent, { persist: false });
       }
       return;
     }
@@ -4512,6 +4547,7 @@ export class AgentManager {
         return undefined;
       case "usage_updated":
         agent.lastUsage = event.usage;
+        this.noteTurnUsage(agent, eventTurnId, event.usage);
         this.emitState(agent);
         return undefined;
       case "mode_changed":
@@ -4558,6 +4594,7 @@ export class AgentManager {
         });
         return undefined;
       case "turn_failed":
+        this.discardTurnAttribution(agent, eventTurnId);
         return this.onStreamTurnFailed({
           agent,
           event,
@@ -4567,6 +4604,7 @@ export class AgentManager {
           options,
         });
       case "turn_canceled":
+        this.discardTurnAttribution(agent, eventTurnId);
         this.onStreamTurnCanceled({
           agent,
           event,
@@ -4665,6 +4703,7 @@ export class AgentManager {
     if (event.usage) {
       agent.lastUsage = { ...agent.lastUsage, ...event.usage };
     }
+    this.recordCompletedTurnUsage(agent, eventTurnId, event.usage);
     // If no usage on turn_completed, keep lastUsage as-is so context window
     // data accumulated during streaming isn't lost when the provider omits
     // it from the completion event.
@@ -4910,7 +4949,17 @@ export class AgentManager {
         actor: options.actor,
         recordedAt: new Date().toISOString(),
         ...(options.providerMessageId ? { providerMessageId: options.providerMessageId } : {}),
+        ...(options.turnId ? { turnId: options.turnId } : {}),
+        outcome,
       });
+      if (outcome === "accepted" && options.turnId) {
+        this.trackTurnAttribution({
+          agent,
+          actor: options.actor,
+          clientMessageId,
+          turnId: options.turnId,
+        });
+      }
     }
     for (const item of items) {
       // Human attempts stay in history on rejection; delivery notifications require acceptance.
@@ -5171,6 +5220,75 @@ export class AgentManager {
     this.trackBackgroundTask(task);
   }
 
+  private trackTurnAttribution(input: {
+    agent: ActiveManagedAgent;
+    actor: AgentActor;
+    clientMessageId: string;
+    turnId: string;
+  }): void {
+    this.turnAttributions.set(this.turnAttributionKey(input.agent.id, input.turnId), {
+      actor: input.actor,
+      clientMessageId: input.clientMessageId,
+      provider: input.agent.provider,
+      model: input.agent.runtimeInfo?.model ?? input.agent.config.model ?? null,
+      startedAt: new Date().toISOString(),
+    });
+  }
+
+  private noteTurnUsage(
+    agent: ActiveManagedAgent,
+    eventTurnId: string | undefined,
+    usage: AgentUsage,
+  ): void {
+    const turnId = eventTurnId ?? agent.activeForegroundTurnId;
+    if (!turnId) return;
+    const current = this.turnAttributions.get(this.turnAttributionKey(agent.id, turnId));
+    if (!current) return;
+    current.usage = { ...current.usage, ...usage };
+  }
+
+  private recordCompletedTurnUsage(
+    agent: ActiveManagedAgent,
+    eventTurnId: string | undefined,
+    usage: AgentUsage | undefined,
+  ): void {
+    if (!this.usageLedger) return;
+    const turnId = eventTurnId ?? agent.activeForegroundTurnId;
+    if (!turnId) return;
+    const key = this.turnAttributionKey(agent.id, turnId);
+    const attribution = this.turnAttributions.get(key);
+    this.turnAttributions.delete(key);
+    const finalUsage = { ...attribution?.usage, ...usage };
+    if (!attribution || !hasUsage(finalUsage)) return;
+    const input: RecordAgentUsageInput = {
+      agentId: agent.id,
+      turnId,
+      ...(attribution.clientMessageId ? { clientMessageId: attribution.clientMessageId } : {}),
+      actor: attribution.actor,
+      provider: attribution.provider,
+      model: attribution.model,
+      startedAt: attribution.startedAt,
+      completedAt: new Date().toISOString(),
+      usage: finalUsage,
+    };
+    const task = this.usageLedger.record(input).catch((error) => {
+      this.logger.warn(
+        { err: error, agentId: agent.id, turnId },
+        "Failed to persist agent turn usage",
+      );
+    });
+    this.trackBackgroundTask(task);
+  }
+
+  private turnAttributionKey(agentId: string, turnId: string): string {
+    return `${agentId}:${turnId}`;
+  }
+
+  private discardTurnAttribution(agent: ActiveManagedAgent, eventTurnId: string | undefined): void {
+    const turnId = eventTurnId ?? agent.activeForegroundTurnId;
+    if (turnId) this.turnAttributions.delete(this.turnAttributionKey(agent.id, turnId));
+  }
+
   private enqueueAgentActorProviderMessageId(
     agentId: string,
     clientMessageId: string,
@@ -5249,6 +5367,7 @@ export class AgentManager {
       await Promise.allSettled(pending);
     }
     await this.actorLedger?.flush().catch(() => undefined);
+    await this.usageLedger?.flush().catch(() => undefined);
   }
 
   private broadcastAgentAttention(

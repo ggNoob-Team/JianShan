@@ -3550,7 +3550,11 @@ export class DaemonClient {
 
   async updateAgent(
     agentId: string,
-    updates: { name?: string; labels?: Record<string, string> },
+    updates: {
+      name?: string;
+      labels?: Record<string, string>;
+      createdBy?: { clientId: string; clientName?: string };
+    },
   ): Promise<void> {
     const requestId = this.createRequestId();
     const message = SessionInboundMessageSchema.parse({
@@ -3560,6 +3564,7 @@ export class DaemonClient {
       ...(updates.labels && Object.keys(updates.labels).length > 0
         ? { labels: updates.labels }
         : {}),
+      ...(updates.createdBy ? { createdBy: updates.createdBy } : {}),
       requestId,
     });
     const payload = await this.sendRequest({

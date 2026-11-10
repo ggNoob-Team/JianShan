@@ -1,7 +1,9 @@
 import { addLocalDaemonOptions } from "../../utils/command-options.js";
 import { Command } from "commander";
 import { daemonLogPath } from "@getpaseo/server/daemon-control";
+import { readAdminServerInfo, resolveAdminListen, resolveAdminUrl } from "@getpaseo/server/admin";
 import { launchLocalDaemon, parseTimeoutMs, rejectRemovedLaunchFlags } from "./local-daemon.js";
+import { ensureDaemonAutostart } from "./autostart.js";
 import { withOutput, type CommandOptions } from "../../output/index.js";
 
 export function startCommand(): Command {
@@ -15,11 +17,15 @@ export async function runStart(options: CommandOptions, _command: Command) {
   if (options.daemonTarget.kind !== "instance") throw new Error("Start requires a local home");
   const home = options.daemonTarget.home;
   const result = await launchLocalDaemon({ home, timeoutMs: parseTimeoutMs(options.timeout) });
+  const autostart = await ensureDaemonAutostart(home).catch(() => null);
+  const adminInfo = await waitForAdminInfo(home);
   const data = {
     action: result.spawned ? "started" : "already_running",
     home,
     pid: result.instance.pid,
     listen: result.instance.listen,
+    adminUrl: adminInfo?.url ?? resolveAdminUrl(resolveAdminListen()),
+    autostart: autostart?.state ?? null,
     logPath: daemonLogPath(home),
   };
   return {
@@ -29,9 +35,19 @@ export async function runStart(options: CommandOptions, _command: Command) {
       idField: "pid" as const,
       columns: [],
       renderHuman: () =>
-        `${result.spawned ? "Started" : "Already running"}: PID ${data.pid}${data.listen ? `, listening on ${data.listen}` : ", not ready"}\nLogs: ${data.logPath}`,
+        `${result.spawned ? "Started" : "Already running"}: PID ${data.pid}${data.listen ? `, listening on ${data.listen}` : ", not ready"}\nAdmin: ${data.adminUrl}\nAutostart: ${data.autostart ?? "unavailable"}\nLogs: ${data.logPath}`,
     },
   };
+}
+
+async function waitForAdminInfo(home: string) {
+  const deadline = Date.now() + 5_000;
+  while (true) {
+    const info = await readAdminServerInfo(home).catch(() => null);
+    if (info) return info;
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 }
 
 export function daemonRunCommand(): Command {

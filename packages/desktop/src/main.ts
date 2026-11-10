@@ -30,6 +30,7 @@ import {
   webContents,
 } from "electron";
 import { registerDaemonManager } from "./daemon/daemon-manager.js";
+import { syncDesktopDaemonStartAtLogin } from "./daemon/daemon-manager.js";
 import { parsePassthroughCliArgsFromArgv, runPassthroughCli } from "./daemon/cli/passthrough.js";
 import { closeAllTransportSessions } from "./daemon/local-transport.js";
 import {
@@ -965,6 +966,12 @@ async function bootstrap(): Promise<void> {
     },
   });
   ensureNotificationCenterRegistration();
+  await getDesktopSettingsStore()
+    .get()
+    .then((settings) => syncDesktopDaemonStartAtLogin(settings.daemon.startAtLogin))
+    .catch((error) => {
+      log.warn("[desktop daemon] failed to update login item", error);
+    });
   registerDaemonManager();
   registerWindowManager({ mode: DESKTOP_WINDOW_CHROME_MODE });
   registerDialogHandlers();

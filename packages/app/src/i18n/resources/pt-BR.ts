@@ -1724,9 +1724,18 @@ export const ptBR: TranslationResources = {
           "O gerenciamento do daemon integrado foi pausado, mas o JianShan não conseguiu parar o daemon.",
         updateFailed: "Não foi possível atualizar o gerenciamento do daemon integrado.",
       },
+      startAtLogin: {
+        title: "Iniciar ao entrar no Windows",
+        hint: "Inicia o daemon integrado ao entrar",
+      },
       keepRunning: {
         title: "Manter daemon em execução ao sair",
         hint: "O daemon continua em execução quando você sai do JianShan",
+      },
+      admin: {
+        title: "Console de administração local",
+        hint: "Entre com a chave exibida por `paseo admin key`",
+        open: "Abrir console",
       },
       logs: {
         title: "Arquivo de log",

@@ -46,6 +46,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | [docs/webview/index.html](docs/webview/index.html)                   | Fork portal home (paseo.zxyz.app site root) — feature status board and requirement index                                       |
 | [docs/website-i18n.md](docs/website-i18n.md)                         | Website languages: locale URLs, translated Markdown pairs, `{#id}` anchors, Chinese style                                      |
 | [docs/service-proxy.md](docs/service-proxy.md)                       | Service proxy: exposing workspace scripts at public URLs, DNS setup, reverse proxy config                                      |
+| [docs/admin-console.md](docs/admin-console.md)                       | Standalone local management console: sidecar lifecycle, admin key, login startup, roles, ownership and token insights.         |
 | [docs/development.md](docs/development.md)                           | Dev server, build sync gotchas, CLI reference, agent state, Playwright MCP                                                     |
 | [docs/rpc-namespacing.md](docs/rpc-namespacing.md)                   | WebSocket RPC naming convention — dotted namespaces and `.request`/`.response` pairs                                           |
 | [docs/protocol-compatibility.md](docs/protocol-compatibility.md)     | Why app/daemon versions drift, protocol vs feature contract, capability gating, COMPAT tagging                                 |

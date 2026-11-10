@@ -695,6 +695,8 @@ describe("loadPersistedConfig", () => {
     try {
       const config = loadPersistedConfig(home);
       expect(config.daemon?.relay?.enabled).toBe(false);
+      expect(config.daemon?.cors?.allowedOrigins).toEqual(["https://paseo-app-8wq.pages.dev"]);
+      expect(config.app?.baseUrl).toBe("https://paseo-app-8wq.pages.dev");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

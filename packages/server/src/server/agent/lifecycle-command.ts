@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 
 import {
   AgentRunCancellationError,
@@ -31,6 +32,7 @@ export interface LifecycleAgentManager {
     updates: {
       title?: string;
       labels?: Record<string, string>;
+      createdBy?: AgentActor;
     },
   ): Promise<void>;
 }
@@ -166,21 +168,23 @@ export async function updateAgentCommand(
     agentId: string;
     name?: string;
     labels?: Record<string, string>;
+    createdBy?: AgentActor;
   },
 ): Promise<UpdateAgentResult> {
   const title = input.name?.trim();
   const labels = input.labels && Object.keys(input.labels).length > 0 ? input.labels : undefined;
 
-  if (!title && !labels) {
+  if (!title && !labels && !input.createdBy) {
     return {
       accepted: false,
-      error: "Nothing to update (provide name and/or labels)",
+      error: "Nothing to update (provide name, labels and/or createdBy)",
     };
   }
 
   await dependencies.agentManager.updateAgentMetadata(input.agentId, {
     ...(title ? { title } : {}),
     ...(labels ? { labels } : {}),
+    ...(input.createdBy ? { createdBy: input.createdBy } : {}),
   });
 
   return {

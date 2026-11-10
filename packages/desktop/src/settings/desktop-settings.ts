@@ -14,6 +14,7 @@ export interface DesktopSettings {
   daemon: {
     manageBuiltInDaemon: boolean;
     keepRunningAfterQuit: boolean;
+    startAtLogin: boolean;
   };
 }
 
@@ -37,6 +38,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   daemon: {
     manageBuiltInDaemon: true,
     keepRunningAfterQuit: false,
+    startAtLogin: true,
   },
 };
 
@@ -54,6 +56,7 @@ const DaemonSchema = z
   .looseObject({
     manageBuiltInDaemon: z.boolean().catch(DEFAULT_DESKTOP_SETTINGS.daemon.manageBuiltInDaemon),
     keepRunningAfterQuit: z.boolean().catch(DEFAULT_DESKTOP_SETTINGS.daemon.keepRunningAfterQuit),
+    startAtLogin: z.boolean().catch(DEFAULT_DESKTOP_SETTINGS.daemon.startAtLogin),
   })
   .catch(() => ({ ...DEFAULT_DESKTOP_SETTINGS.daemon }));
 
@@ -129,6 +132,7 @@ function toDesktopSettings(stored: StoredDesktopSettings): DesktopSettings {
     daemon: {
       manageBuiltInDaemon: stored.daemon.manageBuiltInDaemon,
       keepRunningAfterQuit: stored.daemon.keepRunningAfterQuit,
+      startAtLogin: stored.daemon.startAtLogin,
     },
   };
 }
@@ -160,6 +164,10 @@ function coerceDesktopSettingsPatch(input: unknown): DesktopSettingsPatch {
     const keepRunningAfterQuit = coerceBoolean(input.daemon.keepRunningAfterQuit);
     if (keepRunningAfterQuit !== null) {
       daemonPatch.keepRunningAfterQuit = keepRunningAfterQuit;
+    }
+    const startAtLogin = coerceBoolean(input.daemon.startAtLogin);
+    if (startAtLogin !== null) {
+      daemonPatch.startAtLogin = startAtLogin;
     }
     if (Object.keys(daemonPatch).length > 0) {
       patch.daemon = daemonPatch;

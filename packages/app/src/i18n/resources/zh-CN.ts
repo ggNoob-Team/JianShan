@@ -1668,9 +1668,18 @@ export const zhCN: TranslationResources = {
         pausedStopFailed: "内置 daemon 管理已暂停，但见山无法停止 daemon。",
         updateFailed: "无法更新内置 daemon 管理设置。",
       },
+      startAtLogin: {
+        title: "登录 Windows 时启动",
+        hint: "登录 Windows 后自动启动内置 daemon",
+      },
       keepRunning: {
         title: "退出后保持 daemon 运行",
         hint: "退出见山后 daemon 会继续运行",
+      },
+      admin: {
+        title: "本机管理台",
+        hint: "使用 `paseo admin key` 显示的密钥登录",
+        open: "打开管理台",
       },
       logs: {
         title: "日志文件",

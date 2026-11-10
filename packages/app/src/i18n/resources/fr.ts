@@ -1730,9 +1730,18 @@ export const fr: TranslationResources = {
           "La gestion du daemon intégré a été suspendue, mais JianShan n’a pas pu arrêter le daemon.",
         updateFailed: "Impossible de mettre à jour la gestion du daemon intégré.",
       },
+      startAtLogin: {
+        title: "Démarrer à l'ouverture de session Windows",
+        hint: "Démarre le daemon intégré à l'ouverture de session",
+      },
       keepRunning: {
         title: "Laisser le daemon tourner après la fermeture",
         hint: "Le daemon continue de tourner quand vous quittez JianShan",
+      },
+      admin: {
+        title: "Console d'administration locale",
+        hint: "Connectez-vous avec la clé affichée par `paseo admin key`",
+        open: "Ouvrir la console",
       },
       logs: {
         title: "Fichier journal",

@@ -5004,12 +5004,14 @@ test("updateAgentMetadata bumps updatedAt for stored agents", async () => {
   await manager.updateAgentMetadata(snapshot.id, {
     title: "Stored title",
     labels: { role: "worker" },
+    createdBy: { clientId: "owner-client", clientName: "书记" },
   });
 
   expect(upsertSpy).toHaveBeenCalledTimes(1);
   const after = await storage.get(snapshot.id);
   expect(after?.title).toBe("Stored title");
   expect(after?.labels).toEqual({ surface: "mobile", role: "worker" });
+  expect(after?.createdBy).toEqual({ clientId: "owner-client", clientName: "书记" });
   expect(Date.parse(after!.updatedAt)).toBeGreaterThan(Date.parse(before!.updatedAt));
 });
 
