@@ -38,6 +38,7 @@ function makeStatus(overrides: Partial<DesktopDaemonStatus> = {}): DesktopDaemon
     desktopManaged: true,
     ownedByDesktop: true,
     startedAt: "2026-01-01T00:00:00.000Z",
+    adminUrl: null,
     error: null,
     ...overrides,
   };

@@ -366,14 +366,18 @@ const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
   daemon: {
     listen: "127.0.0.1:6767",
     cors: {
-      allowedOrigins: ["https://app.paseo.sh"],
+      allowedOrigins: ["https://paseo-app-8wq.pages.dev"],
     },
     relay: {
-      enabled: false,
+      enabled: true,
+      endpoint: "relay.paseo.sh:443",
+      publicEndpoint: "relay-next.paseo.sh:443",
+      useTls: true,
+      publicUseTls: true,
     },
   },
   app: {
-    baseUrl: "https://app.paseo.sh",
+    baseUrl: "https://paseo-app-8wq.pages.dev",
   },
 }) as PersistedConfig;
 

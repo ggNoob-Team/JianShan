@@ -3,14 +3,19 @@ import log from "electron-log/main";
 import type { NodeEntrypointInvocation } from "../node-entrypoint-launcher.js";
 import { createNodeEntrypointInvocation } from "../runtime-paths.js";
 import { resolveExternalCliEntrypoint } from "./entrypoints.js";
+import { getBundledCliShimPath } from "../../integrations/cli-install/index.js";
 
 function createExternalCliInvocation(args: string[]): NodeEntrypointInvocation {
-  return createNodeEntrypointInvocation({
+  const invocation = createNodeEntrypointInvocation({
     entrypoint: resolveExternalCliEntrypoint(),
     argvMode: "node-script",
     args,
     baseEnv: process.env,
   });
+  return {
+    ...invocation,
+    env: { ...invocation.env, PASEO_CLI: getBundledCliShimPath() },
+  };
 }
 
 function spawnExternalCli(

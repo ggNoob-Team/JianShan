@@ -12,10 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isVersionMismatch } from "@/desktop/updates/desktop-updates";
+import { getDesktopHost } from "@/desktop/host";
 import {
   getCliDaemonStatus,
   shouldUseDesktopDaemon,
   confirmAndStopDesktopDaemon,
+  type DesktopDaemonStatus,
 } from "@/desktop/daemon/desktop-daemon";
 import { useBuiltInDaemonManagement } from "@/desktop/hooks/use-built-in-daemon-management";
 import { useDaemonStatus } from "@/desktop/hooks/use-daemon-status";
@@ -44,6 +46,27 @@ function useKeepRunningAfterQuitToggle(args: {
   }, [settings.keepRunningAfterQuit, updateSettings]);
 
   return { isUpdatingKeepRunningAfterQuit, handleToggleKeepRunningAfterQuit };
+}
+
+function useStartAtLoginToggle(args: {
+  settings: DesktopDaemonSettings;
+  updateSettings: (next: Partial<DesktopDaemonSettings>) => Promise<unknown>;
+}) {
+  const { settings, updateSettings } = args;
+  const [isUpdatingStartAtLogin, setIsUpdatingStartAtLogin] = useState(false);
+
+  const handleToggleStartAtLogin = useCallback(() => {
+    setIsUpdatingStartAtLogin(true);
+    void updateSettings({ startAtLogin: !settings.startAtLogin })
+      .catch(() => {
+        // useDesktopSettings owns the user-visible IPC error.
+      })
+      .finally(() => {
+        setIsUpdatingStartAtLogin(false);
+      });
+  }, [settings.startAtLogin, updateSettings]);
+
+  return { isUpdatingStartAtLogin, handleToggleStartAtLogin };
 }
 
 function useDaemonCliStatusModal() {
@@ -208,6 +231,9 @@ interface DaemonInfoCardProps {
   activityIcon: ReactElement;
   handleToggleDaemonManagement: () => void;
   isUpdatingDaemonManagement: boolean;
+  startAtLogin: boolean;
+  handleToggleStartAtLogin: () => void;
+  isUpdatingStartAtLogin: boolean;
   keepRunningAfterQuit: boolean;
   handleToggleKeepRunningAfterQuit: () => void;
   isUpdatingKeepRunningAfterQuit: boolean;
@@ -216,6 +242,67 @@ interface DaemonInfoCardProps {
   handleOpenLogs: () => void;
   handleRunCliStatus: () => void;
   isLoadingCliStatus: boolean;
+}
+
+function StartAtLoginRow(props: {
+  startAtLogin: boolean;
+  handleToggleStartAtLogin: () => void;
+  isUpdatingStartAtLogin: boolean;
+}) {
+  const { t } = useTranslation();
+  if (getDesktopHost()?.platform !== "win32") return null;
+
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>{t("desktop.daemon.startAtLogin.title")}</Text>
+        <Text style={settingsStyles.rowHint}>{t("desktop.daemon.startAtLogin.hint")}</Text>
+      </View>
+      <Switch
+        value={props.startAtLogin}
+        onValueChange={props.handleToggleStartAtLogin}
+        disabled={props.isUpdatingStartAtLogin}
+        accessibilityLabel={t("desktop.daemon.startAtLogin.title")}
+      />
+    </View>
+  );
+}
+
+function AdminConsoleCard({ daemonStatus }: { daemonStatus: DesktopDaemonStatus | null }) {
+  const { t } = useTranslation();
+  const { theme } = useUnistyles();
+  const adminUrl = daemonStatus?.adminUrl ?? null;
+  const handleOpen = useCallback(() => {
+    if (adminUrl) void openExternalUrl(adminUrl);
+  }, [adminUrl]);
+  const icon = useMemo(
+    () => <ArrowUpRight size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
+    [theme.iconSize.sm, theme.colors.foregroundMuted],
+  );
+  if (!adminUrl) return null;
+
+  return (
+    <View style={settingsStyles.card}>
+      <View style={settingsStyles.row}>
+        <View style={settingsStyles.rowContent}>
+          <Text style={settingsStyles.rowTitle}>{t("desktop.daemon.admin.title")}</Text>
+          <Text style={settingsStyles.rowHint} selectable>
+            {adminUrl}
+          </Text>
+          <Text style={settingsStyles.rowHint}>{t("desktop.daemon.admin.hint")}</Text>
+        </View>
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={icon}
+          onPress={handleOpen}
+          testID="open-admin-console-button"
+        >
+          {t("desktop.daemon.admin.open")}
+        </Button>
+      </View>
+    </View>
+  );
 }
 
 function DaemonInfoCard(props: DaemonInfoCardProps) {
@@ -229,6 +316,9 @@ function DaemonInfoCard(props: DaemonInfoCardProps) {
     activityIcon,
     handleToggleDaemonManagement,
     isUpdatingDaemonManagement,
+    startAtLogin,
+    handleToggleStartAtLogin,
+    isUpdatingStartAtLogin,
     keepRunningAfterQuit,
     handleToggleKeepRunningAfterQuit,
     isUpdatingKeepRunningAfterQuit,
@@ -263,6 +353,11 @@ function DaemonInfoCard(props: DaemonInfoCardProps) {
           accessibilityLabel={t("desktop.daemon.management.title")}
         />
       </View>
+      <StartAtLoginRow
+        startAtLogin={startAtLogin}
+        handleToggleStartAtLogin={handleToggleStartAtLogin}
+        isUpdatingStartAtLogin={isUpdatingStartAtLogin}
+      />
       <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>{t("desktop.daemon.keepRunning.title")}</Text>
@@ -370,6 +465,10 @@ export function LocalDaemonSection() {
       settings: daemonSettings,
       updateSettings: updateDaemonSettings,
     });
+  const { isUpdatingStartAtLogin, handleToggleStartAtLogin } = useStartAtLoginToggle({
+    settings: daemonSettings,
+    updateSettings: updateDaemonSettings,
+  });
 
   const { isLogsModalOpen, handleCopyLogPath, handleOpenLogs, handleCloseLogsModal } =
     useDaemonLogsModal(daemonLogs);
@@ -390,7 +489,6 @@ export function LocalDaemonSection() {
     () => void openExternalUrl(ADVANCED_DAEMON_SETTINGS_URL),
     [],
   );
-
   const advancedSettingsIcon = useMemo(
     () => <ArrowUpRight size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
     [theme.iconSize.sm, theme.colors.foregroundMuted],
@@ -450,6 +548,9 @@ export function LocalDaemonSection() {
             activityIcon={activityIcon}
             handleToggleDaemonManagement={handleToggleDaemonManagement}
             isUpdatingDaemonManagement={isUpdatingDaemonManagement}
+            startAtLogin={daemonSettings.startAtLogin}
+            handleToggleStartAtLogin={handleToggleStartAtLogin}
+            isUpdatingStartAtLogin={isUpdatingStartAtLogin}
             keepRunningAfterQuit={daemonSettings.keepRunningAfterQuit}
             handleToggleKeepRunningAfterQuit={handleToggleKeepRunningAfterQuit}
             isUpdatingKeepRunningAfterQuit={isUpdatingKeepRunningAfterQuit}
@@ -479,6 +580,8 @@ export function LocalDaemonSection() {
               </View>
             </View>
           ) : null}
+
+          <AdminConsoleCard daemonStatus={daemonStatus} />
 
           {daemonVersionMismatch ? (
             <View style={styles.warningCard}>

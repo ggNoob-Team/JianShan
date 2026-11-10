@@ -67,6 +67,7 @@ import type { GeneratedWorkspaceName } from "../worktree-branch-name-generator.j
 import type { ForgeService } from "../../services/forge-service.js";
 import { areEquivalentPaths } from "../../utils/path.js";
 import { createTerminalManager, type TerminalManager } from "../../terminal/terminal-manager.js";
+import { createLocalJobService } from "../local-jobs/local-job-service.js";
 import { createWorkerTerminalManager } from "../../terminal/worker-terminal-manager.js";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { PASEO_TOOL_NAMES } from "@getpaseo/protocol/paseo-tool-presentation/index";
@@ -924,6 +925,82 @@ describe("Paseo tool timeline presentation", () => {
     } finally {
       await client.close();
       await server.close();
+    }
+  });
+});
+
+describe("local job MCP tools", () => {
+  it("inspects a workspace, starts a command, and returns its result", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "paseo-local-job-tool-"));
+    const terminalManager = createTerminalManager();
+    const jobService = createLocalJobService({
+      terminalManager,
+      createJobId: () => "local-job-tool",
+    });
+    const workspace = createPersistedWorkspaceRecord({
+      workspaceId: "workspace-local",
+      projectId: "project-local",
+      cwd,
+      kind: "local_checkout",
+      displayName: "Paseo",
+      createdAt: "2026-11-09T10:00:00.000Z",
+      updatedAt: "2026-11-09T10:00:00.000Z",
+    });
+    const workspaceRegistry: WorkspaceRegistry = {
+      initialize: async () => {},
+      existsOnDisk: async () => true,
+      list: async () => [workspace],
+      get: async (workspaceId) => (workspaceId === workspace.workspaceId ? workspace : null),
+      update: async () => null,
+      upsert: async () => {},
+      archive: async () => {},
+      remove: async () => {},
+    };
+    const server = await createAgentMcpServer({
+      agentManager: new BoundaryAgentManagerFake() as AgentManager,
+      agentStorage: new BoundaryAgentStorageFake() as AgentStorage,
+      providerSnapshotManager:
+        new BoundaryProviderSnapshotManagerFake() as unknown as ProviderSnapshotManager,
+      workspaceRegistry,
+      localJobs: () => jobService,
+      logger: createTestLogger(),
+    });
+
+    try {
+      const inspected = await invokeToolWithParsedInput(
+        registeredTool(server, "inspect_local_runtime"),
+        {},
+      );
+      expect(inspected.structuredContent).toMatchObject({
+        capabilities: ["local.jobs"],
+        workspaces: [{ workspaceId: "workspace-local", cwd, title: "Paseo" }],
+      });
+
+      const started = await invokeToolWithParsedInput(registeredTool(server, "start_local_job"), {
+        workspaceId: "workspace-local",
+        command: process.execPath,
+        args: ["-e", "process.stdout.write('tool job output')"],
+      });
+      expect(started.structuredContent).toMatchObject({
+        jobId: "local-job-tool",
+      });
+
+      const finished = await invokeToolWithParsedInput(registeredTool(server, "wait_local_job"), {
+        jobId: "local-job-tool",
+        timeoutMs: 5_000,
+      });
+      expect(finished.structuredContent).toMatchObject({
+        jobId: "local-job-tool",
+        status: "succeeded",
+        exitCode: 0,
+      });
+      expect(z.array(z.string()).parse(finished.structuredContent.outputTail).join("\n")).toContain(
+        "tool job output",
+      );
+    } finally {
+      terminalManager.killAll();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
     }
   });
 });

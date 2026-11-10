@@ -105,6 +105,24 @@ describe("desktop packaging", () => {
     expect(config).toContain("!node_modules/@getpaseo/server/dist/server/web-ui/**");
   });
 
+  it("packages the standalone admin sidecar and its UI", () => {
+    const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
+    const serverPackage = readFileSync(join(packageRoot, "..", "server", "package.json"), "utf8");
+    const runtimeTrace = readFileSync(
+      join(packageRoot, "..", "..", "scripts", "trace-daemon.mjs"),
+      "utf8",
+    );
+
+    expect(config).not.toContain("node_modules/@getpaseo/server/dist/server/server/admin/ui");
+    expect(serverPackage).toContain(
+      "fs.cpSync('src/server/admin/ui','dist/server/server/admin/ui'",
+    );
+    expect(runtimeTrace).toContain("packages/server/dist/scripts/admin-entrypoint.js");
+    expect(runtimeTrace).toContain("packages/server/dist/server/server/admin/ui/index.html");
+    expect(runtimeTrace).toContain("packages/server/dist/server/server/admin/ui/app.js");
+    expect(runtimeTrace).toContain("packages/server/dist/server/server/admin/ui/style.css");
+  });
+
   it("uses the server skill catalog without a duplicate desktop resource", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
     const serverPackage = readFileSync(join(packageRoot, "..", "server", "package.json"), "utf8");

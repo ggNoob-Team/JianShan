@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_DESKTOP_SETTINGS } from "../settings/desktop-settings";
-import { createDaemonCommandHandlers } from "./daemon-manager";
+import { createDaemonCommandHandlers, syncDesktopDaemonStartAtLogin } from "./daemon-manager";
 
 const mocks = vi.hoisted(() => ({
   paseoHome: "",
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     daemon: {
       manageBuiltInDaemon: true,
       keepRunningAfterQuit: true,
+      startAtLogin: true,
     },
   },
   runExternalCliJsonCommand: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("electron", () => ({
     getPath: vi.fn(() => mocks.paseoHome),
     getVersion: vi.fn(() => "1.2.3"),
     isPackaged: true,
+    setLoginItemSettings: vi.fn(),
   },
   ipcMain: { handle: vi.fn() },
   powerMonitor: { getSystemIdleTime: vi.fn(() => 0) },
@@ -125,6 +127,22 @@ describe("daemon-manager commands", () => {
     });
   });
 
+  it("installs daemon-only Windows login startup through the bundled CLI", async () => {
+    mocks.runExternalCliJsonCommand.mockResolvedValue({ state: "enabled" });
+
+    await expect(
+      syncDesktopDaemonStartAtLogin(true, { isPackaged: true, platform: "win32" }),
+    ).resolves.toBe(true);
+    expect(mocks.runExternalCliJsonCommand).toHaveBeenCalledWith([
+      "daemon",
+      "autostart",
+      "enable",
+      "--home",
+      mocks.paseoHome,
+      "--json",
+    ]);
+  });
+
   it("reports a stopped daemon without launching the CLI when no local daemon runs", async () => {
     mkdirSync(mocks.paseoHome);
     writeFileSync(path.join(mocks.paseoHome, "server-id"), "srv_existing\n");
@@ -143,6 +161,47 @@ describe("daemon-manager commands", () => {
 
     expect(status).toMatchObject({ serverId: "", status: "stopped", pid: null });
     expect(mocks.runExternalCliJsonCommand).not.toHaveBeenCalled();
+  });
+
+  it("reports the local admin console URL for a running daemon", async () => {
+    mkdirSync(mocks.paseoHome);
+    const startedAt = new Date().toISOString();
+    const lock = {
+      pid: process.pid,
+      startedAt,
+      hostname: hostname(),
+      uid: process.getuid?.() ?? 0,
+      listen: "127.0.0.1:6799",
+      desktopManaged: true,
+    };
+    writeFileSync(path.join(mocks.paseoHome, "paseo.pid"), JSON.stringify(lock));
+    mkdirSync(path.join(mocks.paseoHome, "admin"));
+    writeFileSync(
+      path.join(mocks.paseoHome, "admin", "server.json"),
+      JSON.stringify({
+        pid: process.pid,
+        listen: "127.0.0.1:6801",
+        url: "http://127.0.0.1:6801/",
+        startedAt,
+      }),
+    );
+    mocks.runExternalCliJsonCommand.mockResolvedValue({
+      home: mocks.paseoHome,
+      pid: process.pid,
+      startedAt,
+      listen: "127.0.0.1:6799",
+      hostname: hostname(),
+      localDaemon: "running",
+      daemonVersion: "1.2.3",
+      desktopManaged: true,
+    });
+
+    const status = await createDaemonCommandHandlers().desktop_daemon_status();
+
+    expect(status).toMatchObject({
+      status: "running",
+      adminUrl: "http://127.0.0.1:6801/",
+    });
   });
 
   it("reports an errored daemon when the local daemon state cannot be read", async () => {

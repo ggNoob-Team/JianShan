@@ -97,7 +97,7 @@ export class ConnectedHostSession {
     const actor = { ...this.actor, manageSources: this.permissions().includes("access.manage") };
     switch (message.type) {
       case "hosts.list.request":
-        return this.list(message);
+        return this.list(message, actor);
       case "hosts.add.request":
         this.emit({
           type: "hosts.add.response",
@@ -121,7 +121,7 @@ export class ConnectedHostSession {
         this.emit({ type: "hosts.remove.response", payload: { requestId: message.requestId } });
         return;
       case "hosts.route.open.request":
-        return this.open(message);
+        return this.open(message, actor);
       case "hosts.route.frame.request": {
         const route = this.routes.get(message.routeId);
         if (!route || route.source !== this.delivery.currentSource)
@@ -141,20 +141,20 @@ export class ConnectedHostSession {
       }
     }
   }
-  private async list(message: HostRequest<"hosts.list.request">): Promise<void> {
+  private async list(message: HostRequest<"hosts.list.request">, actor: HostActor): Promise<void> {
     if (!message.observe) {
       this.emit({
         type: "hosts.list.response",
-        payload: { requestId: message.requestId, directory: await this.hosts.list() },
+        payload: { requestId: message.requestId, directory: await this.hosts.listFor(actor) },
       });
       return;
     }
     let stop = () => {};
     const owner = this.delivery.begin("hosts", undefined, () => stop());
     try {
-      stop = this.hosts.observe(() => {
+      stop = this.hosts.observe(actor, () => {
         void this.hosts
-          .list()
+          .listFor(actor)
           .then((directory) => {
             owner.emit({ type: "hosts.changed", payload: { subscriptionId: owner.id, directory } });
             return undefined;
@@ -166,7 +166,7 @@ export class ConnectedHostSession {
         payload: {
           requestId: message.requestId,
           subscriptionId: owner.id,
-          directory: await this.hosts.list(),
+          directory: await this.hosts.listFor(actor),
         },
       });
     } catch (error) {
@@ -174,7 +174,10 @@ export class ConnectedHostSession {
       throw error;
     }
   }
-  private async open(message: HostRequest<"hosts.route.open.request">): Promise<void> {
+  private async open(
+    message: HostRequest<"hosts.route.open.request">,
+    actor: HostActor,
+  ): Promise<void> {
     if (this.delivery.subscriptionIds(this.delivery.currentSource!, "host-route").length >= 32)
       throw new HostError("resource_limit", "Too many routed sessions for this caller");
     let close = () => {};
@@ -202,7 +205,8 @@ export class ConnectedHostSession {
       const route = await this.hosts.openRoute({
         serverId: message.serverId,
         scopeId: message.scopeId,
-        sourceId: this.actor.sourceId,
+        sourceId: actor.sourceId,
+        manageSources: actor.manageSources,
         originSessionId: this.originSessionId,
         permissions: this.permissions(),
         signal: owner.signal,

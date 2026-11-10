@@ -169,7 +169,8 @@ describe("relay websocket URL versioning", () => {
 });
 
 describe("hosted relay client endpoint", () => {
-  test("routes hosted clients directly to the Fly relay upstream", () => {
+  test("routes hosted clients through the resolvable relay alias", () => {
+    expect(DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT).toBe("relay-next.paseo.sh:443");
     const url = new URL(
       buildRelayWebSocketUrl({
         endpoint: "relay.paseo.sh:443",

@@ -115,4 +115,27 @@ describe("FileAgentActorLedger", () => {
     await expect(ledger.list(agentId)).resolves.toEqual([]);
     await expect(new FileAgentActorLedger(directory).list(agentId)).resolves.toEqual([]);
   });
+
+  test("persists turn attribution, outcome and prompt size", async () => {
+    const { directory, agentId } = await fixture();
+    const ledger = new FileAgentActorLedger(directory);
+    await ledger.record({
+      agentId,
+      clientMessageId: "message",
+      text: "统计这段文字",
+      actor: { clientId: "client-role", clientName: "少爷" },
+      recordedAt: "2026-11-02T00:00:00.000Z",
+      turnId: "turn-1",
+      outcome: "accepted",
+    });
+
+    await expect(new FileAgentActorLedger(directory).list(agentId)).resolves.toEqual([
+      expect.objectContaining({
+        turnId: "turn-1",
+        outcome: "accepted",
+        characters: 6,
+        actor: { clientId: "client-role", clientName: "少爷" },
+      }),
+    ]);
+  });
 });

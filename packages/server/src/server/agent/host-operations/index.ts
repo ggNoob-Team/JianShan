@@ -1,5 +1,9 @@
 import { parentAddressLabels } from "@getpaseo/protocol/agent-labels";
-import type { ActiveTurnBehavior, AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type {
+  ActiveTurnBehavior,
+  AgentSnapshotPayload,
+  LocalRuntimeSnapshot,
+} from "@getpaseo/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -29,6 +33,11 @@ export interface HostOperations {
   getStatus: HostOperation;
   getActivity: HostOperation;
   listAgents: HostOperation;
+  inspectLocalRuntime: HostOperation;
+  startLocalJob: HostOperation;
+  getLocalJob: HostOperation;
+  cancelLocalJob: HostOperation;
+  waitLocalJob: HostOperation;
   wait(agentId: string, signal: AbortSignal): Promise<WaitForFinishResult>;
   observe(
     agentId: string,
@@ -44,7 +53,7 @@ export interface ToolHosts {
 /** Daemon MCP has the daemon's authority, bounded by the destination's admission of its link. */
 export function createToolHosts(hosts: ConnectedHosts): ToolHosts {
   return {
-    directory: () => hosts.list(),
+    directory: () => hosts.listAll(),
     async use(serverId, action) {
       const lifetime = new AbortController();
       const transportFactory: DaemonTransportFactory = () => {
@@ -59,6 +68,7 @@ export function createToolHosts(hosts: ConnectedHosts): ToolHosts {
             serverId,
             scopeId: randomUUID(),
             sourceId: "mcp",
+            manageSources: true,
             originSessionId: "mcp",
             permissions: OWNER_PERMISSIONS,
             signal: lifetime.signal,
@@ -281,6 +291,55 @@ export function createHostResolver(input: {
               includeBackground: args.includeBackground === true,
             });
             return result({ workspaces: entries.map(workspaceSummary) });
+          },
+          async inspectLocalRuntime() {
+            if (client.getLastServerInfoMessage()?.features?.localJobs !== true) {
+              throw new Error("Update the target daemon to inspect local runtimes.");
+            }
+            const runtime: LocalRuntimeSnapshot = await client.inspectLocalRuntime();
+            return result(runtime);
+          },
+          async startLocalJob(args) {
+            if (client.getLastServerInfoMessage()?.features?.localJobs !== true) {
+              throw new Error("Update the target daemon to run local jobs.");
+            }
+            const job = await client.startLocalJob({
+              workspaceId: args.workspaceId as string,
+              command: args.command as string,
+              args: (args.args as string[] | undefined) ?? [],
+              ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs as number }),
+            });
+            return result(job);
+          },
+          async getLocalJob(args) {
+            if (client.getLastServerInfoMessage()?.features?.localJobs !== true) {
+              throw new Error("Update the target daemon to read local jobs.");
+            }
+            const response = await client.getLocalJob(args.jobId as string);
+            if (response.error) throw new Error(response.error);
+            if (!response.job) throw new Error(`Unknown local job: ${String(args.jobId)}`);
+            return result(response.job);
+          },
+          async cancelLocalJob(args) {
+            if (client.getLastServerInfoMessage()?.features?.localJobs !== true) {
+              throw new Error("Update the target daemon to cancel local jobs.");
+            }
+            const response = await client.cancelLocalJob(args.jobId as string);
+            if (response.error) throw new Error(response.error);
+            if (!response.job) throw new Error(`Unknown local job: ${String(args.jobId)}`);
+            return result(response.job);
+          },
+          async waitLocalJob(args) {
+            if (client.getLastServerInfoMessage()?.features?.localJobs !== true) {
+              throw new Error("Update the target daemon to wait for local jobs.");
+            }
+            const response = await client.waitLocalJob({
+              jobId: args.jobId as string,
+              ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs as number }),
+            });
+            if (response.error) throw new Error(response.error);
+            if (!response.job) throw new Error(`Unknown local job: ${String(args.jobId)}`);
+            return result(response.job);
           },
           async createWorkspace(args) {
             const isolation = z.enum(["local", "worktree"]).parse(args.isolation);

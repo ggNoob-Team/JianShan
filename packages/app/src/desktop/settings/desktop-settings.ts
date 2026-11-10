@@ -19,6 +19,7 @@ export interface DesktopSettings {
   daemon: {
     manageBuiltInDaemon: boolean;
     keepRunningAfterQuit: boolean;
+    startAtLogin: boolean;
   };
 }
 
@@ -36,6 +37,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   daemon: {
     manageBuiltInDaemon: true,
     keepRunningAfterQuit: false,
+    startAtLogin: true,
   },
 };
 
@@ -171,6 +173,10 @@ function parseDesktopSettings(raw: unknown): DesktopSettings {
         typeof daemon.keepRunningAfterQuit === "boolean"
           ? daemon.keepRunningAfterQuit
           : DEFAULT_DESKTOP_SETTINGS.daemon.keepRunningAfterQuit,
+      startAtLogin:
+        typeof daemon.startAtLogin === "boolean"
+          ? daemon.startAtLogin
+          : DEFAULT_DESKTOP_SETTINGS.daemon.startAtLogin,
     },
   };
 }

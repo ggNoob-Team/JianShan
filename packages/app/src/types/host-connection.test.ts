@@ -5,6 +5,7 @@ import {
   normalizeStoredHostProfile,
   orderHostsLocalFirst,
   resolveActiveHostServerId,
+  resolveHostClientName,
   upsertHostConnectionInProfiles,
   type HostConnection,
   type HostProfile,
@@ -58,6 +59,12 @@ describe("normalizeStoredHostProfile", () => {
     });
 
     expect(profile?.clientName).toBe("Harmony Emulator");
+  });
+
+  it("uses a stable default client name for legacy profiles without one", () => {
+    expect(resolveHostClientName({ clientName: undefined })).toBe("JianShan");
+    expect(resolveHostClientName({ clientName: "   " })).toBe("JianShan");
+    expect(resolveHostClientName({ clientName: " 少爷 " })).toBe("少爷");
   });
 
   it("loads direct TCP connections stored before TLS and password fields existed", () => {

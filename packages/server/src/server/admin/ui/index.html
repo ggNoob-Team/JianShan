@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>见山管理台</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <div id="login-view" class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" role="img">
+              <path d="M3 24 13 7l6 9 3-4 7 12H3Z" />
+            </svg>
+          </span>
+          <span>见山 · 本机管理台</span>
+        </div>
+        <div class="login-copy">
+          <p class="eyebrow">本机管理入口</p>
+          <h1 id="login-title">登录管理台</h1>
+          <p>
+            使用
+            <code>paseo admin key</code>
+            显示的密钥。首次安装默认密钥为 <code>123456</code>，密钥只换取短期会话。
+          </p>
+        </div>
+        <form id="login-form" novalidate>
+          <label for="admin-key">管理密钥</label>
+          <div class="password-field">
+            <input
+              id="admin-key"
+              name="key"
+              type="password"
+              autocomplete="current-password"
+              placeholder="默认 123456"
+              required
+              autofocus
+            />
+            <button id="toggle-key" class="icon-button" type="button" aria-label="显示管理密钥">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+            </button>
+          </div>
+          <p id="login-error" class="field-error" role="alert"></p>
+          <button class="primary-button" type="submit">登录</button>
+        </form>
+        <p class="login-footnote">
+          地址由 daemon sidecar 自动启动。密钥文件：
+          <code>$PASEO_HOME/admin-key</code>
+        </p>
+      </section>
+    </div>
+
+    <div id="app-shell" class="app-shell" hidden>
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <path d="M3 24 13 7l6 9 3-4 7 12H3Z" />
+            </svg>
+          </span>
+          <span>
+            <strong>见山</strong>
+            <small>JianShan Admin</small>
+          </span>
+        </div>
+        <nav class="main-nav" aria-label="管理台导航">
+          <button class="nav-item active" data-view="overview">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 13h6V4H4v9Zm10 7h6v-9h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" />
+            </svg>
+            <span>概览</span>
+          </button>
+          <button class="nav-item" data-view="metadata">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v18M3 12h18" />
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+            <span>元数据</span>
+          </button>
+          <button class="nav-item" data-view="roles">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+            </svg>
+            <span>角色</span>
+          </button>
+          <button class="nav-item" data-view="sessions">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h14v11H9l-4 3V5Z" />
+              <path d="M8 9h8M8 12h5" />
+            </svg>
+            <span>会话</span>
+          </button>
+          <button class="nav-item" data-view="team">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM17 11a3 3 0 1 0 0-6M22 20v-2a4 4 0 0 0-3-3.87"
+              />
+            </svg>
+            <span>团队</span>
+          </button>
+          <button class="nav-item" data-view="titles">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h10M4 19h16" /></svg>
+            <span>标题归属</span>
+          </button>
+          <button class="nav-item" data-view="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.38.36.72.6 1 .3.3.67.43 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.7.6Z"
+              />
+            </svg>
+            <span>设置</span>
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <button id="theme-toggle" class="ghost-button" type="button">切换主题</button>
+          <button id="logout-button" class="ghost-button" type="button">退出登录</button>
+        </div>
+      </aside>
+
+      <main id="main-content" class="main-content" tabindex="-1">
+        <header class="topbar">
+          <div>
+            <p id="view-eyebrow" class="eyebrow">服务概览</p>
+            <h1 id="view-title">管理台</h1>
+          </div>
+          <div class="topbar-actions">
+            <span id="daemon-pill" class="status-pill" data-state="loading">正在连接 daemon</span>
+            <button
+              id="mobile-theme-toggle"
+              class="mobile-action"
+              type="button"
+              aria-label="切换主题"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+                />
+              </svg>
+            </button>
+            <button
+              id="mobile-logout-button"
+              class="mobile-action"
+              type="button"
+              aria-label="退出登录"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 17l5-5-5-5M15 12H3M15 4h5v16h-5" />
+              </svg>
+            </button>
+            <button id="refresh-button" class="secondary-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66L20 8" />
+                <path d="M20 3v5h-5" />
+              </svg>
+              刷新
+            </button>
+          </div>
+        </header>
+
+        <div id="global-error" class="alert error" role="alert" hidden></div>
+
+        <section id="view-overview" class="view active" aria-labelledby="overview-heading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">运行状态</p>
+              <h2 id="overview-heading">本机服务整体情况</h2>
+            </div>
+            <p>管理地址由当前用户的登录启动项托管。</p>
+          </div>
+          <div id="overview-cards" class="stat-grid four"></div>
+          <div class="split-grid">
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>服务状态</h3>
+                <span id="overview-cache" class="muted"></span>
+              </div>
+              <dl id="daemon-details" class="detail-list"></dl>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>角色速览</h3>
+                <span class="muted">pair --name</span>
+              </div>
+              <div id="overview-roles" class="pill-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-metadata" class="view" aria-labelledby="metadata-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Agent 配置</p>
+              <h2 id="metadata-heading">元数据</h2>
+            </div>
+            <p>只配置见山使用的模型，不在此保存供应商密钥。</p>
+          </div>
+          <article class="settings-card">
+            <div class="setting-row">
+              <div>
+                <strong>模型选择</strong>
+                <p>选择见山使用的模型。</p>
+              </div>
+              <div class="segmented" role="group" aria-label="模型选择模式">
+                <button data-metadata-mode="automatic" type="button">自动</button>
+                <button data-metadata-mode="manual" type="button">手动</button>
+              </div>
+            </div>
+            <div id="manual-model-row" class="setting-row" hidden>
+              <div>
+                <strong>模型</strong>
+                <p>只使用此模型；失败后不会切换其他模型。</p>
+              </div>
+              <div class="model-picker">
+                <label class="sr-only" for="metadata-provider">Provider</label>
+                <select id="metadata-provider"></select>
+                <label class="sr-only" for="metadata-model">Model</label>
+                <select id="metadata-model"></select>
+              </div>
+            </div>
+            <div class="card-actions">
+              <span id="metadata-status" class="muted" aria-live="polite"></span>
+              <button id="save-metadata" class="primary-button" type="button">保存配置</button>
+            </div>
+          </article>
+        </section>
+
+        <section id="view-roles" class="view" aria-labelledby="roles-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">成员入口</p>
+              <h2 id="roles-heading">角色</h2>
+            </div>
+            <p>角色名称即 <code>paseo daemon pair --name</code> 中的名称。</p>
+          </div>
+          <div class="split-grid roles-layout">
+            <article class="panel">
+              <div class="panel-heading"><h3>创建角色入口</h3></div>
+              <form id="role-form" class="stack-form">
+                <label for="role-name">角色名称</label>
+                <input id="role-name" maxlength="120" required placeholder="例如：书记一" />
+                <p class="helper">
+                  生成的二维码可重复使用；同一名称即使来自不同设备也归为同一角色。
+                </p>
+                <button class="primary-button" type="submit">生成配对二维码</button>
+              </form>
+              <div id="qr-result" class="qr-result" hidden></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading">
+                <h3>已发现角色</h3>
+                <span id="role-count" class="muted"></span>
+              </div>
+              <div id="roles-list" class="card-list"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-sessions" class="view" aria-labelledby="sessions-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">会话归属</p>
+              <h2 id="sessions-heading">会话</h2>
+            </div>
+            <p>负责人变更只修改当前归属并记录审计，不重写历史提问发送者。</p>
+          </div>
+          <div class="toolbar">
+            <label class="search-box">
+              <span class="sr-only">搜索会话</span>
+              <input id="agent-search" type="search" placeholder="搜索标题、项目、负责人" />
+            </label>
+            <label class="inline-field">
+              <span>负责人</span>
+              <select id="agent-owner-filter">
+                <option value="">全部</option>
+              </select>
+            </label>
+          </div>
+          <div id="sessions-table" class="data-table" role="table" aria-label="会话列表"></div>
+        </section>
+
+        <section id="view-team" class="view" aria-labelledby="team-heading" hidden>
+          <div class="section-heading team-heading-row">
+            <div>
+              <p class="eyebrow">成员工作台</p>
+              <h2 id="team-heading">团队管理</h2>
+              <p>选择成员，查看其当前会话、提问和模型消耗。</p>
+            </div>
+            <div class="date-tools">
+              <button class="segmented-button" data-days="1" type="button">1 天</button>
+              <button class="segmented-button active" data-days="7" type="button">7 天</button>
+              <button class="segmented-button" data-days="30" type="button">30 天</button>
+            </div>
+          </div>
+          <div id="team-tabs" class="member-tabs" role="tablist" aria-label="团队成员"></div>
+          <div id="team-content" class="team-content">
+            <div class="empty-state">正在加载团队数据…</div>
+          </div>
+        </section>
+
+        <section id="view-titles" class="view" aria-labelledby="titles-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">责任人核对</p>
+              <h2 id="titles-heading">标题归属清单</h2>
+            </div>
+            <p>人工转让标记为“人工归属”，其余由角色名称确定。</p>
+          </div>
+          <div class="toolbar">
+            <label class="search-box">
+              <span class="sr-only">搜索标题</span>
+              <input id="title-search" type="search" placeholder="搜索 Workspace、会话或负责人" />
+            </label>
+          </div>
+          <div id="titles-table" class="data-table" role="table" aria-label="标题归属清单"></div>
+        </section>
+
+        <section id="view-settings" class="view" aria-labelledby="settings-heading" hidden>
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">运行配置</p>
+              <h2 id="settings-heading">设置</h2>
+            </div>
+            <p>管理密钥、常用 daemon 配置和完整的非敏感 config.json。</p>
+          </div>
+
+          <div class="settings-page-grid">
+            <form id="admin-key-form" class="panel settings-panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>管理密钥</h3>
+                  <p class="muted">修改后所有已登录浏览器立即失效。</p>
+                </div>
+              </div>
+              <label for="new-admin-key">新密钥</label>
+              <input
+                id="new-admin-key"
+                name="newAdminKey"
+                type="password"
+                minlength="6"
+                maxlength="128"
+                autocomplete="new-password"
+                placeholder="留空使用默认值 123456"
+              />
+              <p class="helper">
+                首次安装默认密钥为 <code>123456</code>。仅本机访问也建议设置更长密钥。
+              </p>
+              <div class="card-actions flush">
+                <span id="admin-key-status" class="muted" aria-live="polite"></span>
+                <button class="primary-button" type="submit">重置管理密钥</button>
+              </div>
+            </form>
+
+            <form id="daemon-settings-form" class="panel settings-panel wide">
+              <div class="panel-heading">
+                <div>
+                  <h3>常用 daemon 配置</h3>
+                  <p class="muted">保存后尝试热重载；需要重启的字段会单独提示。</p>
+                </div>
+              </div>
+
+              <fieldset class="settings-fieldset">
+                <legend>服务与访问</legend>
+                <div class="settings-field-grid">
+                  <label>
+                    <span>Daemon 监听地址</span>
+                    <input data-config-path="daemon.listen" placeholder="127.0.0.1:6767" />
+                  </label>
+                  <label>
+                    <span>见山 Web 地址</span>
+                    <input
+                      data-config-path="app.baseUrl"
+                      placeholder="https://paseo-app-8wq.pages.dev"
+                    />
+                  </label>
+                  <label>
+                    <span>CORS 允许来源</span>
+                    <input
+                      data-config-path="daemon.cors.allowedOrigins"
+                      data-config-list="lines"
+                      placeholder="每行一个来源"
+                    />
+                  </label>
+                  <label>
+                    <span>允许的主机名</span>
+                    <input
+                      data-config-path="daemon.hostnames"
+                      data-config-union="true-or-list"
+                      placeholder="true，或每行一个主机名"
+                    />
+                  </label>
+                  <label>
+                    <span>可信代理</span>
+                    <input
+                      data-config-path="daemon.trustedProxies"
+                      data-config-union="true-or-list"
+                      placeholder="true，或每行一个代理/CIDR"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="settings-fieldset">
+                <legend>Relay 与内置 Agent</legend>
+                <div class="settings-field-grid">
+                  <label>
+                    <span>Relay 端点</span>
+                    <input data-config-path="daemon.relay.endpoint" />
+                  </label>
+                  <label>
+                    <span>Relay 公网端点</span>
+                    <input data-config-path="daemon.relay.publicEndpoint" />
+                  </label>
+                </div>
+                <div class="settings-toggle-grid">
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.relay.enabled" />
+                    <span>启用 Relay</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.relay.useTls" />
+                    <span>Relay 使用 TLS</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.relay.publicUseTls" />
+                    <span>公网端点使用 TLS</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.mcp.enabled" />
+                    <span>启用 MCP</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.mcp.injectIntoAgents" />
+                    <span>向 Agent 注入见山工具</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.browserTools.enabled" />
+                    <span>启用浏览器工具</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.autoArchiveAfterMerge" />
+                    <span>合并后自动归档 Workspace</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="daemon.enableTerminalAgentHooks" />
+                    <span>启用终端 Agent hooks</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="pluginsEnabled" />
+                    <span>启用插件</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-config-path="features.webUi.enabled" />
+                    <span>启用 daemon Web UI</span>
+                  </label>
+                </div>
+              </fieldset>
+
+              <fieldset class="settings-fieldset">
+                <legend>日志</legend>
+                <div class="settings-field-grid">
+                  <label>
+                    <span>全局日志级别</span>
+                    <select data-config-path="log.level">
+                      <option value="">未设置</option>
+                      <option>trace</option>
+                      <option>debug</option>
+                      <option>info</option>
+                      <option>warn</option>
+                      <option>error</option>
+                      <option>fatal</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>文件日志级别</span>
+                    <select data-config-path="log.file.level">
+                      <option value="">未设置</option>
+                      <option>trace</option>
+                      <option>debug</option>
+                      <option>info</option>
+                      <option>warn</option>
+                      <option>error</option>
+                      <option>fatal</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>日志文件路径</span>
+                    <input data-config-path="log.file.path" />
+                  </label>
+                  <label>
+                    <span>轮转大小</span>
+                    <input data-config-path="log.file.rotate.maxSize" placeholder="10m" />
+                  </label>
+                  <label>
+                    <span>保留文件数</span>
+                    <input type="number" min="1" data-config-path="log.file.rotate.maxFiles" />
+                  </label>
+                </div>
+              </fieldset>
+
+              <div class="card-actions flush">
+                <span id="daemon-settings-status" class="muted" aria-live="polite"></span>
+                <button id="retry-common-reload" class="secondary-button" type="button" hidden>
+                  重新应用
+                </button>
+                <button class="primary-button" type="submit">保存并应用</button>
+              </div>
+            </form>
+
+            <article class="panel settings-panel wide">
+              <details id="advanced-config">
+                <summary>
+                  <span>
+                    <strong>高级配置</strong>
+                    <small>完整展示 config.json 中所有非敏感字段</small>
+                  </span>
+                </summary>
+                <p class="helper">
+                  密钥、密码、令牌、凭据、环境变量和请求头不会显示；保存时会保留原值。
+                </p>
+                <label class="sr-only" for="daemon-config-json">config.json</label>
+                <textarea
+                  id="daemon-config-json"
+                  class="config-editor"
+                  rows="24"
+                  spellcheck="false"
+                ></textarea>
+                <div class="card-actions flush">
+                  <span id="advanced-settings-status" class="muted" aria-live="polite"></span>
+                  <button id="retry-advanced-reload" class="secondary-button" type="button" hidden>
+                    重新应用
+                  </button>
+                  <button id="save-advanced-config" class="primary-button" type="button">
+                    保存并应用
+                  </button>
+                </div>
+              </details>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="owner-dialog" aria-labelledby="owner-dialog-title">
+      <form id="owner-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">会话归属</p>
+            <h2 id="owner-dialog-title">转让负责人</h2>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="关闭">×</button>
+        </div>
+        <p id="owner-dialog-agent" class="muted"></p>
+        <label for="owner-select">新负责人</label>
+        <select id="owner-select" required></select>
+        <p class="helper">历史提问仍归属原发送者；本次变更会写入 ownership audit。</p>
+        <div class="card-actions">
+          <button class="secondary-button" value="cancel" type="button" data-close-dialog>
+            取消
+          </button>
+          <button class="primary-button" value="confirm" type="submit">确认转让</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

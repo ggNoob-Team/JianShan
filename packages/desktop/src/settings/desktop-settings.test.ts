@@ -85,6 +85,7 @@ describe("desktop-settings", () => {
       daemon: {
         manageBuiltInDaemon: true,
         keepRunningAfterQuit: false,
+        startAtLogin: true,
       },
     });
   });
@@ -107,6 +108,7 @@ describe("desktop-settings", () => {
       daemon: {
         manageBuiltInDaemon: true,
         keepRunningAfterQuit: false,
+        startAtLogin: true,
       },
     });
     expect(files).toEqual(["desktop-settings.json"]);
@@ -247,6 +249,18 @@ describe("desktop-settings", () => {
     expect(settings.daemon.keepRunningAfterQuit).toBe(true);
   });
 
+  it("keeps an explicit Windows login-item choice across restarts", async () => {
+    const userDataPath = await createTempUserDataDir();
+    directories.add(userDataPath);
+    await createDesktopSettingsStore({ userDataPath }).patch({
+      daemon: { startAtLogin: false },
+    });
+
+    const settings = await createDesktopSettingsStore({ userDataPath }).get();
+
+    expect(settings.daemon.startAtLogin).toBe(false);
+  });
+
   it("migrates desktop-owned values from legacy renderer settings once", async () => {
     const userDataPath = await createTempUserDataDir();
     directories.add(userDataPath);
@@ -274,6 +288,7 @@ describe("desktop-settings", () => {
       daemon: {
         manageBuiltInDaemon: false,
         keepRunningAfterQuit: false,
+        startAtLogin: true,
       },
     });
     expect(ignoredSecondMigration).toEqual(migrated);
@@ -316,7 +331,11 @@ describe("desktop-settings", () => {
     expect(next).toEqual({
       releaseChannel: "beta",
       notifications: { playSound: false },
-      daemon: { manageBuiltInDaemon: true, keepRunningAfterQuit: false },
+      daemon: {
+        manageBuiltInDaemon: true,
+        keepRunningAfterQuit: false,
+        startAtLogin: true,
+      },
     });
   });
 

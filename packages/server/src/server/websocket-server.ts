@@ -24,6 +24,7 @@ import type { AgentManager, AgentMetricsSnapshot } from "./agent/agent-manager.j
 import type { AgentStorage } from "./agent/agent-storage.js";
 import type { DownloadTokenStore } from "./file-download/token-store.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
+import { createLocalJobService, type LocalJobService } from "./local-jobs/local-job-service.js";
 import type pino from "pino";
 import type { ProjectRegistry, WorkspaceRegistry } from "./workspace-registry.js";
 import type { ProjectUpdate } from "./workspace-reconciliation-service.js";
@@ -588,6 +589,10 @@ export class VoiceAssistantWebSocketServer {
   toolHosts() {
     return createToolHosts(this.connectedHosts);
   }
+  localJobs(): LocalJobService {
+    if (!this.localJobService) throw new Error("Local jobs are unavailable");
+    return this.localJobService;
+  }
   private readonly passwordHash: string | undefined;
   private readonly credentialSource: DaemonAuthConfig | undefined;
   private readonly worktreesRoot: string | undefined;
@@ -597,6 +602,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly mcpBaseUrl: string | null;
   private speech!: SpeechService | null;
   private terminalManager!: TerminalManager | null;
+  private localJobService: LocalJobService | null = null;
   private serviceProxy!: ServiceProxySubsystem | null;
   private scriptRuntimeStore!: WorkspaceScriptRuntimeStore | null;
   private getDaemonTcpPort!: (() => number | null) | null;
@@ -844,6 +850,9 @@ export class VoiceAssistantWebSocketServer {
   }): void {
     this.speech = params.speech ?? null;
     this.terminalManager = params.terminalManager ?? null;
+    this.localJobService = this.terminalManager
+      ? createLocalJobService({ terminalManager: this.terminalManager })
+      : null;
     if (this.terminalManager) {
       this.unsubscribeTerminalActivity = this.terminalManager.subscribeTerminalActivity((event) => {
         const reason = resolveTerminalAttentionReason({
@@ -1649,6 +1658,7 @@ export class VoiceAssistantWebSocketServer {
       sttLanguage: this.speech?.resolveSttLanguage() ?? "en",
       tts: () => this.speech?.resolveTts() ?? null,
       terminalManager: this.terminalManager,
+      localJobService: this.localJobService,
       providerSnapshotManager: this.providerSnapshotManager,
       hubExecutionAgents: options.hubExecutionAgents,
       hubRelationships: options.hubRelationships,
@@ -1981,6 +1991,7 @@ export class VoiceAssistantWebSocketServer {
       features: {
         connectedHosts: true,
         hostMultiplexing: true,
+        localJobs: this.localJobService !== null,
         usageSources: true,
         ownedSubscriptions: true,
         agentRequestReceipts: true,

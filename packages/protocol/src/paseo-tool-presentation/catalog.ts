@@ -87,6 +87,14 @@ const BROWSER_FIELDS = [
 ] as const;
 
 const AUTOMATION_OUTPUT = ["id", "status", "nextRunAt", "expiresAt"] as const;
+const LOCAL_JOB_FIELDS = [
+  "serverId",
+  "workspaceId",
+  "command",
+  "args",
+  "timeoutMs",
+  "jobId",
+] as const;
 
 function field(...keys: string[]): PaseoToolContext {
   return (input) => keys.map((key) => input[key]).find(isPresent);
@@ -196,6 +204,45 @@ export const PASEO_TOOL_CATALOG = {
     detail: { inputOrder: WORKSPACE_FIELDS, outputFields: ["workspaceId", "projectId"] },
   },
   list_hosts: { label: "List hosts" },
+  inspect_local_runtime: {
+    label: "Inspect local runtime",
+    context: field("serverId"),
+    detail: { inputOrder: ["serverId"] },
+  },
+  start_local_job: {
+    label: "Start local job",
+    context: field("command", "workspaceId"),
+    detail: {
+      inputOrder: LOCAL_JOB_FIELDS,
+      outputFields: ["jobId", "status", "exitCode", "error", "outputTail"],
+    },
+  },
+  get_local_job: {
+    label: "Get local job",
+    context: field("jobId"),
+    detail: {
+      inputOrder: LOCAL_JOB_FIELDS,
+      outputFields: ["jobId", "status", "exitCode", "error", "outputTail"],
+    },
+  },
+  cancel_local_job: {
+    label: "Cancel local job",
+    context: field("jobId"),
+    detail: { inputOrder: LOCAL_JOB_FIELDS, outputFields: ["jobId", "status", "error"] },
+  },
+  archify_render: {
+    label: "Render Archify",
+    context: field("title"),
+    detail: { inputOrder: ["workspaceId", "title", "spec"] },
+  },
+  wait_local_job: {
+    label: "Wait for local job",
+    context: field("jobId"),
+    detail: {
+      inputOrder: LOCAL_JOB_FIELDS,
+      outputFields: ["jobId", "status", "exitCode", "error", "outputTail"],
+    },
+  },
   list_workspaces: { label: "List workspaces" },
   rename_workspace: {
     label: "Rename workspace",

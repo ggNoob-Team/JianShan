@@ -25,6 +25,7 @@ export interface DesktopDaemonStatus {
   desktopManaged: boolean;
   ownedByDesktop: boolean;
   startedAt: string | null;
+  adminUrl: string | null;
   error: string | null;
 }
 
@@ -134,6 +135,7 @@ function parseDesktopDaemonStatus(raw: unknown): DesktopDaemonStatus {
     desktopManaged: raw.desktopManaged === true,
     ownedByDesktop: raw.ownedByDesktop === true,
     startedAt: typeof raw.startedAt === "string" ? raw.startedAt : null,
+    adminUrl: toStringOrNull(raw.adminUrl),
     error: toStringOrNull(raw.error),
   };
 }

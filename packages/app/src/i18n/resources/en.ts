@@ -1715,9 +1715,18 @@ export const en = {
           "Built-in daemon management was paused, but JianShan could not stop the daemon.",
         updateFailed: "Unable to update built-in daemon management.",
       },
+      startAtLogin: {
+        title: "Start when you sign in to Windows",
+        hint: "Starts the built-in daemon when you sign in",
+      },
       keepRunning: {
         title: "Keep daemon running after quit",
         hint: "Daemon keeps running when you quit JianShan",
+      },
+      admin: {
+        title: "Local admin console",
+        hint: "Sign in with the key shown by `paseo admin key`",
+        open: "Open console",
       },
       logs: {
         title: "Log file",

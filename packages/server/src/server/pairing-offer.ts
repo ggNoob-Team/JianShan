@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
 
 import { normalizeClientName } from "@getpaseo/protocol/agent-actor";
+import { DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT } from "@getpaseo/protocol/daemon-endpoints";
 
 import { createConnectionOfferV2, encodeOfferToFragmentUrl } from "./connection-offer.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
@@ -37,10 +38,12 @@ export async function generateLocalPairingOffer(args: {
   }
 
   const relayEndpoint = args.relayEndpoint ?? "relay.paseo.sh:443";
-  const relayPublicEndpoint = args.relayPublicEndpoint ?? relayEndpoint;
+  const relayPublicEndpoint =
+    args.relayPublicEndpoint ??
+    (relayEndpoint === "relay.paseo.sh:443" ? DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT : relayEndpoint);
   const relayUseTls = args.relayUseTls ?? relayEndpoint === "relay.paseo.sh:443";
   const relayPublicUseTls = args.relayPublicUseTls ?? relayUseTls;
-  const appBaseUrl = args.appBaseUrl ?? "https://app.paseo.sh";
+  const appBaseUrl = args.appBaseUrl ?? "https://paseo-app-8wq.pages.dev";
   const serverId = getOrCreateServerId(args.paseoHome, { logger: args.logger });
   const daemonKeyPair = await loadOrCreateDaemonKeyPair(args.paseoHome, args.logger);
   const offer = await createConnectionOfferV2({

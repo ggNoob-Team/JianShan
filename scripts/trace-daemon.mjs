@@ -79,6 +79,7 @@ const ptyNativeFiles = (await readdir(ptyNativeRoot, { withFileTypes: true }))
 const entries = [
   "packages/cli/dist/index.js",
   "packages/server/dist/scripts/supervisor-entrypoint.js",
+  "packages/server/dist/scripts/admin-entrypoint.js",
   "packages/server/dist/server/terminal/terminal-worker-process.js",
   "packages/server/dist/server/server/speech/providers/local/worker-process.js",
   ...(traceDesktop
@@ -98,6 +99,10 @@ const additionalInputs = [
   "packages/server/dist/server/builtin-plugins/**",
   // Shell integration scripts loaded by the terminal manager
   "packages/server/dist/server/terminal/shell-integration/**",
+  // The standalone admin console is served from filesystem paths.
+  "packages/server/dist/server/server/admin/ui/index.html",
+  "packages/server/dist/server/server/admin/ui/style.css",
+  "packages/server/dist/server/server/admin/ui/app.js",
   // Silero VAD ONNX model (sherpa speech provider)
   "packages/server/dist/server/server/speech/providers/local/sherpa/assets/silero_vad.onnx",
   // OpenCode loads these plugins from a content-addressed runtime copy, one

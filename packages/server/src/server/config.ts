@@ -25,6 +25,7 @@ import { resolveSpeechConfig } from "./speech/speech-config-resolver.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
 import { mergeHostnames, parseHostnamesEnv, type HostnamesConfig } from "./hostnames.js";
 import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
+import { DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT } from "@getpaseo/protocol/daemon-endpoints";
 
 export {
   loadPersistedConfig,
@@ -37,7 +38,7 @@ export {
 
 const DEFAULT_PORT = 6767;
 const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
-const DEFAULT_APP_BASE_URL = "https://app.paseo.sh";
+const DEFAULT_APP_BASE_URL = "https://paseo-app-8wq.pages.dev";
 const DEFAULT_TRUSTED_PROXIES = ["loopback"];
 
 interface ResolveBundledWebUiDistDirInput {
@@ -297,6 +298,11 @@ function resolveTlsFromEnv(
   return persistedValue ?? fallback;
 }
 
+function resolvePublicRelayEndpoint(endpoint: string, configured: string | undefined): string {
+  if (configured !== undefined) return configured;
+  return endpoint === DEFAULT_RELAY_ENDPOINT ? DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT : endpoint;
+}
+
 function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
   const environmentEnabled = parseBooleanEnv(input.env.PASEO_RELAY_ENABLED);
   // COMPAT(relayOptInDefault): daemons whose startup config omitted this field
@@ -312,8 +318,7 @@ function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
     DEFAULT_RELAY_ENDPOINT;
   const publicEndpoint =
     input.env.PASEO_RELAY_PUBLIC_ENDPOINT ??
-    input.persisted.daemon?.relay?.publicEndpoint ??
-    endpoint;
+    resolvePublicRelayEndpoint(endpoint, input.persisted.daemon?.relay?.publicEndpoint);
   const useTls =
     input.cliRelayUseTls ??
     resolveTlsFromEnv(

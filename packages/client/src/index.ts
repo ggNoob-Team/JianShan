@@ -23,6 +23,8 @@ import type {
   ProjectListRequestMessage,
   ProjectListResponseMessage,
   ListProviderModesResponseMessage,
+  LocalJobSnapshot,
+  LocalRuntimeSnapshot,
   MutableDaemonConfig,
   MutableDaemonConfigPatch,
   ProviderDiagnosticResponseMessage,
@@ -495,11 +497,36 @@ export interface PaseoApi {
   dispose(): Promise<void>;
   observeEvents: DaemonClient["observeEvents"];
   readonly terminals: PaseoTerminalActions;
+  readonly localJobs: PaseoLocalJobActions;
   readonly workspaces: PaseoWorkspaceActions;
   readonly projects: PaseoProjectActions;
   readonly agents: PaseoAgentActions;
   readonly providers: PaseoProviderActions;
   readonly config: PaseoConfigActions;
+}
+
+export interface PaseoLocalJobActions {
+  inspect(requestId?: string): Promise<LocalRuntimeSnapshot>;
+  start(input: {
+    workspaceId: string;
+    command: string;
+    args?: string[];
+    timeoutMs?: number;
+    requestId?: string;
+  }): Promise<LocalJobSnapshot>;
+  get(
+    jobId: string,
+    requestId?: string,
+  ): Promise<{ job: LocalJobSnapshot | null; error: string | null }>;
+  cancel(
+    jobId: string,
+    requestId?: string,
+  ): Promise<{ job: LocalJobSnapshot | null; error: string | null }>;
+  wait(input: {
+    jobId: string;
+    timeoutMs?: number;
+    requestId?: string;
+  }): Promise<{ job: LocalJobSnapshot | null; error: string | null }>;
 }
 
 export interface PaseoClient extends PaseoApi {
@@ -719,6 +746,13 @@ export function createPaseoApi(
     hosts: createHostActions(daemonClient, { own, signal: lifetime.signal, api: createPaseoApi }),
     observeEvents,
     terminals,
+    localJobs: {
+      inspect: (requestId) => daemonClient.inspectLocalRuntime(requestId),
+      start: (input) => daemonClient.startLocalJob(input),
+      get: (jobId, requestId) => daemonClient.getLocalJob(jobId, requestId),
+      cancel: (jobId, requestId) => daemonClient.cancelLocalJob(jobId, requestId),
+      wait: (input) => daemonClient.waitLocalJob(input),
+    },
     projects: {
       list: (options) => daemonClient.listProjects(options),
       subscribe: (handler) => {

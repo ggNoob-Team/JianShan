@@ -8,6 +8,7 @@ import {
 } from "@getpaseo/server/daemon-control";
 import { readPersistedConfig, resolveConfigFromPersisted } from "@getpaseo/server/configuration";
 import { connectToDaemon, buildDaemonConnectionCommandError } from "../../utils/client.js";
+import { readAdminServerInfo, resolveAdminListen, resolveAdminUrl } from "@getpaseo/server/admin";
 import { withOutput, toCommandError, type CommandOptions } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
 import { describeDaemonTarget, type DaemonTarget } from "../../utils/daemon-target.js";
@@ -21,9 +22,14 @@ export function daemonStatusCommand(): Command {
 export async function runStatusCommand(options: CommandOptions, _command: Command) {
   const target = options.daemonTarget;
   const instance = target.kind === "instance" ? await readDaemonInstance(target.home) : null;
+  const adminInfo =
+    target.kind === "instance" ? await readAdminServerInfo(target.home).catch(() => null) : null;
   const local =
     target.kind === "instance"
-      ? localStatus(target.home, instance)
+      ? {
+          ...localStatus(target.home, instance),
+          adminUrl: adminInfo?.url ?? resolveAdminUrl(resolveAdminListen()),
+        }
       : { host: describeDaemonTarget(target) };
   const observed =
     target.kind === "endpoint" || instance?.listen

@@ -8,6 +8,7 @@ import {
 } from "../host-operations/index.js";
 import { AgentDirectory } from "../directory.js";
 import { stat } from "node:fs/promises";
+import { arch, platform } from "node:os";
 import { z } from "zod";
 import { ensureValidJson } from "../../json-utils.js";
 import type { Logger } from "pino";
@@ -50,6 +51,7 @@ import type { FirstAgentContext } from "../../messages.js";
 import { everyMsToFiveFieldCron } from "@getpaseo/protocol/schedule/cadence";
 import { expandUserPath, isSameOrDescendantPath, resolvePathFromBase } from "../../path-utils.js";
 import type { TerminalManager } from "../../../terminal/terminal-manager.js";
+import type { LocalJobService } from "../../local-jobs/local-job-service.js";
 import { encodeTerminalKeyInput } from "@getpaseo/protocol/terminal-key-input";
 import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
 import type { CreatePaseoWorktreeWorkflowFn } from "../../worktree-session.js";
@@ -131,6 +133,7 @@ export interface PaseoToolHostDependencies {
   agentMessages?: () => AgentMessageDelivery;
   serverId?: string;
   hosts?: () => ToolHosts;
+  localJobs?: () => LocalJobService;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   terminalManager?: TerminalManager | null;
@@ -674,6 +677,10 @@ function createToolCatalog(
     if (!options.agentMessages) throw new Error("Agent message delivery is not configured");
     return options.agentMessages();
   }
+  function localJobs(): LocalJobService {
+    if (!options.localJobs) throw new Error("Local jobs are not configured");
+    return options.localJobs();
+  }
   const localHostOperations = new Map<string, HostOperation>();
   const tools = new Map<string, PaseoToolDefinition>();
   const hostTools = new Map([
@@ -684,6 +691,11 @@ function createToolCatalog(
     ["get_agent_status", "getStatus"],
     ["get_agent_activity", "getActivity"],
     ["list_agents", "listAgents"],
+    ["inspect_local_runtime", "inspectLocalRuntime"],
+    ["start_local_job", "startLocalJob"],
+    ["get_local_job", "getLocalJob"],
+    ["cancel_local_job", "cancelLocalJob"],
+    ["wait_local_job", "waitLocalJob"],
   ] as const satisfies ReadonlyArray<readonly [string, keyof HostOperations]>);
   const hostResolver = createHostResolver({
     serverId: options.serverId ?? "self",
@@ -702,6 +714,13 @@ function createToolCatalog(
       getStatus: (args, context) => localHostOperations.get("get_agent_status")!(args, context),
       getActivity: (args, context) => localHostOperations.get("get_agent_activity")!(args, context),
       listAgents: (args, context) => localHostOperations.get("list_agents")!(args, context),
+      inspectLocalRuntime: (args, context) =>
+        localHostOperations.get("inspect_local_runtime")!(args, context),
+      startLocalJob: (args, context) => localHostOperations.get("start_local_job")!(args, context),
+      getLocalJob: (args, context) => localHostOperations.get("get_local_job")!(args, context),
+      cancelLocalJob: (args, context) =>
+        localHostOperations.get("cancel_local_job")!(args, context),
+      waitLocalJob: (args, context) => localHostOperations.get("wait_local_job")!(args, context),
       async observe(agentId, handler, signal) {
         const unsubscribe = agentManager.subscribe(
           (event) => {
@@ -1476,6 +1495,134 @@ function createToolCatalog(
   );
 
   registerTool(
+    "inspect_local_runtime",
+    {
+      title: "Inspect local runtime",
+      description:
+        "Inspect a daemon's local execution capabilities and available workspaces. For open-ended device work such as building, installing, and testing, prefer creating a local agent on that host and give it the goal, constraints, and success criteria; let it decide the commands. Use local jobs only for a specific deterministic command the caller already knows it needs.",
+      inputSchema: {},
+    },
+    async () => {
+      if (!options.workspaceRegistry) throw new Error("Workspace registry is unavailable");
+      localJobs();
+      const workspaces = await options.workspaceRegistry.list();
+      return {
+        content: [],
+        structuredContent: ensureValidJson({
+          platform: platform(),
+          arch: arch(),
+          capabilities: ["local.jobs"],
+          workspaces: workspaces
+            .filter((workspace) => workspace.archivedAt === null)
+            .map((workspace) => ({
+              workspaceId: workspace.workspaceId,
+              cwd: workspace.cwd,
+              title: workspace.title ?? workspace.displayName,
+            })),
+        }),
+      };
+    },
+  );
+
+  registerTool(
+    "start_local_job",
+    {
+      title: "Start local job",
+      description:
+        "Start a command on a daemon's local machine in an existing workspace. Use this when the user asks to build, install, run, or test on a specific local device. The command runs asynchronously and returns a jobId.",
+      inputSchema: {
+        workspaceId: z.string().min(1),
+        command: z.string().min(1),
+        args: z.array(z.string()).optional(),
+        timeoutMs: z
+          .number()
+          .int()
+          .positive()
+          .max(30 * 60 * 1000)
+          .optional(),
+      },
+    },
+    async (args) => {
+      if (!options.workspaceRegistry) throw new Error("Workspace registry is unavailable");
+      const workspace = await options.workspaceRegistry.get(args.workspaceId as string);
+      if (!workspace || workspace.archivedAt !== null) {
+        throw new Error(`Workspace not found: ${String(args.workspaceId)}`);
+      }
+      const job = await localJobs().start({
+        workspaceId: workspace.workspaceId,
+        cwd: workspace.cwd,
+        command: args.command as string,
+        args: (args.args as string[] | undefined) ?? [],
+        ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs as number }),
+      });
+      return {
+        content: [],
+        structuredContent: ensureValidJson(job),
+      };
+    },
+  );
+
+  registerTool(
+    "get_local_job",
+    {
+      title: "Get local job",
+      description:
+        "Read the current status and bounded output tail for a local job started by start_local_job.",
+      inputSchema: { jobId: z.string().min(1) },
+    },
+    async ({ jobId }) => {
+      const job = localJobs().get(jobId as string);
+      if (!job) throw new Error(`Unknown local job: ${String(jobId)}`);
+      return {
+        content: [],
+        structuredContent: ensureValidJson(job),
+      };
+    },
+  );
+
+  registerTool(
+    "cancel_local_job",
+    {
+      title: "Cancel local job",
+      description:
+        "Cancel a running command started by start_local_job and wait for the local process to stop.",
+      inputSchema: { jobId: z.string().min(1) },
+    },
+    async ({ jobId }) => {
+      const job = await localJobs().cancel(jobId as string);
+      if (!job) throw new Error(`Unknown local job: ${String(jobId)}`);
+      return {
+        content: [],
+        structuredContent: ensureValidJson(job),
+      };
+    },
+  );
+
+  registerTool(
+    "wait_local_job",
+    {
+      title: "Wait for local job",
+      description:
+        "Wait up to 60 seconds for a local job to finish. Returns the final snapshot when complete, or the current running snapshot when the timeout expires.",
+      inputSchema: {
+        jobId: z.string().min(1),
+        timeoutMs: z.number().int().positive().max(60_000).optional(),
+      },
+    },
+    async ({ jobId, timeoutMs }) => {
+      const job = await localJobs().wait(
+        jobId as string,
+        (timeoutMs as number | undefined) ?? 30_000,
+      );
+      if (!job) throw new Error(`Unknown local job: ${String(jobId)}`);
+      return {
+        content: [],
+        structuredContent: ensureValidJson(job),
+      };
+    },
+  );
+
+  registerTool(
     "create_workspace",
     {
       title: "Create workspace",
@@ -1688,7 +1835,7 @@ function createToolCatalog(
     {
       title: "Create agent",
       description:
-        "Create an agent. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
+        "Create an agent. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Pass a remote host's serverId and workspaceId to run the agent there. For remote device work, delegate the outcome, constraints, and success criteria rather than prescribing command-by-command steps; the local agent can inspect and use that machine's tools. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
       inputSchema: createAgentInputSchema,
       outputSchema: {
         agentId: z.string(),

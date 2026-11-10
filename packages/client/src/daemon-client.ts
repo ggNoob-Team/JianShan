@@ -126,6 +126,8 @@ import type {
   CloseItemsResponse,
   KillTerminalResponse,
   CaptureTerminalResponse,
+  LocalRuntimeSnapshot,
+  LocalJobSnapshot,
   TerminalInput,
   SessionInboundMessage,
   SessionOutboundMessage,
@@ -681,6 +683,10 @@ type SubscribeTerminalPayload = SubscribeTerminalResponse["payload"];
 type CloseItemsPayload = CloseItemsResponse["payload"];
 type KillTerminalPayload = KillTerminalResponse["payload"];
 type CaptureTerminalPayload = CaptureTerminalResponse["payload"];
+interface LocalJobResultPayload {
+  job: LocalJobSnapshot | null;
+  error: string | null;
+}
 type ScheduleCreatePayload = Extract<
   SessionOutboundMessage,
   { type: "schedule/create/response" }
@@ -3544,7 +3550,11 @@ export class DaemonClient {
 
   async updateAgent(
     agentId: string,
-    updates: { name?: string; labels?: Record<string, string> },
+    updates: {
+      name?: string;
+      labels?: Record<string, string>;
+      createdBy?: { clientId: string; clientName?: string };
+    },
   ): Promise<void> {
     const requestId = this.createRequestId();
     const message = SessionInboundMessageSchema.parse({
@@ -3554,6 +3564,7 @@ export class DaemonClient {
       ...(updates.labels && Object.keys(updates.labels).length > 0
         ? { labels: updates.labels }
         : {}),
+      ...(updates.createdBy ? { createdBy: updates.createdBy } : {}),
       requestId,
     });
     const payload = await this.sendRequest({
@@ -7212,6 +7223,67 @@ export class DaemonClient {
       responseType: "capture_terminal_response",
       options: { skipQueue: true },
     });
+  }
+
+  async inspectLocalRuntime(requestId?: string): Promise<LocalRuntimeSnapshot> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"local.runtime.inspect.response">({
+        requestId,
+        message: { type: "local.runtime.inspect.request" },
+      });
+    return payload.runtime;
+  }
+
+  async startLocalJob(input: {
+    workspaceId: string;
+    command: string;
+    args?: string[];
+    timeoutMs?: number;
+    requestId?: string;
+  }): Promise<LocalJobSnapshot> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"local.job.start.response">({
+      requestId: input.requestId,
+      message: {
+        type: "local.job.start.request",
+        workspaceId: input.workspaceId,
+        command: input.command,
+        args: input.args ?? [],
+        ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+      },
+    });
+    return payload.job;
+  }
+
+  async getLocalJob(jobId: string, requestId?: string): Promise<LocalJobResultPayload> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"local.job.get.response">({
+      requestId,
+      message: { type: "local.job.get.request", jobId },
+    });
+    return { job: payload.job, error: payload.error };
+  }
+
+  async cancelLocalJob(jobId: string, requestId?: string): Promise<LocalJobResultPayload> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"local.job.cancel.response">({
+      requestId,
+      message: { type: "local.job.cancel.request", jobId },
+    });
+    return { job: payload.job, error: payload.error };
+  }
+
+  async waitLocalJob(input: {
+    jobId: string;
+    timeoutMs?: number;
+    requestId?: string;
+  }): Promise<LocalJobResultPayload> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"local.job.wait.response">({
+      requestId: input.requestId,
+      message: {
+        type: "local.job.wait.request",
+        jobId: input.jobId,
+        ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+      },
+    });
+    return { job: payload.job, error: payload.error };
   }
 
   async scheduleCreate(options: CreateScheduleOptions): Promise<ScheduleCreatePayload> {

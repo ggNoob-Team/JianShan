@@ -103,7 +103,7 @@ export const DEFAULT_RELAY_ENDPOINT = "relay.paseo.sh:443";
 // service remains healthy when clients connect to its Fly upstream directly.
 // Keep daemon sockets on the public endpoint, but route clients around the
 // lossy bridge until it can preserve WebSocket backpressure.
-export const DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT = "paseo-relay-next.fly.dev:443";
+export const DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT = "relay-next.paseo.sh:443";
 
 export function normalizeRelayProtocolVersion(
   value: unknown,
