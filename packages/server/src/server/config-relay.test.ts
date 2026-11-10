@@ -128,6 +128,28 @@ describe("daemon relay config", () => {
     expect(loadConfig(home, { env: {} }).relayPublicUseTls).toBe(true);
   });
 
+  test("advertises the resolvable public alias for the hosted relay", async () => {
+    const home = await createPaseoHome({ version: 1, daemon: { relay: {} } });
+    const config = loadConfig(home, { env: {} });
+
+    expect(config.relayEndpoint).toBe("relay.paseo.sh:443");
+    expect(config.relayPublicEndpoint).toBe("relay-next.paseo.sh:443");
+  });
+
+  test("keeps an explicitly configured public relay endpoint", async () => {
+    const home = await createPaseoHome({
+      version: 1,
+      daemon: {
+        relay: {
+          endpoint: "relay.example.com:443",
+          publicEndpoint: "public.example.com:443",
+        },
+      },
+    });
+
+    expect(loadConfig(home, { env: {} }).relayPublicEndpoint).toBe("public.example.com:443");
+  });
+
   test("PASEO_RELAY_PUBLIC_USE_TLS overrides relayUseTls for public side", async () => {
     const home = await createPaseoHome({ version: 1, daemon: { relay: {} } });
     const config = loadConfig(home, {
