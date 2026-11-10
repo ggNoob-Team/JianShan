@@ -82,6 +82,12 @@ export interface HostProfile {
   updatedAt: string;
 }
 
+export const DEFAULT_HOST_CLIENT_NAME = "JianShan";
+
+export function resolveHostClientName(profile: Pick<HostProfile, "clientName">): string {
+  return normalizeClientName(profile.clientName) ?? DEFAULT_HOST_CLIENT_NAME;
+}
+
 export function defaultLifecycle(): HostLifecycle {
   return {};
 }
