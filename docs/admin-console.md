@@ -46,6 +46,26 @@ and request headers are omitted. Saving preserves their existing values.
 New homes default both `app.baseUrl` and `daemon.cors.allowedOrigins` to
 `https://paseo-app-8wq.pages.dev`.
 
+New homes also enable the official Relay by default:
+
+```json
+{
+  "daemon": {
+    "relay": {
+      "enabled": true,
+      "endpoint": "relay.paseo.sh:443",
+      "publicEndpoint": "relay-next.paseo.sh:443",
+      "useTls": true,
+      "publicUseTls": true
+    }
+  }
+}
+```
+
+The daemon connects through the public relay endpoint. Pairing offers advertise
+the resolvable `relay-next.paseo.sh` alias so existing mobile clients do not
+rewrite it to the retired Fly hostname.
+
 ## Login startup
 
 Autostart is scoped to the current user:

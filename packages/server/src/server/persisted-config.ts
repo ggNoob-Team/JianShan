@@ -369,7 +369,11 @@ const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
       allowedOrigins: ["https://paseo-app-8wq.pages.dev"],
     },
     relay: {
-      enabled: false,
+      enabled: true,
+      endpoint: "relay.paseo.sh:443",
+      publicEndpoint: "relay-next.paseo.sh:443",
+      useTls: true,
+      publicUseTls: true,
     },
   },
   app: {

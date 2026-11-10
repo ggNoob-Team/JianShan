@@ -690,11 +690,17 @@ describe("PersistedConfigSchema voice mode config", () => {
 });
 
 describe("loadPersistedConfig", () => {
-  test("materializes relay disabled for a new Paseo home", () => {
+  test("materializes the official enabled relay for a new Paseo home", () => {
     const home = createTempHome();
     try {
       const config = loadPersistedConfig(home);
-      expect(config.daemon?.relay?.enabled).toBe(false);
+      expect(config.daemon?.relay).toEqual({
+        enabled: true,
+        endpoint: "relay.paseo.sh:443",
+        publicEndpoint: "relay-next.paseo.sh:443",
+        useTls: true,
+        publicUseTls: true,
+      });
       expect(config.daemon?.cors?.allowedOrigins).toEqual(["https://paseo-app-8wq.pages.dev"]);
       expect(config.app?.baseUrl).toBe("https://paseo-app-8wq.pages.dev");
     } finally {
