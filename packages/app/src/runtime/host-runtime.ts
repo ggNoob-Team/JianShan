@@ -15,6 +15,7 @@ import {
 import {
   connectionFromListen,
   createRemoteSshHostConnection,
+  findCachedClientName,
   normalizeStoredHostProfile,
   resolveHostClientName,
   upsertHostConnectionInProfiles,
@@ -563,11 +564,12 @@ function createDefaultDeps(
     createClient: ({ host, connection, clientId, runtimeGeneration }) => {
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
+      const clientName = resolveHostClientName(host);
       const base = {
         suppressSendErrors: true,
         clientId,
         clientType: "mobile",
-        clientName: resolveHostClientName(host),
+        ...(clientName ? { clientName } : {}),
         appVersion: resolveAppVersion() ?? undefined,
         runtimeGeneration,
         capabilities: appCapabilities,
@@ -634,6 +636,7 @@ function createDefaultDeps(
       });
     },
     connectToDaemon: async ({ host, connection, timeoutMs }) => {
+      const clientName = resolveHostClientName(host);
       if (connection.type === "routed") {
         const origin = resolveOrigin(connection.originServerId);
         if (!origin?.isConnected)
@@ -642,7 +645,7 @@ function createDefaultDeps(
           url: "ws://routed-host/ws",
           clientId: crypto.randomUUID(),
           clientType: "mobile",
-          clientName: resolveHostClientName(host),
+          ...(clientName ? { clientName } : {}),
           transportFactory: createHostChannelTransport(
             origin,
             host.serverId,
@@ -663,7 +666,7 @@ function createDefaultDeps(
       return connectToDaemon(connection, {
         ...(host.serverId ? { serverId: host.serverId } : {}),
         ...(host.password ? { password: host.password } : {}),
-        clientName: resolveHostClientName(host),
+        ...(clientName ? { clientName } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         capabilities: appCapabilities,
@@ -1755,6 +1758,9 @@ export class HostRuntimeStore {
       }
       this.hosts = profiles;
       this.replicaCache.setHosts(profiles.map((profile) => profile.serverId));
+      if (await this.backfillMissingClientNames(profiles)) {
+        shouldPersistHosts = true;
+      }
       projectIconCache.setHosts(profiles.map((profile) => profile.serverId));
       await projectIconCache.restore();
       this.syncHosts(profiles);
@@ -1774,6 +1780,31 @@ export class HostRuntimeStore {
           console.error("[HostRuntime] Failed to persist host registry", error),
         );
       }
+    }
+  }
+
+  private async backfillMissingClientNames(profiles: HostProfile[]): Promise<boolean> {
+    const missing = profiles.filter((profile) => !profile.clientName);
+    if (missing.length === 0) return false;
+    try {
+      const clientId = await this.deps.getClientId();
+      let changed = false;
+      for (const profile of missing) {
+        const directory = await this.replicaCache
+          .readDirectory(profile.serverId)
+          .catch(() => undefined);
+        if (!directory) continue;
+        const clientName = findCachedClientName(directory.agents.values(), clientId);
+        if (!clientName) continue;
+        profile.clientName = clientName;
+        changed = true;
+      }
+      return changed;
+    } catch (error) {
+      console.warn("[HostRuntime] Failed to backfill client names from replica cache", {
+        error,
+      });
+      return false;
     }
   }
 

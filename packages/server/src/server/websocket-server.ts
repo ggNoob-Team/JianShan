@@ -21,6 +21,7 @@ import { getHostName } from "./host-name.js";
 import { randomUUID } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import type { AgentManager, AgentMetricsSnapshot } from "./agent/agent-manager.js";
+import { newSessionClientName, resumedClientName } from "./websocket-client-name.js";
 import type { AgentStorage } from "./agent/agent-storage.js";
 import type { DownloadTokenStore } from "./file-download/token-store.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
@@ -1795,7 +1796,7 @@ export class VoiceAssistantWebSocketServer {
     const connection = this.createSessionConnection({
       ws,
       clientId,
-      clientName: message.clientName,
+      clientName: newSessionClientName(message.clientType, message.clientName),
       clientType: message.clientType,
       appVersion: message.appVersion ?? null,
       clientCapabilities: message.capabilities ?? null,
@@ -1928,7 +1929,10 @@ export class VoiceAssistantWebSocketServer {
     existing.permissionCeiling = message.sessionPermissions;
     existing.session.setPermissions(pending.admission!.permissions);
     existing.session.setRouted(message.routed === true);
-    existing.session.updateClientName(message.clientName);
+    // A legacy hello may omit clientName. Keep the name already established for
+    // this clientId instead of clearing it; only an explicit name changes it.
+    const resumedName = resumedClientName(message.clientName);
+    if (resumedName) existing.session.updateClientName(resumedName);
     existing.session.updateClientType(message.clientType);
     this.assignHostSource(existing, message, pending.admission!.principalId);
     const newAppVersion = message.appVersion ?? null;

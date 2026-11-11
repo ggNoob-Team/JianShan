@@ -82,10 +82,22 @@ export interface HostProfile {
   updatedAt: string;
 }
 
-export const DEFAULT_HOST_CLIENT_NAME = "JianShan";
+export function resolveHostClientName(
+  profile: Pick<HostProfile, "clientName">,
+): string | undefined {
+  return normalizeClientName(profile.clientName);
+}
 
-export function resolveHostClientName(profile: Pick<HostProfile, "clientName">): string {
-  return normalizeClientName(profile.clientName) ?? DEFAULT_HOST_CLIENT_NAME;
+export function findCachedClientName(
+  agents: Iterable<{ createdBy?: { clientId: string; clientName?: string } }>,
+  clientId: string,
+): string | undefined {
+  for (const agent of agents) {
+    if (agent.createdBy?.clientId !== clientId) continue;
+    const clientName = normalizeClientName(agent.createdBy.clientName);
+    if (clientName) return clientName;
+  }
+  return undefined;
 }
 
 export function defaultLifecycle(): HostLifecycle {

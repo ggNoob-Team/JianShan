@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import {
   createRemoteSshHostConnection,
+  findCachedClientName,
   normalizeStoredHostProfile,
   orderHostsLocalFirst,
   resolveActiveHostServerId,
@@ -61,10 +62,21 @@ describe("normalizeStoredHostProfile", () => {
     expect(profile?.clientName).toBe("Harmony Emulator");
   });
 
-  it("uses a stable default client name for legacy profiles without one", () => {
-    expect(resolveHostClientName({ clientName: undefined })).toBe("JianShan");
-    expect(resolveHostClientName({ clientName: "   " })).toBe("JianShan");
+  it("leaves legacy profiles without a client name", () => {
+    expect(resolveHostClientName({ clientName: undefined })).toBeUndefined();
+    expect(resolveHostClientName({ clientName: "   " })).toBeUndefined();
     expect(resolveHostClientName({ clientName: " 少爷 " })).toBe("少爷");
+  });
+
+  it("finds the cached client name for the current client id", () => {
+    const agents = [
+      { createdBy: { clientId: "cid_other", clientName: "Other" } },
+      { createdBy: { clientId: "cid_current", clientName: " 少爷 " } },
+      { createdBy: { clientId: "cid_current", clientName: "Ignored" } },
+    ];
+
+    expect(findCachedClientName(agents, "cid_current")).toBe("少爷");
+    expect(findCachedClientName(agents, "cid_missing")).toBeUndefined();
   });
 
   it("loads direct TCP connections stored before TLS and password fields existed", () => {

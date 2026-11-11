@@ -89,6 +89,12 @@ frame size. Awaitable output completes when the physical send completes. An over
 closes without closing siblings or the saved link. Routed sessions release resources on disconnect;
 subscription demand is rebuilt by its owning client on reconnect.
 
+`clientName` is display and audit metadata bound to the stable `clientId`; it is not an
+authorization credential. A resumed session keeps the name it already has when a hello omits
+`clientName`. A new mobile session without a name gets the `JianShan` default. Host profiles created
+before `clientName` was stored backfill it from cached agent creator metadata; do not treat the
+fallback as a user-selected name.
+
 See the [SDK reference](../public-docs/sdk/reference.md#clienthosts),
 [CLI reference](../public-docs/cli.md#connected-hosts), and
 [plugin reference](../public-docs/plugins/reference.md#connected-hosts).
