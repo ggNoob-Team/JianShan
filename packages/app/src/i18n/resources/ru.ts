@@ -1526,6 +1526,14 @@ export const ru: TranslationResources = {
     footer: {
       usage: "Использование",
     },
+    team: {
+      label: "Команда",
+      unavailableTitle: "Страница команды недоступна",
+      unavailableMessage:
+        "Этот хост использует старый daemon или локальная консоль управления не запущена.",
+      openFailedTitle: "Не удалось открыть страницу команды",
+      openFailedMessage: "Консоль управления не опубликовала доступный URL.",
+    },
     help: {
       trigger: "Помощь и поддержка",
       sectionHelp: "Помощь",

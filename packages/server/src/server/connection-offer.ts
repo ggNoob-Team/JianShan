@@ -1,6 +1,7 @@
 import os from "node:os";
 
 import { ConnectionOfferV2Schema, type ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { PairingRole } from "@getpaseo/protocol/agent-actor";
 
 interface BuildOfferEndpointsArgs {
   listenHost: string;
@@ -32,6 +33,7 @@ export async function createConnectionOfferV2(args: {
   daemonPublicKeyB64: string;
   relay: { endpoint: string; useTls?: boolean };
   clientName?: string;
+  role?: PairingRole;
 }): Promise<ConnectionOffer> {
   return ConnectionOfferV2Schema.parse({
     v: 2,
@@ -39,6 +41,7 @@ export async function createConnectionOfferV2(args: {
     daemonPublicKeyB64: args.daemonPublicKeyB64,
     relay: args.relay,
     ...(args.clientName ? { clientName: args.clientName } : {}),
+    ...(args.role ? { role: args.role } : {}),
   });
 }
 

@@ -1499,6 +1499,13 @@ export const ar: TranslationResources = {
     footer: {
       usage: "الاستخدام",
     },
+    team: {
+      label: "الفريق",
+      unavailableTitle: "صفحة الفريق غير متاحة",
+      unavailableMessage: "المضيف متصل بخادم أقدم أو وحدة التحكم المحلية غير قيد التشغيل.",
+      openFailedTitle: "تعذر فتح صفحة الفريق",
+      openFailedMessage: "لم تنشر وحدة التحكم المحلية عنوان URL صالحًا.",
+    },
     help: {
       trigger: "المساعدة والدعم",
       sectionHelp: "المساعدة",

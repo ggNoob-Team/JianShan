@@ -1,6 +1,7 @@
 import type pino from "pino";
 import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
+import { readAdminServerInfo } from "../../admin/admin-control.js";
 import { getPidLockInfo } from "../../pid-lock.js";
 import { generateLocalPairingOffer } from "../../pairing-offer.js";
 import {
@@ -173,7 +174,10 @@ export class DaemonSession {
     msg: Extract<SessionInboundMessage, { type: "daemon.get_status.request" }>,
   ): Promise<void> {
     try {
-      const pidInfo = await getPidLockInfo(this.paseoHome);
+      const [pidInfo, adminInfo] = await Promise.all([
+        getPidLockInfo(this.paseoHome),
+        readAdminServerInfo(this.paseoHome).catch(() => null),
+      ]);
       const providers = (await this.listProviderAvailability()).map((p) => ({
         provider: p.provider,
         available: p.available,
@@ -189,6 +193,7 @@ export class DaemonSession {
           nodePath: process.execPath,
           startedAt: pidInfo?.startedAt ?? null,
           listen: this.daemonRuntimeConfig?.listen ?? null,
+          adminUrl: adminInfo?.url ?? null,
           relay: this.daemonRuntimeConfig?.getRelayConfig() ?? null,
           providers,
         },
@@ -205,6 +210,7 @@ export class DaemonSession {
           nodePath: process.execPath,
           startedAt: null,
           listen: null,
+          adminUrl: null,
           relay: null,
           providers: [],
         },
@@ -227,6 +233,7 @@ export class DaemonSession {
         appBaseUrl: this.daemonRuntimeConfig?.appBaseUrl,
         includeQr: true,
         clientName: msg.clientName,
+        role: msg.role,
         logger: this.logger,
       });
       this.host.emit({
@@ -237,6 +244,7 @@ export class DaemonSession {
           qr: pairing.qr ?? null,
           relayEnabled: pairing.relayEnabled,
           ...(pairing.clientName ? { clientName: pairing.clientName } : {}),
+          role: pairing.role,
         },
       });
     } catch (error) {

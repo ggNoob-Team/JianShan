@@ -2,6 +2,7 @@ import { watchdog } from "@/watchdog";
 import { createHostChannelTransport } from "@getpaseo/client/internal/hosts";
 import type { OwnedSubscription } from "@getpaseo/client";
 import type { HostDirectory } from "@getpaseo/protocol/hosts";
+import type { PairingRole } from "@getpaseo/protocol/agent-actor";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import equal from "fast-deep-equal/es6";
@@ -2168,6 +2169,7 @@ export class HostRuntimeStore {
     daemonPublicKeyB64: string;
     label?: string;
     clientName?: string;
+    role?: PairingRole;
     password?: string;
     replaceConnectionId?: string;
   }): Promise<HostProfile> {
@@ -2182,6 +2184,7 @@ export class HostRuntimeStore {
       serverId: input.serverId,
       label: input.label,
       clientName: input.clientName,
+      role: input.role,
       replaceConnectionId: input.replaceConnectionId,
       connection: {
         id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
@@ -2289,6 +2292,7 @@ export class HostRuntimeStore {
       daemonPublicKeyB64: connection.daemonPublicKeyB64,
       label,
       clientName: offer.clientName,
+      role: offer.role,
       password,
       replaceConnectionId,
     });
@@ -2306,6 +2310,7 @@ export class HostRuntimeStore {
       ...(password ? { password } : {}),
       label: offer.serverId,
       ...(offer.clientName ? { clientName: offer.clientName } : {}),
+      ...(offer.role ? { role: offer.role } : {}),
       appearance: defaultHostAppearance(),
       lifecycle: {},
       connections: [connection],
@@ -2446,6 +2451,7 @@ export class HostRuntimeStore {
     serverId: string;
     label?: string;
     clientName?: string;
+    role?: PairingRole;
     password?: string;
     replaceConnectionId?: string;
     connection: HostConnection;
@@ -2457,6 +2463,7 @@ export class HostRuntimeStore {
       serverId: input.serverId,
       label: input.label,
       clientName: input.clientName,
+      role: input.role,
       connection: input.connection,
       replaceConnectionId: input.replaceConnectionId,
       password: input.password,

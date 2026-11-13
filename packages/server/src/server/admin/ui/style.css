@@ -855,8 +855,33 @@ textarea {
   background: var(--surface-2);
 }
 
+.role-row {
+  flex-wrap: wrap;
+}
+
 .role-row strong {
-  flex: 1;
+  flex: 1 1 160px;
+}
+
+.role-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.role-row-actions select {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 28px 6px 10px;
+}
+
+.text-button.danger {
+  color: var(--danger);
+}
+
+.text-button.danger:hover {
+  background: var(--danger-soft);
 }
 
 .role-row small {
@@ -1358,4 +1383,71 @@ dialog form {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.public-team-page {
+  width: min(100%, 1320px);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.public-team-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.public-team-header small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.public-team-shell {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 720px) {
+  .public-team-page {
+    padding: 14px;
+  }
+
+  .public-team-header {
+    margin-bottom: 16px;
+  }
+
+  .public-team-shell {
+    padding: 16px;
+    border-radius: var(--radius);
+  }
+}
+
+.team-content,
+.team-grid,
+.team-stat-grid,
+.team-grid > .panel,
+.heatmap {
+  min-width: 0;
+}
+
+.team-content,
+.team-grid,
+.team-stat-grid {
+  width: 100%;
+}
+
+.team-content {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.heatmap {
+  max-width: 100%;
 }

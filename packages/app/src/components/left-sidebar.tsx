@@ -579,6 +579,7 @@ function MobileSidebar({
           style={styles.sidebarHeaderGroup}
           onBeforeNavigate={closeSidebar}
           firstRowTrailing={closeButton}
+          showTeamRow
         />
 
         {isInitialLoad && !hasActiveHostFilter ? (
@@ -761,7 +762,7 @@ function DesktopSidebar({
           ) : (
             <TitlebarDragRegion />
           )}
-          <SidebarNavRows style={sidebarHeaderGroupStyle} />
+          <SidebarNavRows style={sidebarHeaderGroupStyle} showTeamRow />
         </View>
 
         {isInitialLoad && !hasActiveHostFilter ? (

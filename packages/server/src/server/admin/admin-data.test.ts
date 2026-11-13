@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { buildTeamInsights, buildTitleMap, loadAdminSnapshot, upsertRole } from "./admin-data.js";
+import {
+  buildTeamInsights,
+  buildTitleMap,
+  deleteRole,
+  discoverRoles,
+  loadAdminSnapshot,
+  upsertRole,
+} from "./admin-data.js";
 
 const directories: string[] = [];
 
@@ -101,6 +108,32 @@ async function fixture(): Promise<string> {
 }
 
 describe("admin data projection", () => {
+  test("persists a role kind and removes deleted roles from discovery", async () => {
+    const home = await fixture();
+    const admin = await upsertRole(home, "书记", "admin");
+    expect(admin).toMatchObject({ name: "书记", role: "admin" });
+    expect((await loadAdminSnapshot(home)).roles).toContainEqual(
+      expect.objectContaining({ name: "书记", role: "admin" }),
+    );
+
+    expect(await deleteRole(home, admin.id)).toBe(true);
+    const snapshot = await loadAdminSnapshot(home);
+    expect(discoverRoles(snapshot).map((role) => role.name)).not.toContain("书记");
+  });
+
+  test("deletes a role that was only discovered from historical activity", async () => {
+    const home = await fixture();
+    const discovered = discoverRoles(await loadAdminSnapshot(home)).find(
+      (role) => role.name === "村长",
+    );
+    expect(discovered).toBeDefined();
+
+    expect(await deleteRole(home, discovered!.id, discovered!.name)).toBe(true);
+    expect(discoverRoles(await loadAdminSnapshot(home)).map((role) => role.name)).not.toContain(
+      "村长",
+    );
+  });
+
   test("groups questions and usage by pair name while sessions use createdBy", async () => {
     const home = await fixture();
     await upsertRole(home, "书记");

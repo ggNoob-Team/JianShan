@@ -1514,6 +1514,14 @@ export const en = {
     footer: {
       usage: "Usage",
     },
+    team: {
+      label: "Team",
+      unavailableTitle: "Team page unavailable",
+      unavailableMessage:
+        "This host is connected to an older daemon or its admin console is not running.",
+      openFailedTitle: "Could not open team page",
+      openFailedMessage: "The admin console did not publish a usable URL.",
+    },
     help: {
       trigger: "Help and support",
       sectionHelp: "Help",

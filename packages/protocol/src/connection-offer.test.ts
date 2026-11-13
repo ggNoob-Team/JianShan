@@ -55,6 +55,23 @@ describe("connection offer", () => {
     });
   });
 
+  it("round-trips the paired role", () => {
+    const offer = ConnectionOfferSchema.parse({
+      v: 2,
+      serverId: "server-123",
+      daemonPublicKeyB64: "pubkey",
+      clientName: "Team admin",
+      role: "admin",
+      relay: { endpoint: "relay.paseo.sh:443" },
+    });
+    const encoded = encodeBase64UrlNoPadUtf8(JSON.stringify(offer));
+
+    expect(parseConnectionOfferFromUrl(`https://app.paseo.sh/#offer=${encoded}`)).toMatchObject({
+      clientName: "Team admin",
+      role: "admin",
+    });
+  });
+
   it("leaves relay TLS unset when absent", () => {
     expect(
       ConnectionOfferSchema.parse({

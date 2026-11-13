@@ -6,15 +6,17 @@ import {
   NotebookPen,
   Plus,
   Search,
+  UsersRound,
   Zap,
 } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { Alert, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useHostRouteServerId } from "@/navigation/host-route-context";
+import { useHostRuntimeClient, useHosts } from "@/runtime/host-runtime";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { canCreateWorktreeForProjectKind } from "@/projects/host-projects";
 import { useHostFeature } from "@/runtime/host-features";
@@ -30,6 +32,9 @@ import {
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
+import { resolveHostRole } from "@/types/host-connection";
+import { openExternalUrl } from "@/utils/open-external-url";
+import { buildTeamPageUrl } from "@/sidebar-nav/team-page-link";
 import {
   buildNewWorkspaceRoute,
   buildNotesRoute,
@@ -48,6 +53,8 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
   style?: StyleProp<ViewStyle>;
   /** Sits to the right of the first row, which shrinks to make room. */
   firstRowTrailing?: ReactNode;
+  /** Renders the role-gated team row inside the same bordered group after nav preferences. */
+  showTeamRow?: boolean;
 }
 
 /**
@@ -55,12 +62,17 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
  * `sidebarNavItems` preference. Renders nothing — not even the bordered group
  * wrapper — when every item is hidden and there is no `firstRowTrailing`.
  */
-export function SidebarNavRows({ style, onBeforeNavigate, firstRowTrailing }: SidebarNavRowsProps) {
+export function SidebarNavRows({
+  style,
+  onBeforeNavigate,
+  firstRowTrailing,
+  showTeamRow = false,
+}: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems("header");
   const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
   const groupRef = useRef<View | null>(null);
 
-  if (visibleItems.length === 0 && !firstRowTrailing) return null;
+  if (visibleItems.length === 0 && !firstRowTrailing && !showTeamRow) return null;
 
   const [firstRow, ...restRows] = visibleItems.map((item) => {
     if (item.kind === "plugin") {
@@ -89,6 +101,7 @@ export function SidebarNavRows({ style, onBeforeNavigate, firstRowTrailing }: Si
         firstRow
       )}
       {restRows}
+      {showTeamRow ? <SidebarTeamRow onBeforeNavigate={onBeforeNavigate} /> : null}
     </View>
   );
 }
@@ -236,6 +249,53 @@ function SidebarNotesRow({ onBeforeNavigate }: SidebarNavRowProps) {
       onPress={handlePress}
       isActive={pathname.includes("/notes")}
       testID="sidebar-notes"
+      variant="compact"
+    />
+  );
+}
+
+export function SidebarTeamRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const { t } = useTranslation();
+  const pathname = usePathname();
+  const routeServerId = useHostRouteServerId();
+  const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const lastWorkspaceSelection = useLastWorkspaceSelection();
+  const hosts = useHosts();
+  const serverId =
+    routeServerId ?? activeWorkspaceSelection?.serverId ?? lastWorkspaceSelection?.serverId ?? null;
+  const client = useHostRuntimeClient(serverId ?? "");
+  const host = serverId ? hosts.find((entry) => entry.serverId === serverId) : undefined;
+  const isAdmin = host ? resolveHostRole(host) === "admin" : false;
+
+  const openTeamPage = useCallback(async () => {
+    if (!client) return;
+    onBeforeNavigate?.();
+    try {
+      const status = await client.getDaemonStatus({ timeout: 3_000 });
+      const url = buildTeamPageUrl(status.adminUrl);
+      if (!url) {
+        Alert.alert(t("sidebar.team.unavailableTitle"), t("sidebar.team.unavailableMessage"));
+        return;
+      }
+      await openExternalUrl(url);
+    } catch (error) {
+      Alert.alert(
+        t("sidebar.team.openFailedTitle"),
+        error instanceof Error ? error.message : t("sidebar.team.openFailedMessage"),
+      );
+    }
+  }, [client, onBeforeNavigate, t]);
+  const handlePress = useCallback(() => void openTeamPage(), [openTeamPage]);
+
+  if (!serverId || !isAdmin) return null;
+
+  return (
+    <SidebarHeaderRow
+      icon={UsersRound}
+      label={t("sidebar.team.label")}
+      onPress={handlePress}
+      isActive={pathname.includes("/team")}
+      testID="sidebar-team"
       variant="compact"
     />
   );

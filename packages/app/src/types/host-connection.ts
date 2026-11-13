@@ -19,7 +19,13 @@ import {
   HostAppearanceSchema,
 } from "@/hosts/appearance";
 import { z } from "zod";
-import { ClientNameSchema, normalizeClientName } from "@getpaseo/protocol/agent-actor";
+import {
+  ClientNameSchema,
+  PairingRoleSchema,
+  normalizeClientName,
+  resolvePairingRole,
+  type PairingRole,
+} from "@getpaseo/protocol/agent-actor";
 
 export { DirectTcpHostConnectionSchema };
 export type DirectTcpHostConnection = Omit<WireDirectTcpHostConnection, "password">;
@@ -73,6 +79,8 @@ export interface HostProfile {
   password?: string;
   /** Human-readable name of this device/client within the paired host. */
   clientName?: string;
+  /** UI role carried by the pairing link. It grants no daemon authority. */
+  role?: PairingRole;
   label: string;
   appearance: HostAppearance;
   lifecycle: HostLifecycle;
@@ -86,6 +94,10 @@ export function resolveHostClientName(
   profile: Pick<HostProfile, "clientName">,
 ): string | undefined {
   return normalizeClientName(profile.clientName);
+}
+
+export function resolveHostRole(profile: Pick<HostProfile, "role">): PairingRole {
+  return resolvePairingRole(profile.role);
 }
 
 export function findCachedClientName(
@@ -216,6 +228,35 @@ function upsertHostConnectionById(
   return next;
 }
 
+function withoutConnection(
+  connections: HostConnection[],
+  connectionId: string | undefined,
+): HostConnection[] {
+  return connectionId
+    ? connections.filter((connection) => connection.id !== connectionId)
+    : connections;
+}
+
+function findMatchingProfileIndexes(
+  profiles: HostProfile[],
+  serverId: string,
+  connection: HostConnection,
+): number[] {
+  return profiles.reduce<number[]>((matches, daemon, index) => {
+    if (
+      daemon.serverId === serverId ||
+      // A routed candidate names its origin; its destination belongs to the host profile.
+      (connection.type !== "routed" &&
+        daemon.connections.some((existingConnection) =>
+          hostConnectionEquals(existingConnection, connection),
+        ))
+    ) {
+      matches.push(index);
+    }
+    return matches;
+  }, []);
+}
+
 function hasProfileChanged(input: {
   matchingCount: number;
   previous: HostProfile;
@@ -224,6 +265,7 @@ function hasProfileChanged(input: {
   createdAt: string;
   label: string;
   clientName?: string;
+  role?: PairingRole;
   preferredConnectionId: string;
   lifecycle: HostLifecycle;
   connections: HostConnection[];
@@ -236,6 +278,7 @@ function hasProfileChanged(input: {
     input.createdAt !== previous.createdAt ||
     input.label !== previous.label ||
     (input.clientName !== undefined && input.clientName !== previous.clientName) ||
+    (input.role !== undefined && input.role !== previous.role) ||
     input.preferredConnectionId !== previous.preferredConnectionId ||
     !hostLifecycleEquals(previous.lifecycle, input.lifecycle) ||
     connections.length !== previous.connections.length ||
@@ -251,6 +294,7 @@ export function upsertHostConnectionInProfiles(input: {
   serverId: string;
   label?: string;
   clientName?: string;
+  role?: PairingRole;
   connection: HostConnection;
   replaceConnectionId?: string;
   password?: string;
@@ -267,26 +311,16 @@ export function upsertHostConnectionInProfiles(input: {
   const labelTrimmed = input.label?.trim() ?? "";
   const derivedLabel = labelTrimmed || serverId;
   const clientName = normalizeClientName(input.clientName);
+  const role = input.role;
   const existing = input.profiles;
-  const matchingIndexes = existing.reduce<number[]>((matches, daemon, index) => {
-    if (
-      daemon.serverId === serverId ||
-      // A routed candidate names its origin; its destination belongs to the host profile.
-      (normalizedConnection.type !== "routed" &&
-        daemon.connections.some((existingConnection) =>
-          hostConnectionEquals(existingConnection, normalizedConnection),
-        ))
-    ) {
-      matches.push(index);
-    }
-    return matches;
-  }, []);
+  const matchingIndexes = findMatchingProfileIndexes(existing, serverId, normalizedConnection);
 
   if (matchingIndexes.length === 0) {
     const profile: HostProfile = {
       serverId,
       ...(password ? { password } : {}),
       ...(clientName ? { clientName } : {}),
+      ...(role ? { role } : {}),
       label: derivedLabel,
       appearance: defaultHostAppearance(),
       lifecycle: defaultLifecycle(),
@@ -301,13 +335,12 @@ export function upsertHostConnectionInProfiles(input: {
   const matchedProfiles = matchingIndexes.map((index) => existing[index]);
   const prev = matchedProfiles.find((daemon) => daemon.serverId === serverId) ?? matchedProfiles[0];
   const candidateConnections = matchedProfiles.flatMap((daemon) => daemon.connections);
-  const remainingConnections = input.replaceConnectionId
-    ? candidateConnections.filter((connection) => connection.id !== input.replaceConnectionId)
-    : candidateConnections;
+  const remainingConnections = withoutConnection(candidateConnections, input.replaceConnectionId);
   const nextConnections = upsertHostConnectionById(remainingConnections, normalizedConnection);
   const nextLifecycle = prev.lifecycle;
   const nextLabel = prev.label === prev.serverId ? derivedLabel : prev.label;
   const nextClientName = clientName ?? prev.clientName;
+  const nextRole = role ?? prev.role;
   const nextPreferredConnectionId =
     prev.preferredConnectionId &&
     nextConnections.some((connection) => connection.id === prev.preferredConnectionId)
@@ -325,6 +358,7 @@ export function upsertHostConnectionInProfiles(input: {
     createdAt: nextCreatedAt,
     label: nextLabel,
     clientName,
+    role,
     preferredConnectionId: nextPreferredConnectionId,
     lifecycle: nextLifecycle,
     connections: nextConnections,
@@ -338,6 +372,7 @@ export function upsertHostConnectionInProfiles(input: {
     ...prev,
     ...(password ? { password } : {}),
     ...(nextClientName ? { clientName: nextClientName } : {}),
+    ...(nextRole ? { role: nextRole } : {}),
     serverId,
     label: nextLabel,
     lifecycle: nextLifecycle,
@@ -479,6 +514,7 @@ const StoredHostProfileSchema = z.strictObject({
   password: z.string().optional(),
   label: z.string().optional(),
   clientName: ClientNameSchema.optional(),
+  role: PairingRoleSchema.optional(),
   appearance: HostAppearanceSchema.optional(),
   lifecycle: z.strictObject({}).optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),
@@ -579,6 +615,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
     serverId,
     ...(password ? { password } : {}),
     ...(record.clientName ? { clientName: record.clientName } : {}),
+    ...(record.role ? { role: record.role } : {}),
     label,
     appearance: record.appearance ?? defaultHostAppearance(),
     lifecycle: defaultLifecycle(),

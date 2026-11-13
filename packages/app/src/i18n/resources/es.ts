@@ -1551,6 +1551,14 @@ export const es: TranslationResources = {
     footer: {
       usage: "Uso",
     },
+    team: {
+      label: "Equipo",
+      unavailableTitle: "Página del equipo no disponible",
+      unavailableMessage:
+        "Este host usa un daemon anterior o la consola de administración no está en ejecución.",
+      openFailedTitle: "No se pudo abrir la página del equipo",
+      openFailedMessage: "La consola de administración no publicó una URL utilizable.",
+    },
     help: {
       trigger: "Ayuda y soporte",
       sectionHelp: "Ayuda",

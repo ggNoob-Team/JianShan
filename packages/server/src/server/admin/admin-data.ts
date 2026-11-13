@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import type { AgentActor } from "@getpaseo/protocol/agent-actor";
+import {
+  DEFAULT_PAIRING_ROLE,
+  resolvePairingRole,
+  type AgentActor,
+  type PairingRole,
+} from "@getpaseo/protocol/agent-actor";
 import type { AgentUsage } from "@getpaseo/protocol/agent-types";
 
 export interface AdminAgentRecord {
@@ -52,8 +57,10 @@ export interface AdminUsageEntry {
 export interface AdminRoleRecord {
   id: string;
   name: string;
+  role: PairingRole;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface OwnershipAuditEntry {
@@ -86,6 +93,7 @@ export interface AdminSnapshot {
   actors: Array<AdminActorEntry & { agentId: string }>;
   usages: AdminUsageEntry[];
   roles: AdminRoleRecord[];
+  deletedRoleNames: string[];
   ownershipAudit: OwnershipAuditEntry[];
   projects: AdminProjectRecord[];
   workspaces: AdminWorkspaceRecord[];
@@ -178,41 +186,85 @@ const MAX_THINKING_SECONDS = 30 * 60;
 const MAX_AGENT_SECONDS = 30 * 60;
 
 export async function loadAdminSnapshot(paseoHome: string): Promise<AdminSnapshot> {
-  const [agents, actors, usages, roles, ownershipAudit, projects, workspaces] = await Promise.all([
-    loadAgents(path.join(paseoHome, "agents")),
-    loadActors(path.join(paseoHome, "agent-actors")),
-    loadUsages(path.join(paseoHome, "agent-usage")),
-    loadRoles(paseoHome),
-    loadOwnershipAudit(paseoHome),
-    readJsonArray<AdminProjectRecord>(path.join(paseoHome, "projects", "projects.json")),
-    readJsonArray<AdminWorkspaceRecord>(path.join(paseoHome, "projects", "workspaces.json")),
-  ]);
-  return { agents, actors, usages, roles, ownershipAudit, projects, workspaces };
+  const [agents, actors, usages, roleRecords, ownershipAudit, projects, workspaces] =
+    await Promise.all([
+      loadAgents(path.join(paseoHome, "agents")),
+      loadActors(path.join(paseoHome, "agent-actors")),
+      loadUsages(path.join(paseoHome, "agent-usage")),
+      loadRoleRecords(paseoHome),
+      loadOwnershipAudit(paseoHome),
+      readJsonArray<AdminProjectRecord>(path.join(paseoHome, "projects", "projects.json")),
+      readJsonArray<AdminWorkspaceRecord>(path.join(paseoHome, "projects", "workspaces.json")),
+    ]);
+  return {
+    agents,
+    actors,
+    usages,
+    roles: roleRecords.filter((role) => !role.deletedAt),
+    deletedRoleNames: roleRecords.filter((role) => role.deletedAt).map((role) => role.name),
+    ownershipAudit,
+    projects,
+    workspaces,
+  };
 }
 
 export async function loadRoles(paseoHome: string): Promise<AdminRoleRecord[]> {
-  return readJsonArray<AdminRoleRecord>(resolveRolesPath(paseoHome));
+  return (await loadRoleRecords(paseoHome)).filter((role) => !role.deletedAt);
 }
 
-export async function upsertRole(paseoHome: string, name: string): Promise<AdminRoleRecord> {
+export async function upsertRole(
+  paseoHome: string,
+  name: string,
+  role: PairingRole = DEFAULT_PAIRING_ROLE,
+): Promise<AdminRoleRecord> {
   const normalized = name.trim();
   if (!normalized) throw new Error("角色名称不能为空");
-  const roles = await loadRoles(paseoHome);
+  const roles = await loadRoleRecords(paseoHome);
   const now = new Date().toISOString();
-  const existing = roles.find((role) => role.name === normalized);
-  const role: AdminRoleRecord = existing
-    ? { ...existing, updatedAt: now }
+  const existing = roles.find((item) => item.name === normalized);
+  const record: AdminRoleRecord = existing
+    ? { ...existing, role, deletedAt: null, updatedAt: now }
     : {
         id: roleId(normalized),
         name: normalized,
+        role,
         createdAt: now,
         updatedAt: now,
       };
   const next = existing
-    ? roles.map((item) => (item.id === role.id ? role : item))
-    : [...roles, role];
+    ? roles.map((item) => (item.id === record.id ? record : item))
+    : [...roles, record];
   await writePrivateJson(resolveRolesPath(paseoHome), next);
-  return role;
+  return record;
+}
+
+export async function deleteRole(paseoHome: string, id: string, name?: string): Promise<boolean> {
+  const roles = await loadRoleRecords(paseoHome);
+  const existing = roles.find((role) => role.id === id && !role.deletedAt);
+  const now = new Date().toISOString();
+  if (existing) {
+    const next = roles.map((role) =>
+      role.id === id ? { ...role, deletedAt: now, updatedAt: now } : role,
+    );
+    await writePrivateJson(resolveRolesPath(paseoHome), next);
+    return true;
+  }
+
+  const discoveredName = name?.trim();
+  if (!discoveredName) return false;
+  const tombstone: AdminRoleRecord = {
+    id: roleId(discoveredName),
+    name: discoveredName,
+    role: DEFAULT_PAIRING_ROLE,
+    createdAt: "",
+    updatedAt: now,
+    deletedAt: now,
+  };
+  await writePrivateJson(
+    resolveRolesPath(paseoHome),
+    roles.filter((role) => role.name !== discoveredName).concat(tombstone),
+  );
+  return true;
 }
 
 export async function appendOwnershipAudit(
@@ -245,13 +297,15 @@ export async function loadOwnershipAudit(paseoHome: string): Promise<OwnershipAu
 
 export function discoverRoles(snapshot: AdminSnapshot): AdminRoleRecord[] {
   const values = new Map<string, AdminRoleRecord>();
+  const deleted = new Set(snapshot.deletedRoleNames);
   for (const role of snapshot.roles) values.set(role.name, role);
   const add = (actor: AgentActor | undefined) => {
     const name = actor?.clientName?.trim();
-    if (!name || values.has(name)) return;
+    if (!name || deleted.has(name) || values.has(name)) return;
     values.set(name, {
       id: roleId(name),
       name,
+      role: DEFAULT_PAIRING_ROLE,
       createdAt: "",
       updatedAt: "",
     });
@@ -723,6 +777,15 @@ function validTimeZone(value: string | undefined): string {
 
 function roleId(name: string): string {
   return `role_${createHash("sha256").update(name).digest("hex").slice(0, 16)}`;
+}
+
+async function loadRoleRecords(paseoHome: string): Promise<AdminRoleRecord[]> {
+  const roles = await readJsonArray<AdminRoleRecord>(resolveRolesPath(paseoHome));
+  const normalized = roles.filter(
+    (role) => typeof role.id === "string" && typeof role.name === "string",
+  );
+  for (const role of normalized) role.role = resolvePairingRole(role.role);
+  return normalized;
 }
 
 function resolveRolesPath(paseoHome: string): string {

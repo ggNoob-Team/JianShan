@@ -10,13 +10,14 @@ import * as QRCode from "qrcode";
 import type { Server } from "node:http";
 import type { Logger } from "pino";
 
-import type { AgentActor } from "@getpaseo/protocol/agent-actor";
+import { PairingRoleSchema, type AgentActor } from "@getpaseo/protocol/agent-actor";
 import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 
 import {
   appendOwnershipAudit,
   buildTeamInsights,
   buildTitleMap,
+  deleteRole,
   discoverRoles,
   loadAdminSnapshot,
   upsertRole,
@@ -140,6 +141,22 @@ function createAdminApp(input: {
 
   app.get("/api/session", (req, res) => {
     res.json({ authenticated: readSession(req, input.sessions, input.paseoHome) !== null });
+  });
+
+  app.get("/team", (_req, res) => {
+    res.sendFile(path.join(resolveAdminUiDir(), "team.html"));
+  });
+
+  app.get("/api/team/public", async (req, res, next) => {
+    try {
+      const snapshot = await loadAdminSnapshot(input.paseoHome);
+      const start = readQueryString(req, "start") ?? startOfDaysAgo(7);
+      const end = readQueryString(req, "end") ?? new Date().toISOString();
+      const timeZone = readQueryString(req, "timeZone") ?? undefined;
+      res.json(buildTeamInsights({ snapshot, start, end, timeZone }));
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.delete("/api/session", (req, res) => {
@@ -346,9 +363,18 @@ function createAdminApp(input: {
         res.status(400).json({ error: "角色名称不能为空" });
         return;
       }
-      const role = await upsertRole(input.paseoHome, name);
+      const parsedRole = PairingRoleSchema.safeParse(req.body?.role ?? "member");
+      if (!parsedRole.success) {
+        res.status(400).json({ error: "角色必须是 admin 或 member" });
+        return;
+      }
+      const role = await upsertRole(input.paseoHome, name, parsedRole.data);
       const offer = await withAdminDaemonClient(input.paseoHome, (client) =>
-        client.getDaemonPairingOffer({ clientName: role.name, timeout: 5_000 }),
+        client.getDaemonPairingOffer({
+          clientName: role.name,
+          role: role.role,
+          timeout: 5_000,
+        }),
       );
       if (!offer.relayEnabled || !offer.url) {
         res.status(409).json({
@@ -363,6 +389,21 @@ function createAdminApp(input: {
         width: 360,
       });
       res.status(201).json({ role, url: offer.url, qr });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/roles/:roleId", async (req, res, next) => {
+    try {
+      const snapshot = await loadAdminSnapshot(input.paseoHome);
+      const discovered = discoverRoles(snapshot).find((role) => role.id === req.params.roleId);
+      const removed = await deleteRole(input.paseoHome, req.params.roleId, discovered?.name);
+      if (!removed) {
+        res.status(404).json({ error: "角色不存在" });
+        return;
+      }
+      res.status(204).end();
     } catch (error) {
       next(error);
     }
@@ -498,6 +539,7 @@ function serializeRole(
   return {
     id: role.id,
     name: role.name,
+    role: role.role,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
     sessions: snapshot.agents.filter((agent) => agent.createdBy?.clientName === role.name).length,

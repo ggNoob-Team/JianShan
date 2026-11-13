@@ -4,6 +4,15 @@ export const MAX_CLIENT_NAME_LENGTH = 120;
 
 export const ClientNameSchema = z.string().trim().min(1).max(MAX_CLIENT_NAME_LENGTH);
 
+/** UI role carried by a pairing link. It grants no daemon authority. */
+export const PairingRoleSchema = z.enum(["admin", "member"]);
+export type PairingRole = z.infer<typeof PairingRoleSchema>;
+export const DEFAULT_PAIRING_ROLE: PairingRole = "member";
+
+export function resolvePairingRole(value: PairingRole | null | undefined): PairingRole {
+  return value ?? DEFAULT_PAIRING_ROLE;
+}
+
 /**
  * Display and audit metadata for the client that originated an action.
  *

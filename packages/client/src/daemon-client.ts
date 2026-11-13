@@ -25,6 +25,7 @@ import {
   MAX_FILE_UPLOAD_LABEL,
 } from "@getpaseo/protocol/file-upload-limits";
 import type { AgentAttentionNotificationPayload } from "@getpaseo/protocol/agent-attention-notification";
+import type { PairingRole } from "@getpaseo/protocol/agent-actor";
 import { MAX_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
 import {
   AgentCreateFailedStatusPayloadSchema,
@@ -825,6 +826,7 @@ export interface DaemonPairingOfferOptions {
   requestId?: string;
   timeout?: number;
   clientName?: string;
+  role?: PairingRole;
 }
 type DaemonUpdateResponse = z.infer<typeof DaemonUpdateResponseSchema>;
 type FetchAgentsPayload = Extract<
@@ -6189,6 +6191,7 @@ export class DaemonClient {
       message: {
         type: "daemon.get_pairing_offer.request",
         ...(options?.clientName ? { clientName: options.clientName } : {}),
+        ...(options?.role ? { role: options.role } : {}),
       },
       responseType: "daemon.get_pairing_offer.response",
       timeout: options?.timeout,

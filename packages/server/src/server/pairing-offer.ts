@@ -1,6 +1,10 @@
 import type { Logger } from "pino";
 
-import { normalizeClientName } from "@getpaseo/protocol/agent-actor";
+import {
+  normalizeClientName,
+  resolvePairingRole,
+  type PairingRole,
+} from "@getpaseo/protocol/agent-actor";
 import { DEFAULT_HOSTED_RELAY_CLIENT_ENDPOINT } from "@getpaseo/protocol/daemon-endpoints";
 
 import { createConnectionOfferV2, encodeOfferToFragmentUrl } from "./connection-offer.js";
@@ -13,6 +17,7 @@ export interface LocalPairingOffer {
   url: string | null;
   qr: string | null;
   clientName?: string;
+  role: PairingRole;
 }
 
 export async function generateLocalPairingOffer(args: {
@@ -25,15 +30,18 @@ export async function generateLocalPairingOffer(args: {
   appBaseUrl?: string;
   includeQr?: boolean;
   clientName?: string;
+  role?: PairingRole;
   logger?: Logger;
 }): Promise<LocalPairingOffer> {
   const relayEnabled = args.relayEnabled ?? true;
   const clientName = normalizeClientName(args.clientName);
+  const role = resolvePairingRole(args.role);
   if (!relayEnabled) {
     return {
       relayEnabled: false,
       url: null,
       qr: null,
+      role,
     };
   }
 
@@ -51,6 +59,7 @@ export async function generateLocalPairingOffer(args: {
     daemonPublicKeyB64: daemonKeyPair.publicKeyB64,
     relay: { endpoint: relayPublicEndpoint, useTls: relayPublicUseTls },
     clientName,
+    role,
   });
   const url = encodeOfferToFragmentUrl({ offer, appBaseUrl });
 
@@ -60,6 +69,7 @@ export async function generateLocalPairingOffer(args: {
       url,
       qr: null,
       ...(clientName ? { clientName } : {}),
+      role,
     };
   }
 
@@ -75,5 +85,6 @@ export async function generateLocalPairingOffer(args: {
     url,
     qr,
     ...(clientName ? { clientName } : {}),
+    role,
   };
 }

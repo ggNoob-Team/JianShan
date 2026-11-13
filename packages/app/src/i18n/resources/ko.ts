@@ -1514,6 +1514,14 @@ export const ko: TranslationResources = {
     footer: {
       usage: "사용량",
     },
+    team: {
+      label: "팀",
+      unavailableTitle: "팀 페이지를 사용할 수 없음",
+      unavailableMessage:
+        "이 호스트가 이전 daemon에 연결되어 있거나 로컬 관리 콘솔이 실행 중이 아닙니다.",
+      openFailedTitle: "팀 페이지를 열 수 없음",
+      openFailedMessage: "관리 콘솔이 사용 가능한 URL을 게시하지 않았습니다.",
+    },
     help: {
       trigger: "도움말 및 지원",
       sectionHelp: "도움말",

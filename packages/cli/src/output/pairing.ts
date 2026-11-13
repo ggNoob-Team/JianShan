@@ -1,3 +1,5 @@
+import type { PairingRole } from "@getpaseo/protocol/agent-actor";
+
 const ANSI_PATTERN = new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;]*m`, "g");
 
 interface PairingInstructions {
@@ -5,6 +7,7 @@ interface PairingInstructions {
   qr: string | null;
   connectionUri?: string | null;
   clientName?: string;
+  role?: PairingRole;
   columns?: number;
 }
 
@@ -52,6 +55,8 @@ export function formatPairingInstructions({
   columns,
   connectionUri,
   clientName,
+  role,
 }: PairingInstructions): string {
-  return `\nScan to pair${clientName ? ` as ${clientName}` : ""}:\n${formatQr(qr, columns)}\n\nPairing link:\n${url}${connectionUri ? `\n\nConnection URI:\n${redactConnectionUri(connectionUri)}` : ""}\n\nTreat this pairing link like a password. Anyone with it can access this daemon.\n`;
+  const identity = clientName ? `${clientName}${role === "admin" ? " (admin)" : ""}` : "";
+  return `\nScan to pair${identity ? ` as ${identity}` : ""}:\n${formatQr(qr, columns)}\n\nPairing link:\n${url}${connectionUri ? `\n\nConnection URI:\n${redactConnectionUri(connectionUri)}` : ""}\n\nTreat this pairing link like a password. Anyone with it can access this daemon.\n`;
 }

@@ -7,6 +7,7 @@ import {
   orderHostsLocalFirst,
   resolveActiveHostServerId,
   resolveHostClientName,
+  resolveHostRole,
   upsertHostConnectionInProfiles,
   type HostConnection,
   type HostProfile,
@@ -60,6 +61,18 @@ describe("normalizeStoredHostProfile", () => {
     });
 
     expect(profile?.clientName).toBe("Harmony Emulator");
+  });
+
+  it("preserves the paired admin role and treats legacy hosts as members", () => {
+    const admin = normalizeStoredHostProfile({
+      serverId: "srv_admin",
+      clientName: "Team admin",
+      role: "admin",
+      connections: [{ type: "directTcp", endpoint: "localhost:6767" }],
+    });
+
+    expect(resolveHostRole({ role: admin?.role })).toBe("admin");
+    expect(resolveHostRole({ role: undefined })).toBe("member");
   });
 
   it("leaves legacy profiles without a client name", () => {
@@ -228,6 +241,22 @@ describe("createRemoteSshHostConnection", () => {
 });
 
 describe("upsertHostConnectionInProfiles", () => {
+  it("stores a changed pairing role", () => {
+    const [profile] = upsertHostConnectionInProfiles({
+      profiles: [makeHost("srv_role")],
+      serverId: "srv_role",
+      clientName: "Team admin",
+      role: "admin",
+      connection: {
+        id: "direct:localhost:6767",
+        type: "directTcp",
+        endpoint: "localhost:6767",
+      },
+    });
+
+    expect(profile).toMatchObject({ clientName: "Team admin", role: "admin" });
+  });
+
   const connection: HostConnection = {
     id: "socket:/tmp/paseo.sock",
     type: "directSocket",

@@ -26,4 +26,19 @@ describe("local pairing offer", () => {
     expect(parsed?.relay.endpoint).toBe("relay-next.paseo.sh:443");
     expect(parsed?.relay.useTls).toBe(true);
   });
+
+  test("carries the requested role in the pairing offer", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "paseo-pairing-offer-"));
+    directories.push(home);
+
+    const pairing = await generateLocalPairingOffer({
+      paseoHome: home,
+      includeQr: false,
+      clientName: "Team admin",
+      role: "admin",
+    });
+    const parsed = parseConnectionOfferFromUrl(pairing.url!);
+
+    expect(parsed?.role).toBe("admin");
+  });
 });

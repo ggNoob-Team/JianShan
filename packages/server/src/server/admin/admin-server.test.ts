@@ -6,12 +6,17 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { ensureAdminKey, rotateAdminKey } from "./admin-control.js";
 import { startAdminServer } from "./admin-server.js";
 
+const pairingRequests: Array<{ clientName?: string; role?: string }> = [];
+
 vi.mock("./admin-daemon.js", () => ({
   withAdminDaemonClient: async (
     _paseoHome: string,
     action: (client: {
       getDaemonConfig: () => Promise<{ config: Record<string, unknown> }>;
-      getDaemonPairingOffer: () => Promise<{ relayEnabled: boolean; url: string }>;
+      getDaemonPairingOffer: (options?: {
+        clientName?: string;
+        role?: string;
+      }) => Promise<{ relayEnabled: boolean; url: string }>;
       reloadDaemonConfig: () => Promise<{
         appliedPaths: string[];
         restartRequiredPaths: string[];
@@ -29,10 +34,13 @@ vi.mock("./admin-daemon.js", () => ({
           app: { baseUrl: "https://paseo-app-8wq.pages.dev" },
         },
       }),
-      getDaemonPairingOffer: async () => ({
-        relayEnabled: true,
-        url: "https://app.paseo.sh/#offer=test",
-      }),
+      getDaemonPairingOffer: async (options) => {
+        pairingRequests.push(options ?? {});
+        return {
+          relayEnabled: true,
+          url: "https://app.paseo.sh/#offer=test",
+        };
+      },
       reloadDaemonConfig: async () => ({
         appliedPaths: ["app.baseUrl"],
         restartRequiredPaths: [],
@@ -45,6 +53,7 @@ const directories: string[] = [];
 const handles: Array<Awaited<ReturnType<typeof startAdminServer>>> = [];
 
 afterEach(async () => {
+  pairingRequests.length = 0;
   await Promise.all(handles.splice(0).map((handle) => handle.close()));
   await Promise.all(
     directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
@@ -64,7 +73,15 @@ describe("admin server", () => {
 
     const page = await fetch(handle.url);
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("见山管理台");
+    const pageHtml = await page.text();
+    expect(pageHtml).toContain("见山管理台");
+    expect(pageHtml).toContain('id="role-access-role"');
+
+    const roleScript = await fetch(new URL("/app.js", handle.url));
+    expect(roleScript.status).toBe(200);
+    const roleScriptText = await roleScript.text();
+    expect(roleScriptText).toContain("data-role-regenerate");
+    expect(roleScriptText).toContain("data-role-delete");
 
     const unauthorized = await fetch(new URL("/api/roles", handle.url));
     expect(unauthorized.status).toBe(401);
@@ -111,13 +128,52 @@ describe("admin server", () => {
     const response = await fetch(new URL("/api/roles", handle.url), {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({ name: "八哥" }),
+      body: JSON.stringify({ name: "八哥", role: "admin" }),
     });
 
     expect(response.status).toBe(201);
-    const body = (await response.json()) as { qr: string; url: string };
+    const body = (await response.json()) as {
+      qr: string;
+      url: string;
+      role: { id: string; name: string; role: string };
+    };
     expect(body.url).toBe("https://app.paseo.sh/#offer=test");
     expect(body.qr).toMatch(/^data:image\/png;base64,/);
+    expect(body.role).toMatchObject({ name: "八哥", role: "admin" });
+    expect(pairingRequests).toContainEqual(
+      expect.objectContaining({ clientName: "八哥", role: "admin" }),
+    );
+
+    const removed = await fetch(new URL(`/api/roles/${body.role.id}`, handle.url), {
+      method: "DELETE",
+      headers: { Cookie: cookie },
+    });
+    expect(removed.status).toBe(204);
+    const roles = await fetch(new URL("/api/roles", handle.url), { headers: { Cookie: cookie } });
+    expect(await roles.json()).toMatchObject({ roles: [] });
+  });
+
+  test("serves the same team data without an admin login", async () => {
+    const home = await mkdtemp(path.join(tmpdir(), "paseo-admin-server-"));
+    directories.push(home);
+    await ensureAdminKey(home);
+    const handle = await startAdminServer({
+      paseoHome: home,
+      listen: { host: "127.0.0.1", port: 0 },
+    });
+    handles.push(handle);
+
+    const page = await fetch(new URL("/team", handle.url));
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain("见山团队");
+
+    const team = await fetch(new URL("/api/team/public", handle.url));
+    expect(team.status).toBe(200);
+    expect(await team.json()).toMatchObject({
+      members: expect.any(Array),
+      summary: expect.any(Object),
+      unassigned: expect.any(Object),
+    });
   });
 
   test("reads and saves the non-sensitive daemon config", async () => {

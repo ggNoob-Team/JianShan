@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ClientNameSchema } from "./agent-actor.js";
+import { ClientNameSchema, PairingRoleSchema } from "./agent-actor.js";
 
 /**
  * Relay-only pairing offer.
@@ -13,6 +13,8 @@ export const ConnectionOfferV2Schema = z.object({
   serverId: z.string().min(1),
   daemonPublicKeyB64: z.string().min(1),
   clientName: ClientNameSchema.optional(),
+  /** Optional so links created before roles existed remain valid members. */
+  role: PairingRoleSchema.optional(),
   relay: z.object({
     endpoint: z.string().min(1),
     useTls: z.boolean().optional(),

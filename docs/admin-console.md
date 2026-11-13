@@ -94,9 +94,15 @@ port manually.
 
 ## Team attribution
 
-The role name is the `--name` value supplied to `paseo daemon pair`. The client
-embeds it in the pairing offer and sends it with every prompt. Team views group
-questions by that name and use `createdBy` for current session ownership.
+The role name is the `--name` value supplied to `paseo daemon pair`. The optional
+`--role` is `admin` or `member` and defaults to `member`. The client embeds both
+values in the pairing offer and sends the name with every prompt. Team views
+group questions by that name and use `createdBy` for current session ownership.
+
+The admin role controls one client surface: it adds **团队** to the left sidebar.
+The entry opens the admin console's standalone `/team` page. That page and
+`/api/team/public` do not require the admin key. Do not expose the admin console
+beyond a trusted network unless the team view is intentionally public there.
 
 Transferring an owner updates `createdBy` and appends an event to
 `$PASEO_HOME/admin/ownership-audit.jsonl`. Historical question attribution does

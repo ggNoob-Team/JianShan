@@ -1487,6 +1487,13 @@ export const zhCN: TranslationResources = {
     footer: {
       usage: "使用情况",
     },
+    team: {
+      label: "团队",
+      unavailableTitle: "团队页面不可用",
+      unavailableMessage: "当前主机版本过旧，或本机管理台未运行。",
+      openFailedTitle: "无法打开团队页面",
+      openFailedMessage: "本机管理台没有发布可用地址。",
+    },
     help: {
       trigger: "帮助与支持",
       sectionHelp: "帮助",

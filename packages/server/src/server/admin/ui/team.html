@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>见山团队</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/team.js" defer></script>
+  </head>
+  <body>
+    <main class="public-team-page">
+      <header class="public-team-header">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" role="img">
+              <path d="M3 24 13 7l6 9 3-4 7 12H3Z" />
+            </svg>
+          </span>
+          <span>
+            <strong>见山团队</strong>
+            <small>实时查看团队投入与成员会话</small>
+          </span>
+        </div>
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="切换深浅色">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+            />
+          </svg>
+        </button>
+      </header>
+
+      <section class="public-team-shell" aria-labelledby="team-heading">
+        <div class="section-heading team-heading-row">
+          <div>
+            <p class="eyebrow">成员工作台</p>
+            <h1 id="team-heading">团队管理</h1>
+            <p>选择成员，查看其当前会话、提问和模型消耗。此页面无需登录。</p>
+          </div>
+          <div class="date-tools">
+            <button class="segmented-button" data-days="1" type="button">1 天</button>
+            <button class="segmented-button active" data-days="7" type="button">7 天</button>
+            <button class="segmented-button" data-days="30" type="button">30 天</button>
+          </div>
+        </div>
+        <div id="team-tabs" class="member-tabs" role="tablist" aria-label="团队成员"></div>
+        <div id="team-content" class="team-content">
+          <div class="empty-state">正在加载团队数据…</div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

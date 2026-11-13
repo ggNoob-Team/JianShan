@@ -1,6 +1,12 @@
 import { AgentMessageSchema } from "./agent-message.js";
-import { AgentActorSchema, ClientNameSchema } from "./agent-actor.js";
-export { AgentActorSchema, ClientNameSchema, type AgentActor } from "./agent-actor.js";
+import { AgentActorSchema, ClientNameSchema, PairingRoleSchema } from "./agent-actor.js";
+export {
+  AgentActorSchema,
+  ClientNameSchema,
+  PairingRoleSchema,
+  type AgentActor,
+  type PairingRole,
+} from "./agent-actor.js";
 import {
   HostsListRequestSchema,
   HostsAddRequestSchema,
@@ -1418,6 +1424,7 @@ export const DaemonGetPairingOfferRequestSchema = z.object({
   type: z.literal("daemon.get_pairing_offer.request"),
   requestId: z.string(),
   clientName: ClientNameSchema.optional(),
+  role: PairingRoleSchema.optional(),
 });
 
 export const DaemonConfigReloadRequestSchema = z.object({
@@ -5712,6 +5719,7 @@ export const DaemonGetStatusResponseSchema = z.object({
       nodePath: z.string(),
       startedAt: z.string().nullable().optional(),
       listen: z.string().nullable(),
+      adminUrl: z.string().nullable().optional(),
       relay: z
         .object({
           enabled: z.boolean(),
@@ -5778,6 +5786,7 @@ export const DaemonGetPairingOfferResponseSchema = z.object({
       qr: z.string().nullable().optional(),
       relayEnabled: z.boolean(),
       clientName: ClientNameSchema.optional(),
+      role: PairingRoleSchema.optional(),
     })
     .passthrough(),
 });

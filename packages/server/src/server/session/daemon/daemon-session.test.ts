@@ -13,6 +13,7 @@ import type { ProviderAvailability } from "../../agent/agent-manager.js";
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { SessionOutboundMessage } from "../../messages.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
+import { writeAdminServerInfo } from "../../admin/admin-control.js";
 
 const tempDirs: string[] = [];
 
@@ -207,6 +208,7 @@ describe("DaemonSession", () => {
           nodePath: process.execPath,
           startedAt: null,
           listen: "127.0.0.1:6767",
+          adminUrl: null,
           relay: null,
           providers: [
             { provider: "claude", available: true, error: null },
@@ -240,6 +242,7 @@ describe("DaemonSession", () => {
           nodePath: process.execPath,
           startedAt: null,
           listen: null,
+          adminUrl: null,
           relay: null,
           providers: [],
         },
@@ -269,7 +272,7 @@ describe("DaemonSession", () => {
     expect(emitted).toEqual([
       {
         type: "daemon.get_pairing_offer.response",
-        payload: { requestId: "p-1", url: "", qr: null, relayEnabled: false },
+        payload: { requestId: "p-1", url: "", qr: null, relayEnabled: false, role: "member" },
       },
     ]);
   });
@@ -292,6 +295,8 @@ describe("DaemonSession", () => {
     await subsystem.handleGetPairingOfferRequest({
       type: "daemon.get_pairing_offer.request",
       requestId: "p-2",
+      clientName: "Team admin",
+      role: "admin",
     });
 
     expect(emitted).toHaveLength(1);
@@ -304,6 +309,24 @@ describe("DaemonSession", () => {
     expect(message.payload.relayEnabled).toBe(true);
     expect(message.payload.url.startsWith("https://app.example.test")).toBe(true);
     expect(typeof message.payload.qr).toBe("string");
+    expect(message.payload).toMatchObject({ clientName: "Team admin", role: "admin" });
+  });
+
+  test("status exposes the admin console URL for the team page", async () => {
+    const { subsystem, paseoHome, emitted } = makeSubsystem({ serverId: "srv-1" });
+    await writeAdminServerInfo(paseoHome, {
+      pid: process.pid,
+      listen: "127.0.0.1:6769",
+      url: "http://127.0.0.1:6769/",
+      startedAt: "2026-11-13T00:00:00.000Z",
+    });
+
+    await subsystem.handleGetStatusRequest({ type: "daemon.get_status.request", requestId: "s-3" });
+
+    expect(emitted).toContainEqual({
+      type: "daemon.get_status.response",
+      payload: expect.objectContaining({ adminUrl: "http://127.0.0.1:6769/" }),
+    });
   });
 
   test("pairing offer reads relay state at request time", async () => {

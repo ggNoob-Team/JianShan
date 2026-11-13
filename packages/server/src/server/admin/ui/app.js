@@ -390,6 +390,10 @@ async function saveMetadata() {
   }
 }
 
+function roleLabel(role) {
+  return role === "admin" ? "管理员" : "成员";
+}
+
 async function loadRoles() {
   const data = await api("/api/roles");
   state.roles = data.roles;
@@ -398,24 +402,34 @@ async function loadRoles() {
     data.roles
       .map(
         (role) => `<div class="role-row">
-          <strong>${escapeHtml(role.name)}</strong>
+          <strong>${escapeHtml(role.name)} <span class="badge ${role.role === "admin" ? "success" : ""}">${roleLabel(role.role)}</span></strong>
           <small>${role.sessions ?? 0} 会话 · ${role.questions ?? 0} 提问 · ${
             role.lastActiveAt ? formatDate(role.lastActiveAt) : "尚未使用"
           }</small>
-          <button class="text-button" data-role-name="${escapeHtml(role.name)}">重新生成二维码</button>
+          <div class="role-row-actions">
+            <select data-role-value aria-label="${escapeHtml(role.name)} 的角色类型">
+              <option value="member" ${role.role === "member" ? "selected" : ""}>成员</option>
+              <option value="admin" ${role.role === "admin" ? "selected" : ""}>管理员</option>
+            </select>
+            <button class="text-button" data-role-regenerate="${escapeHtml(role.name)}">重新生成二维码</button>
+            <button class="text-button danger" data-role-delete="${escapeHtml(role.id)}" data-role-name="${escapeHtml(role.name)}">删除</button>
+          </div>
         </div>`,
       )
       .join("") || `<div class="empty-state">尚未创建角色。输入名称生成第一个入口。</div>`;
 }
 
-async function createRole(name) {
-  const result = await api("/api/roles", { method: "POST", body: JSON.stringify({ name }) });
+async function createRole(name, role) {
+  const result = await api("/api/roles", {
+    method: "POST",
+    body: JSON.stringify({ name, role }),
+  });
   const qr = result.qr
     ? `<img alt="${escapeHtml(name)} 的配对二维码" src="${escapeHtml(result.qr)}" />`
     : "";
   $("#qr-result").hidden = false;
   $("#qr-result").innerHTML = `
-    <strong>${escapeHtml(name)}</strong>
+    <strong>${escapeHtml(name)} <span class="badge ${role === "admin" ? "success" : ""}">${roleLabel(role)}</span></strong>
     ${qr}
     <p class="helper">配对链接</p>
     <code>${escapeHtml(result.url)}</code>
@@ -424,7 +438,14 @@ async function createRole(name) {
     </div>
   `;
   await loadRoles();
-  toast(`已生成角色「${name}」`);
+  toast(`已生成${roleLabel(role)}角色「${name}」`);
+}
+
+async function removeRole(id, name) {
+  if (!window.confirm(`删除角色「${name}」？已发出的二维码不会立刻失效。`)) return;
+  await api(`/api/roles/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await loadRoles();
+  toast(`已删除角色「${name}」`);
 }
 
 async function loadAgents() {
@@ -726,15 +747,29 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#role-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const name = $("#role-name").value.trim();
+    const role = $("#role-access-role").value;
     if (!name) return;
-    void createRole(name).catch((error) => setGlobalError(error.message));
+    void createRole(name, role).catch((error) => setGlobalError(error.message));
   });
 
   $("#roles-list").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-role-name]");
-    if (!button) return;
-    $("#role-name").value = button.dataset.roleName;
-    void createRole(button.dataset.roleName).catch((error) => setGlobalError(error.message));
+    const regenerate = event.target.closest("[data-role-regenerate]");
+    if (regenerate) {
+      const rowRole = regenerate.closest(".role-row")?.querySelector("[data-role-value]")?.value;
+      const role = rowRole === "admin" ? "admin" : "member";
+      $("#role-name").value = regenerate.dataset.roleRegenerate;
+      $("#role-access-role").value = role;
+      void createRole(regenerate.dataset.roleRegenerate, role).catch((error) =>
+        setGlobalError(error.message),
+      );
+      return;
+    }
+    const remove = event.target.closest("[data-role-delete]");
+    if (remove) {
+      void removeRole(remove.dataset.roleDelete, remove.dataset.roleName).catch((error) =>
+        setGlobalError(error.message),
+      );
+    }
   });
   $("#qr-result").addEventListener("click", (event) => {
     const button = event.target.closest("[data-copy-role-url]");

@@ -14,7 +14,12 @@ import { addJsonAndDaemonHostOptions, withGlobalOptions } from "../../utils/comm
 import { formatPairingInstructions } from "../../output/pairing.js";
 import { parseConnectionOfferFromUrl } from "@getpaseo/protocol/connection-offer";
 import { serializeRelayConnectionUri } from "@getpaseo/protocol/daemon-endpoints";
-import { MAX_CLIENT_NAME_LENGTH, normalizeClientName } from "@getpaseo/protocol/agent-actor";
+import {
+  DEFAULT_PAIRING_ROLE,
+  MAX_CLIENT_NAME_LENGTH,
+  normalizeClientName,
+  type PairingRole,
+} from "@getpaseo/protocol/agent-actor";
 
 interface PairOptions {
   daemonTarget: DaemonTarget;
@@ -22,6 +27,7 @@ interface PairOptions {
   json?: boolean;
   relay?: boolean;
   name?: string;
+  role: PairingRole;
 }
 
 export interface PairCommandOutput {
@@ -37,6 +43,7 @@ export interface PairingOffer {
   url: string | null;
   qr: string | null;
   clientName?: string;
+  role: PairingRole;
 }
 
 const PAIRING_DAEMON_RPC_TIMEOUT_MS = 1500;
@@ -53,6 +60,13 @@ function parseClientName(value: string): string {
     );
   }
   return name;
+}
+
+function parsePairingRole(value: string): PairingRole {
+  if (value !== "admin" && value !== "member") {
+    throw new InvalidArgumentError('Role must be "admin" or "member".');
+  }
+  return value;
 }
 
 function rejectRemovedNameFlagArgs(argv: string[]): string[] {
@@ -92,6 +106,12 @@ export function pairCommand(): Command {
   )
     .option("--relay", "Enable relay without prompting")
     .option("-n, --name <name>", "Name the client receiving this pairing link", parseClientName)
+    .option(
+      "--role <role>",
+      'Role for this client: "admin" or "member"',
+      parsePairingRole,
+      DEFAULT_PAIRING_ROLE,
+    )
     .action(
       withGlobalOptions((options: PairOptions, _command: Command) => runPairCommand(options)),
     );
@@ -101,6 +121,7 @@ export async function resolveLocalPairingOffer(options: {
   paseoHome: string;
   enableRelay?: boolean;
   clientName?: string;
+  role?: PairingRole;
 }): Promise<PairingOffer> {
   const instance = await readDaemonInstance(options.paseoHome);
   if (instance)
@@ -108,6 +129,7 @@ export async function resolveLocalPairingOffer(options: {
       { kind: "instance", home: options.paseoHome },
       options.enableRelay,
       options.clientName,
+      options.role,
     );
   if (options.enableRelay)
     editPersistedConfig(options.paseoHome, "daemon.relay.enabled", { value: true });
@@ -127,6 +149,7 @@ export async function resolveLocalPairingOffer(options: {
     appBaseUrl: config.appBaseUrl,
     includeQr: true,
     clientName: options.clientName,
+    role: options.role,
   });
 }
 
@@ -134,6 +157,7 @@ async function resolveDaemonPairingOffer(
   target: DaemonTarget,
   enableRelay: boolean | undefined,
   clientName: string | undefined,
+  role: PairingRole | undefined,
 ): Promise<PairingOffer> {
   const client = await connectToDaemon({
     target,
@@ -149,6 +173,7 @@ async function resolveDaemonPairingOffer(
     let offer = await client.getDaemonPairingOffer({
       timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
       clientName,
+      role,
     });
     if (!offer.relayEnabled && enableRelay) {
       if (serverInfo.features.relayConfig !== true) {
@@ -159,6 +184,7 @@ async function resolveDaemonPairingOffer(
         offer = await client.getDaemonPairingOffer({
           timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
           clientName,
+          role,
         });
       } catch (error) {
         throw new Error(
@@ -172,6 +198,7 @@ async function resolveDaemonPairingOffer(
       url: offer.url || null,
       qr: offer.qr ?? null,
       clientName: offer.clientName,
+      role: offer.role ?? role ?? DEFAULT_PAIRING_ROLE,
     };
   } finally {
     await client.close().catch(() => undefined);
@@ -201,8 +228,13 @@ export async function runPairCommand(options: PairOptions): Promise<void> {
   const target = options.daemonTarget;
   const resolveOffer = (enableRelay: boolean) =>
     target.kind === "instance"
-      ? resolveLocalPairingOffer({ paseoHome: target.home, enableRelay, clientName: options.name })
-      : resolveDaemonPairingOffer(target, enableRelay, options.name);
+      ? resolveLocalPairingOffer({
+          paseoHome: target.home,
+          enableRelay,
+          clientName: options.name,
+          role: options.role,
+        })
+      : resolveDaemonPairingOffer(target, enableRelay, options.name, options.role);
   const offline = target.kind === "instance" && !(await readDaemonInstance(target.home));
   const pairing = await resolveOffer(options.relay === true);
 
@@ -239,6 +271,7 @@ function outputPairingResult(
   const offer = parseConnectionOfferFromUrl(pairing.url);
   const connectionUri = offer ? serializeRelayConnectionUri({ offer }) : null;
   const clientName = offer?.clientName ?? pairing.clientName;
+  const role = offer?.role ?? pairing.role;
 
   if (options.json) {
     output.writeStdout(
@@ -249,6 +282,7 @@ function outputPairingResult(
           qr: pairing.qr,
           connectionUri,
           clientName,
+          role,
         },
         null,
         2,
@@ -263,6 +297,7 @@ function outputPairingResult(
       qr: pairing.qr,
       connectionUri,
       clientName,
+      role,
       columns: output.columns,
     }),
   );

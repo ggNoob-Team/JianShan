@@ -240,7 +240,10 @@
               <p class="eyebrow">成员入口</p>
               <h2 id="roles-heading">角色</h2>
             </div>
-            <p>角色名称即 <code>paseo daemon pair --name</code> 中的名称。</p>
+            <p>
+              角色名称即 <code>paseo daemon pair --name</code>，角色类型对应
+              <code>--role admin|member</code>。
+            </p>
           </div>
           <div class="split-grid roles-layout">
             <article class="panel">
@@ -248,8 +251,14 @@
               <form id="role-form" class="stack-form">
                 <label for="role-name">角色名称</label>
                 <input id="role-name" maxlength="120" required placeholder="例如：书记一" />
+                <label for="role-access-role">角色类型</label>
+                <select id="role-access-role">
+                  <option value="member" selected>成员（member）</option>
+                  <option value="admin">管理员（admin，显示团队入口）</option>
+                </select>
                 <p class="helper">
-                  生成的二维码可重复使用；同一名称即使来自不同设备也归为同一角色。
+                  生成的二维码可重复使用；admin 角色会在客户端左侧显示团队入口，member
+                  只显示普通工作区。
                 </p>
                 <button class="primary-button" type="submit">生成配对二维码</button>
               </form>

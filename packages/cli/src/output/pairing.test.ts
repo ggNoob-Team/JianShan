@@ -26,6 +26,18 @@ describe("formatPairingInstructions", () => {
     expect(output).toContain("Scan to pair as Harmony Emulator:");
   });
 
+  it("labels an admin pairing link", () => {
+    const output = formatPairingInstructions({
+      qr: QR,
+      url: URL,
+      columns: 80,
+      clientName: "Harmony Emulator",
+      role: "admin",
+    });
+
+    expect(output).toContain("Scan to pair as Harmony Emulator (admin):");
+  });
+
   it("does not print a QR that would reach the terminal edge", () => {
     const output = formatPairingInstructions({ qr: QR, url: URL, columns: 6 });
 
