@@ -325,6 +325,25 @@ textarea {
   background: var(--surface-2);
 }
 
+.segmented-button {
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+}
+
+.segmented-button:hover {
+  color: var(--text);
+}
+
+.segmented-button.active,
+.segmented-button[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
 .ghost-button {
   min-height: 36px;
   padding: 0 10px;

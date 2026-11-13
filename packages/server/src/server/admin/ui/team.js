@@ -168,7 +168,9 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", () => {
       state.days = Number(button.dataset.days);
       for (const item of document.querySelectorAll("[data-days]")) {
-        item.classList.toggle("active", item === button);
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", String(active));
       }
       void loadTeam().catch((error) => {
         $("#team-content").innerHTML =
