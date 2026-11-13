@@ -1541,11 +1541,6 @@ export const ptBR: TranslationResources = {
     },
     team: {
       label: "Equipe",
-      unavailableTitle: "Página da equipe indisponível",
-      unavailableMessage:
-        "Este host usa um daemon mais antigo ou o console de administração local não está em execução.",
-      openFailedTitle: "Não foi possível abrir a página da equipe",
-      openFailedMessage: "O console de administração não publicou uma URL utilizável.",
     },
     help: {
       trigger: "Ajuda e suporte",

@@ -9,6 +9,16 @@ import {
   type PairingRole,
 } from "@getpaseo/protocol/agent-actor";
 import type { AgentUsage } from "@getpaseo/protocol/agent-types";
+import type {
+  TeamHeatmapDay as HeatmapDay,
+  TeamMemberInsights as MemberInsights,
+  TeamInsights,
+} from "@getpaseo/protocol/team-insights";
+export type {
+  TeamHeatmapDay as HeatmapDay,
+  TeamMemberInsights as MemberInsights,
+  TeamInsights,
+} from "@getpaseo/protocol/team-insights";
 
 export interface AdminAgentRecord {
   id: string;
@@ -97,55 +107,6 @@ export interface AdminSnapshot {
   ownershipAudit: OwnershipAuditEntry[];
   projects: AdminProjectRecord[];
   workspaces: AdminWorkspaceRecord[];
-}
-
-export interface MemberInsights {
-  id: string;
-  name: string;
-  seconds: number;
-  sessions: number;
-  projects: Array<{ key: string; label: string; seconds: number; share: number }>;
-  timeComponents: Array<{ key: string; label: string; seconds: number; share: number }>;
-  sessionDistribution: Array<{
-    key: string;
-    label: string;
-    seconds: number;
-    share: number;
-  }>;
-  questionCount: number;
-  acceptedQuestionCount: number;
-  completedTurns: number;
-  tokenDataAvailable: boolean;
-  inputTokens: number;
-  cachedInputTokens: number;
-  outputTokens: number;
-  totalCostUsd: number;
-  lastActiveAt: string | null;
-  heatmap: HeatmapDay[];
-}
-
-export interface HeatmapDay {
-  date: string;
-  slots: number[];
-}
-
-export interface TeamInsights {
-  generatedAt: string;
-  start: string;
-  end: string;
-  timeZone: string;
-  members: MemberInsights[];
-  unassigned: MemberInsights;
-  summary: {
-    totalSeconds: number;
-    sessions: number;
-    questions: number;
-    completedTurns: number;
-    inputTokens: number;
-    cachedInputTokens: number;
-    outputTokens: number;
-    totalCostUsd: number;
-  };
 }
 
 export interface TitleMapItem {

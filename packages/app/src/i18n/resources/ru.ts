@@ -1528,11 +1528,6 @@ export const ru: TranslationResources = {
     },
     team: {
       label: "Команда",
-      unavailableTitle: "Страница команды недоступна",
-      unavailableMessage:
-        "Этот хост использует старый daemon или локальная консоль управления не запущена.",
-      openFailedTitle: "Не удалось открыть страницу команды",
-      openFailedMessage: "Консоль управления не опубликовала доступный URL.",
     },
     help: {
       trigger: "Помощь и поддержка",

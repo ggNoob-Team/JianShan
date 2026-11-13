@@ -1,5 +1,7 @@
 import { AgentMessageSchema } from "./agent-message.js";
 import { AgentActorSchema, ClientNameSchema, PairingRoleSchema } from "./agent-actor.js";
+import { TeamInsightsSchema } from "./team-insights.js";
+export type { TeamInsights } from "./team-insights.js";
 export {
   AgentActorSchema,
   ClientNameSchema,
@@ -1425,6 +1427,14 @@ export const DaemonGetPairingOfferRequestSchema = z.object({
   requestId: z.string(),
   clientName: ClientNameSchema.optional(),
   role: PairingRoleSchema.optional(),
+});
+
+export const DaemonTeamGetRequestSchema = z.object({
+  type: z.literal("daemon.team.get.request"),
+  requestId: z.string(),
+  start: z.string(),
+  end: z.string(),
+  timeZone: z.string().optional(),
 });
 
 export const DaemonConfigReloadRequestSchema = z.object({
@@ -3850,6 +3860,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WaitForFinishRequestSchema,
   DaemonGetStatusRequestSchema,
   DaemonGetPairingOfferRequestSchema,
+  DaemonTeamGetRequestSchema,
   DaemonConfigReloadRequestSchema,
   HubManagementDaemonConnectRequestSchema,
   HubManagementDaemonGetStatusRequestSchema,
@@ -5719,7 +5730,6 @@ export const DaemonGetStatusResponseSchema = z.object({
       nodePath: z.string(),
       startedAt: z.string().nullable().optional(),
       listen: z.string().nullable(),
-      adminUrl: z.string().nullable().optional(),
       relay: z
         .object({
           enabled: z.boolean(),
@@ -5787,6 +5797,16 @@ export const DaemonGetPairingOfferResponseSchema = z.object({
       relayEnabled: z.boolean(),
       clientName: ClientNameSchema.optional(),
       role: PairingRoleSchema.optional(),
+    })
+    .passthrough(),
+});
+
+export const DaemonTeamGetResponseSchema = z.object({
+  type: z.literal("daemon.team.get.response"),
+  payload: z
+    .object({
+      requestId: z.string(),
+      team: TeamInsightsSchema,
     })
     .passthrough(),
 });
@@ -7809,6 +7829,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   SetVoiceModeResponseMessageSchema,
   DaemonGetStatusResponseSchema,
   DaemonGetPairingOfferResponseSchema,
+  DaemonTeamGetResponseSchema,
   DaemonConfigReloadResponseSchema,
   HubManagementDaemonConnectResponseSchema,
   HubManagementDaemonGetStatusResponseSchema,
@@ -8071,6 +8092,7 @@ export type ListProviderFeaturesResponseMessage = z.infer<
 export type ListAvailableProvidersResponse = z.infer<typeof ListAvailableProvidersResponseSchema>;
 export type DaemonGetStatusResponse = z.infer<typeof DaemonGetStatusResponseSchema>;
 export type DaemonGetPairingOfferResponse = z.infer<typeof DaemonGetPairingOfferResponseSchema>;
+export type DaemonTeamGetResponse = z.infer<typeof DaemonTeamGetResponseSchema>;
 export type DaemonConfigReloadResponse = z.infer<typeof DaemonConfigReloadResponseSchema>;
 export type DiagnosticsResponse = z.infer<typeof DiagnosticsResponseSchema>;
 export type GetProvidersSnapshotResponseMessage = z.infer<

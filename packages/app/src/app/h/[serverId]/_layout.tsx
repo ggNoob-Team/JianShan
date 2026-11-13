@@ -42,6 +42,7 @@ function KnownHostRoute() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="quick-input" />
+      <Stack.Screen name="team" />
       <Stack.Screen name="workspace/[workspaceId]/index" />
       <Stack.Screen name="agent/[agentId]" options={AGENT_SCREEN_OPTIONS} />
       <Stack.Screen name="sessions" />

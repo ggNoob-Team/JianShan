@@ -11,12 +11,12 @@ import {
 } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useHostRouteServerId } from "@/navigation/host-route-context";
-import { useHostRuntimeClient, useHosts } from "@/runtime/host-runtime";
+import { useHosts } from "@/runtime/host-runtime";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { canCreateWorktreeForProjectKind } from "@/projects/host-projects";
 import { useHostFeature } from "@/runtime/host-features";
@@ -33,12 +33,11 @@ import {
 } from "@/stores/navigation-active-workspace-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
 import { resolveHostRole } from "@/types/host-connection";
-import { openExternalUrl } from "@/utils/open-external-url";
-import { buildTeamPageUrl } from "@/sidebar-nav/team-page-link";
 import {
   buildNewWorkspaceRoute,
   buildNotesRoute,
   buildHostQuickInputRoute,
+  buildHostTeamRoute,
   buildRecentRoute,
   buildSchedulesRoute,
   buildSessionsRoute,
@@ -263,29 +262,14 @@ export function SidebarTeamRow({ onBeforeNavigate }: SidebarNavRowProps) {
   const hosts = useHosts();
   const serverId =
     routeServerId ?? activeWorkspaceSelection?.serverId ?? lastWorkspaceSelection?.serverId ?? null;
-  const client = useHostRuntimeClient(serverId ?? "");
   const host = serverId ? hosts.find((entry) => entry.serverId === serverId) : undefined;
   const isAdmin = host ? resolveHostRole(host) === "admin" : false;
 
-  const openTeamPage = useCallback(async () => {
-    if (!client) return;
+  const handlePress = useCallback(() => {
+    if (!serverId) return;
     onBeforeNavigate?.();
-    try {
-      const status = await client.getDaemonStatus({ timeout: 3_000 });
-      const url = buildTeamPageUrl(status.adminUrl);
-      if (!url) {
-        Alert.alert(t("sidebar.team.unavailableTitle"), t("sidebar.team.unavailableMessage"));
-        return;
-      }
-      await openExternalUrl(url);
-    } catch (error) {
-      Alert.alert(
-        t("sidebar.team.openFailedTitle"),
-        error instanceof Error ? error.message : t("sidebar.team.openFailedMessage"),
-      );
-    }
-  }, [client, onBeforeNavigate, t]);
-  const handlePress = useCallback(() => void openTeamPage(), [openTeamPage]);
+    router.push(buildHostTeamRoute(serverId));
+  }, [onBeforeNavigate, serverId]);
 
   if (!serverId || !isAdmin) return null;
 

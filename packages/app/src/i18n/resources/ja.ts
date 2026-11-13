@@ -1524,11 +1524,6 @@ export const ja: TranslationResources = {
     },
     team: {
       label: "チーム",
-      unavailableTitle: "チームページを利用できません",
-      unavailableMessage:
-        "このホストは古い daemon に接続しているか、ローカル管理コンソールが起動していません。",
-      openFailedTitle: "チームページを開けませんでした",
-      openFailedMessage: "管理コンソールが有効な URL を公開していません。",
     },
     help: {
       trigger: "ヘルプとサポート",

@@ -420,6 +420,14 @@ export function buildHostSessionsRoute(serverId: string) {
   return `${base}/sessions` as const;
 }
 
+export function buildHostTeamRoute(serverId: string) {
+  const base = buildHostRootRoute(serverId);
+  if (base === "/") {
+    return "/" as const;
+  }
+  return `${base}/team` as const;
+}
+
 export function buildHostQuickInputRoute(serverId: string) {
   const base = buildHostRootRoute(serverId);
   if (base === "/") {

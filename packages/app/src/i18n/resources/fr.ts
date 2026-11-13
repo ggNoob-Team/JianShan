@@ -1547,11 +1547,6 @@ export const fr: TranslationResources = {
     },
     team: {
       label: "Équipe",
-      unavailableTitle: "Page de l’équipe indisponible",
-      unavailableMessage:
-        "Cet hôte utilise un daemon plus ancien ou la console d’administration n’est pas en cours d’exécution.",
-      openFailedTitle: "Impossible d’ouvrir la page de l’équipe",
-      openFailedMessage: "La console d’administration n’a pas publié d’URL utilisable.",
     },
     help: {
       trigger: "Aide et assistance",

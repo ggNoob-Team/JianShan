@@ -117,6 +117,7 @@ import type {
   UsageReportEntry,
   DaemonGetStatusResponse,
   DaemonGetPairingOfferResponse,
+  DaemonTeamGetResponse,
   DaemonConfigReloadResponse,
   DiagnosticsResponse,
   AgentRewindResponseMessage,
@@ -641,6 +642,7 @@ interface UsageListReportsPayload {
 }
 type DaemonStatusPayload = DaemonGetStatusResponse["payload"];
 type DaemonPairingOfferPayload = DaemonGetPairingOfferResponse["payload"];
+type DaemonTeamGetPayload = DaemonTeamGetResponse["payload"];
 type DiagnosticsPayload = DiagnosticsResponse["payload"];
 type ReadProjectConfigPayload = Extract<
   SessionOutboundMessage,
@@ -827,6 +829,13 @@ export interface DaemonPairingOfferOptions {
   timeout?: number;
   clientName?: string;
   role?: PairingRole;
+}
+export interface DaemonTeamGetOptions {
+  start: string;
+  end: string;
+  timeZone?: string;
+  requestId?: string;
+  timeout?: number;
 }
 type DaemonUpdateResponse = z.infer<typeof DaemonUpdateResponseSchema>;
 type FetchAgentsPayload = Extract<
@@ -6195,6 +6204,20 @@ export class DaemonClient {
       },
       responseType: "daemon.get_pairing_offer.response",
       timeout: options?.timeout,
+    });
+  }
+
+  async getDaemonTeamInsights(options: DaemonTeamGetOptions): Promise<DaemonTeamGetPayload> {
+    return this.sendCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: {
+        type: "daemon.team.get.request",
+        start: options.start,
+        end: options.end,
+        ...(options.timeZone ? { timeZone: options.timeZone } : {}),
+      },
+      responseType: "daemon.team.get.response",
+      timeout: options.timeout,
     });
   }
 

@@ -100,9 +100,11 @@ values in the pairing offer and sends the name with every prompt. Team views
 group questions by that name and use `createdBy` for current session ownership.
 
 The admin role controls one client surface: it adds **团队** to the left sidebar.
-The entry opens the admin console's standalone `/team` page. That page and
-`/api/team/public` do not require the admin key. Do not expose the admin console
-beyond a trusted network unless the team view is intentionally public there.
+The entry opens a client-native team page at `/h/:serverId/team`. It requests
+the same team aggregation from `daemon.team.get.request`; it does not open the
+admin console in a browser. The admin console still exposes its standalone
+`/team` page and `/api/team/public` without the admin key. Do not expose the
+admin console beyond a trusted network unless that public team view is intended.
 
 Transferring an owner updates `createdBy` and appends an event to
 `$PASEO_HOME/admin/ownership-audit.jsonl`. Historical question attribution does
