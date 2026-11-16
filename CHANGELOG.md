@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.13.8 - 2026-11-16
+
+Team roles, an embedded team view, steadier directory sync, and full Codex history on resume.
+
+### Added
+
+- Added pairing roles, so a host can grant a client a role when it pairs.
+- Added the admin team view and embedded it in the client, with per-member sessions, questions and model usage.
+- Added a date-range selector to the team view.
+
+### Improved
+
+- Kept directory subscriptions alive while a demand refresh is in flight, so release/reacquire cycles cannot reject the refresh promise.
+
+### Fixed
+
+- Fixed reopening an idle Codex agent showing only the tail of the thread; the persisted transcript now loads before the live window.
+- Fixed the team view ignoring the selected date range.
+
 ## 0.13.24 - 2026-11-06
 
 JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup, and a composer that stays put.
