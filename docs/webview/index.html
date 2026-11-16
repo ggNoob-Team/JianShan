@@ -644,8 +644,8 @@
         需求可视化、会话收纳、个人知识库、本地意图目录、设备 / 环境感知以及消息 / 实时聊天；P2
         才是任务闭环、分布式 Agent、通用办公、通用 Agent、AI 手套与新书。<br />
         下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android 固定直链
-        <code>https://paseo.zxyz.app/apk/paseo-latest.apk</code> · 桌面端 Windows 与 macOS
-        均已更新到 GitHub Release v0.13.7 · 鸿蒙 AppGallery 邀请测试。
+        <code>https://paseo.zxyz.app/apk/paseo-latest.apk</code> · 桌面端 Windows、macOS 与 Linux
+        均已更新到 GitHub Release v0.13.8 · 鸿蒙 AppGallery 邀请测试。
       </div>
 
       <div class="tabs" id="tabs">
@@ -2239,24 +2239,27 @@
       </div>
       <div class="pane" id="pane-download">
         <section>
-          <h2>桌面端 <span class="n">WINDOWS V0.13.7 / MACOS V0.13.7 · GITHUB RELEASE</span></h2>
+          <h2>
+            桌面端
+            <span class="n">WINDOWS V0.13.8 / MACOS V0.13.8 / LINUX V0.13.8 · GITHUB RELEASE</span>
+          </h2>
           <div class="grid">
             <div class="card">
               <div class="t">Windows 安装包<span class="badge b-live">EXE</span></div>
               <div class="d">
-                Paseo-Setup-0.13.7.exe · 约 277 MB · Windows 10/11（x64 + arm64 通用安装器）
+                Paseo-Setup-0.13.8.exe · 约 277 MB · Windows 10/11（x64 + arm64 通用安装器）
               </div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.7/Paseo-Setup-0.13.7.exe"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-Setup-0.13.8.exe"
                   >下载 Windows 版</a
                 >
               </div>
               <div class="src">
-                GitHub Release v0.13.7 ·
+                GitHub Release v0.13.8 ·
                 <a
-                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.13.7"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.13.8"
                   style="color: var(--accent, #38bdf8)"
                   >Release 页面</a
                 >还有 x64 / arm64 单独安装器与 zip
@@ -2264,17 +2267,52 @@
             </div>
             <div class="card">
               <div class="t">macOS 安装包<span class="badge b-live">DMG</span></div>
-              <div class="d">Paseo-0.13.7-arm64.dmg · 约 179 MB · Apple Silicon（M 系列芯片）</div>
+              <div class="d">Paseo-0.13.8-arm64.dmg · 约 179 MB · Apple Silicon（M 系列芯片）</div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.7/Paseo-0.13.7-arm64.dmg"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-0.13.8-arm64.dmg"
                   >下载 macOS 版</a
                 >
               </div>
               <div class="src">
                 首次打开若提示「无法验证开发者 / 已损坏」：右键 → 打开，或终端执行 sudo xattr -cr
                 /Applications/Paseo.app
+              </div>
+            </div>
+            <div class="card">
+              <div class="t">
+                Linux 安装包<span class="badge b-live">APPIMAGE · DEB · RPM</span>
+              </div>
+              <div class="d">
+                Paseo-x86_64.AppImage · 约 161 MB · x86_64（也提供 deb / rpm / tar.gz）
+              </div>
+              <div class="card-actions">
+                <a
+                  class="primary-button"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-x86_64.AppImage"
+                  >下载 AppImage</a
+                >
+              </div>
+              <div class="src">
+                GitHub Release v0.13.8 ·
+                <a
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-0.13.8-amd64.deb"
+                  style="color: var(--accent, #38bdf8)"
+                  >deb</a
+                >
+                ·
+                <a
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-0.13.8-x86_64.rpm"
+                  style="color: var(--accent, #38bdf8)"
+                  >rpm</a
+                >
+                ·
+                <a
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.8/Paseo-0.13.8-x64.tar.gz"
+                  style="color: var(--accent, #38bdf8)"
+                  >tar.gz</a
+                >
               </div>
             </div>
           </div>
@@ -2346,6 +2384,9 @@
       </div>
 
       <footer>
+        更新于 <code>2026-11-16 11:10 CST</code> · 下载页升级到 <code>v0.13.8</code>:Windows
+        <code>Paseo-Setup-0.13.8.exe</code>、macOS arm64 DMG、Linux AppImage / deb / rpm /
+        tar.gz,以及 Android arm64 APK(<code>b2822455…</code>)。<br />
         更新于 <code>2026-11-12 17:55 CST</code> · AI
         手套需求补充产品视频：TapBand、Mudra、MANUS、SenseGlove、Rokoko、StretchSense、Neofect、HaptX、Dexmo
         均加入可点击演示链接，并补充柔性触觉手套与手语翻译手套研究演示。未新增需求项，计划中仍
