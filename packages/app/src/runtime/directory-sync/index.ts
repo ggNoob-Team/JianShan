@@ -207,7 +207,9 @@ export class DirectorySync {
     const wasDemanded = this.fullDemandSources.size > 0;
     if (demanded) this.fullDemandSources.add(source);
     else this.fullDemandSources.delete(source);
-    if (!this.hasDemand()) this.releaseSubscriptions();
+    // React StrictMode can release and reacquire demand in the same render pass. Keep the live
+    // subscriptions until the in-flight refresh settles so release cannot reject its ready promise.
+    if (!this.hasDemand() && !this.demandRefresh) this.releaseSubscriptions();
     if (!wasDemanded && this.fullDemandSources.size > 0) {
       void this.loadCachedDirectory().catch(() => undefined);
       if (this.getOnlineConnection()) void this.requestDemandRefresh().catch(() => undefined);
@@ -224,7 +226,7 @@ export class DirectorySync {
     }
     this.routeDemandIds.clear();
     for (const agentId of next) this.routeDemandIds.add(agentId);
-    if (!this.hasDemand()) this.releaseSubscriptions();
+    if (!this.hasDemand() && !this.demandRefresh) this.releaseSubscriptions();
     if (this.routeDemandIds.size > 0 && this.getOnlineConnection()) {
       void this.requestDemandRefresh().catch(() => undefined);
     }
@@ -390,6 +392,8 @@ export class DirectorySync {
             current.connectionEpoch !== source.connectionEpoch)
         ) {
           void this.requestDemandRefresh().catch(() => undefined);
+        } else if (!this.hasDemand()) {
+          this.releaseSubscriptions();
         }
       });
     return this.demandRefresh;

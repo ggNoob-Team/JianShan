@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import type { OwnedSubscription } from "@getpaseo/client";
 import { ReplicaCache } from "@/runtime/replica-cache";
 import {
   createSqliteReplicaRowStore,
@@ -33,6 +34,22 @@ type ProjectListResult = Awaited<ReturnType<DaemonClient["listProjects"]>>;
 type AgentFetchResult = Awaited<ReturnType<DaemonClient["fetchAgents"]>>;
 type WorkspaceScriptsResult = Awaited<ReturnType<DaemonClient["listWorkspaceScripts"]>>;
 
+function rejectReadyOnRelease<T>(subscription: OwnedSubscription<T>): OwnedSubscription<T> {
+  let rejectReady!: (error: Error) => void;
+  const released = new Promise<never>((_, reject) => {
+    rejectReady = reject;
+  });
+  return {
+    subscriptionId: subscription.subscriptionId,
+    ready: Promise.race([subscription.ready, released]),
+    subscribe: (observer) => subscription.subscribe(observer),
+    release: () => {
+      rejectReady(new Error("Subscription released"));
+      return subscription.release();
+    },
+  };
+}
+
 class FakeDirectoryClient {
   supportsBackgroundWorkspaces(): boolean {
     return false;
@@ -42,6 +59,8 @@ class FakeDirectoryClient {
   listWorkspaceLabelsCalls = 0;
   fetchAgentsCalls = 0;
   lastAgentOptions: unknown;
+  rejectAgentReadyOnRelease = false;
+  rejectWorkspaceReadyOnRelease = false;
   fetchWorkspacesCalls = 0;
   lastWorkspaceOptions: unknown;
   listProjectsCalls = 0;
@@ -151,15 +170,18 @@ class FakeDirectoryClient {
   }
 
   observeAgents(options: Parameters<DaemonClient["observeAgents"]>[0]) {
-    return subscriptionFixture(this.fetchAgents({ ...options, subscribe: {} }), (receive) =>
-      this.on("agent_update", receive),
+    const subscription = subscriptionFixture(
+      this.fetchAgents({ ...options, subscribe: {} }),
+      (receive) => this.on("agent_update", receive),
     );
+    return this.rejectAgentReadyOnRelease ? rejectReadyOnRelease(subscription) : subscription;
   }
 
   observeWorkspaces(options: Parameters<DaemonClient["observeWorkspaces"]>[0]) {
-    return subscriptionFixture(this.fetchWorkspaces(options), (receive) =>
+    const subscription = subscriptionFixture(this.fetchWorkspaces(options), (receive) =>
       this.on("workspace_update", receive),
     );
+    return this.rejectWorkspaceReadyOnRelease ? rejectReadyOnRelease(subscription) : subscription;
   }
 
   observeEvents(events: readonly SessionOutboundMessage["type"][]) {
@@ -589,6 +611,48 @@ describe("DirectorySync session readiness", () => {
 
     expect(client.fetchAgentsCalls).toBe(1);
     expect(client.fetchWorkspacesCalls).toBe(1);
+    directory.dispose();
+  });
+
+  it("keeps the directory refresh alive when demand is released and reacquired", async () => {
+    const serverId = "reacquired-directory-demand";
+    const { client, directory } = createDirectory(serverId);
+    client.rejectAgentReadyOnRelease = true;
+    client.rejectWorkspaceReadyOnRelease = true;
+    const releaseAgents = client.holdAgentFetch();
+    const releaseWorkspaces = client.holdWorkspaceFetch();
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+    store.updateSessionServerInfo(serverId, {
+      serverId,
+      hostname: null,
+      version: "test",
+      features: { workspaceMultiplicity: true },
+    });
+
+    const firstDemand = {};
+    directory.setDemand(firstDemand, true);
+    await expect.poll(() => client.fetchAgentsCalls).toBe(1);
+    await expect.poll(() => client.fetchWorkspacesCalls).toBe(1);
+
+    directory.setDemand(firstDemand, false);
+    directory.setDemand({}, true);
+    releaseAgents({
+      requestId: "agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    releaseWorkspaces({
+      requestId: "workspaces",
+      entries: [createWorkspaceEntry("workspace-1")],
+      emptyProjects: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+
+    await Promise.allSettled([directory.refreshDemand()]);
+
+    const workspaces = useSessionStore.getState().sessions[serverId]?.workspaces;
+    expect([...(workspaces?.keys() ?? [])]).toContain("workspace-1");
     directory.dispose();
   });
 

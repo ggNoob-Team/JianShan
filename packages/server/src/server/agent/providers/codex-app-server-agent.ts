@@ -3651,8 +3651,10 @@ export class CodexAppServerAgentSession implements AgentSession {
       await this.loadSkills();
 
       if (this.currentThreadId) {
-        await this.ensureThreadLoaded();
+        // Resume narrows a paginated thread to its live window. Read the persisted thread first
+        // so reopening an idle agent restores the full transcript instead of only the tail.
         await this.loadPersistedHistory(this.client);
+        await this.ensureThreadLoaded();
         await this.applyDefaultModelAndThinking();
       }
 
