@@ -82,6 +82,26 @@ for (const viewport of VIEWPORTS) {
       );
       await expect(page.getByText("Refreshed note body", { exact: true })).toBeVisible();
       await captureDialog(page, testInfo, `project-notes-${viewport.name}-after-refresh`);
+
+      await page.getByTestId(`note-details-${note.noteId}`).click();
+      const detail = page.getByTestId("project-notes-detail");
+      await expect(detail).toBeVisible();
+      await expect(detail.getByText("Refreshed note title", { exact: true })).toBeVisible();
+      await expect(page).toHaveURL(workspaceUrl);
+      await expectDialogSettled(page, viewport.name === "compact");
+      await captureDialog(page, testInfo, `project-notes-${viewport.name}-detail`);
+
+      await page.getByTestId("note-edit").click();
+      await page.getByTestId("note-title-input").fill("Dialog edited title");
+      await page.getByTestId("note-save").first().click();
+      await expect(detail.getByText("Dialog edited title", { exact: true })).toBeVisible();
+
+      await page.getByTestId("sheet-header-back").click();
+      await expect(page.getByTestId("project-notes-list")).toBeVisible();
+      await expect(page.getByTestId(`note-row-${note.noteId}`)).toContainText(
+        "Dialog edited title",
+      );
+      await expect(page).toHaveURL(workspaceUrl);
     } finally {
       await workspace.cleanup();
     }

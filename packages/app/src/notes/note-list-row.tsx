@@ -12,22 +12,32 @@ import { buildNotePreviewSegments, type NotePreviewSegment } from "./note-previe
 
 /**
  * One note in a list: title, a four-line preview of the content, where it came
- * from, and a way into the detail screen.
+ * from, and a way into the detail view.
  *
  * The row itself is not a button — tapping the text does nothing, so a link
  * inside the preview can be tapped without opening the note. Links keep working
  * in the shortened preview; anything cut off by the ellipsis is reached through
- * the details screen.
+ * the detail view.
  */
-export const NoteListRow = memo(function NoteListRow({ note }: { note: HostNote }): ReactElement {
+export const NoteListRow = memo(function NoteListRow({
+  note,
+  onOpen,
+}: {
+  note: HostNote;
+  onOpen?: (note: HostNote) => void;
+}): ReactElement {
   const { t } = useTranslation();
   const timeLabel = useCompactTimeAgo(new Date(note.updatedAt));
   const preview = useMemo(() => buildNotePreviewSegments(note.text), [note.text]);
   const copyLink = useCopyLink();
 
   const handleOpen = useCallback(() => {
+    if (onOpen) {
+      onOpen(note);
+      return;
+    }
     router.push({ pathname: "/notes/[noteId]", params: { noteId: note.noteId } });
-  }, [note.noteId]);
+  }, [note, onOpen]);
 
   return (
     <View style={styles.row} testID={`note-row-${note.noteId}`}>
