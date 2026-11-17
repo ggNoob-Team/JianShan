@@ -8,6 +8,7 @@ const member = {
   seconds: 540,
   sessions: 2,
   projects: [{ key: "见山", label: "见山", seconds: 540, share: 1 }],
+  accounts: [{ key: "codex", label: "codex", seconds: 540, share: 1 }],
   timeComponents: [{ key: "agent", label: "AI 运行", seconds: 540, share: 1 }],
   sessionDistribution: [{ key: "agent-1", label: "团队页", seconds: 540, share: 1 }],
   questionCount: 3,

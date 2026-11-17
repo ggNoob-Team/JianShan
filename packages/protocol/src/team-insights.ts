@@ -18,6 +18,7 @@ export const TeamMemberInsightsSchema = z.object({
   seconds: z.number(),
   sessions: z.number(),
   projects: z.array(TeamMetricBucketSchema),
+  accounts: z.array(TeamMetricBucketSchema),
   timeComponents: z.array(TeamMetricBucketSchema),
   sessionDistribution: z.array(TeamMetricBucketSchema),
   questionCount: z.number(),

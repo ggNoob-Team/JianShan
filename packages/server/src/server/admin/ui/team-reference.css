@@ -1,0 +1,1358 @@
+/* Team analytics reference layout, ported from the myAgents team page. */
+.team-reference-page {
+  --bg: #f4f6fb;
+  --card: #fff;
+  --line: #e2e7f0;
+  --ink: #1c2333;
+  --muted: #6b7688;
+  --accent: #3b5ea8;
+  --green: #1f8a52;
+  --amber: #b7791f;
+  --red: #c0392b;
+  --violet: #6b4fbb;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    15px/1.6 "Noto Sans CJK SC",
+    "PingFang SC",
+    "Microsoft YaHei",
+    system-ui,
+    sans-serif;
+}
+
+#view-team.team-reference-page {
+  display: block;
+  min-height: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.team-reference-page *,
+.reference-team-body * {
+  box-sizing: border-box;
+}
+
+.team-reference-page button {
+  font: inherit;
+}
+
+.team-reference-page .portal-header {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
+.team-reference-page .header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.team-reference-page .route-nav {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 1440px;
+  margin: 0 auto 10px;
+  color: #5e6a7f;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.team-reference-page .route-nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #52617a;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.team-reference-page .route-nav button:hover {
+  background: #eef3ff;
+  color: #274f9b;
+}
+
+.team-reference-page .route-nav button.active {
+  background: #e5edff;
+  color: #1f4f9a;
+  font-weight: 700;
+}
+
+.team-reference-page .breadcrumb {
+  min-width: 0;
+  margin: 0 0 8px;
+  color: #8791a3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.team-reference-page .breadcrumb ol {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-reference-page .breadcrumb li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.team-reference-page .breadcrumb li + li::before {
+  margin: 0 7px;
+  color: #b1b8c5;
+  content: "/";
+}
+
+.team-reference-page .breadcrumb button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #61708a;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.team-reference-page .breadcrumb button:hover {
+  color: #3b5ea8;
+  text-decoration: underline;
+}
+
+.team-reference-page .breadcrumb [aria-current="page"] {
+  min-width: 0;
+  color: #2b3547;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.team-reference-page .team-page-header .header-row {
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.team-reference-page .team-page-header-compact .header-row {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.team-reference-page .team-page-header-compact {
+  position: relative;
+}
+
+.team-reference-page .team-page-header-compact .route-nav {
+  padding-right: 280px;
+  margin-bottom: 0;
+}
+
+.team-reference-page .team-page-title h1 {
+  margin: 4px 0 3px;
+  color: var(--ink);
+  font-size: 23px;
+  line-height: 1.6;
+}
+
+.team-reference-page .team-page-title p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.team-reference-page .team-page-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+#view-team .team-overview-heading {
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+#view-team .team-overview-heading > div:first-child {
+  min-width: 0;
+}
+
+#view-team .team-overview-heading .eyebrow {
+  margin-bottom: 2px;
+}
+
+#view-team .team-overview-heading h2 {
+  margin-bottom: 4px;
+}
+
+#view-team .team-overview-heading p:last-child {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.team-reference-page .badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.team-reference-page .action-button {
+  display: inline-block;
+  margin: 2px 0 2px 8px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.team-reference-page .action-button:hover {
+  filter: brightness(0.96);
+}
+
+.team-reference-page .team-page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 10px 16px 24px;
+}
+
+#view-team .team-page {
+  max-width: none;
+  padding: 0;
+}
+
+.team-reference-page .team-console {
+  margin: 0;
+  box-shadow: 0 14px 36px rgba(31, 55, 95, 0.08);
+}
+
+.team-reference-page .personal-console {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.team-reference-page .team-console-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.team-reference-page .team-cache-status {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.team-reference-page .personal-date-picker {
+  position: relative;
+  flex: 1 1 290px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-range-trigger {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 9px;
+  width: 100%;
+  min-height: 38px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f7f9fd;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-reference-page .personal-range-trigger:hover {
+  background: #f0f5fd;
+}
+
+.team-reference-page .personal-range-trigger:focus-visible {
+  outline: 3px solid rgba(52, 89, 166, 0.22);
+  outline-offset: 2px;
+}
+
+.team-reference-page .personal-range-trigger-label {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.team-reference-page .personal-range-trigger strong {
+  grid-column: 2;
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.team-reference-page .personal-range-chevron {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.team-reference-page .personal-range-trigger[aria-expanded="true"] .personal-range-chevron {
+  transform: rotate(180deg);
+}
+
+.team-reference-page .ghost {
+  min-height: 38px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.team-reference-page .personal-calendar-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  z-index: 45;
+  width: min(340px, calc(100vw - 16px));
+  padding: 10px;
+  border: 1px solid #cfdaeb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(31, 55, 95, 0.2);
+}
+
+.team-reference-page .personal-calendar-popover[hidden] {
+  display: none;
+}
+
+.team-reference-page .personal-calendar-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.team-reference-page .personal-calendar-quick button,
+.team-reference-page .personal-calendar-nav button,
+.team-reference-page .personal-calendar-foot button {
+  border: 1px solid #d7e1f2;
+  background: #f4f7fd;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.team-reference-page .personal-calendar-quick button {
+  min-height: 28px;
+  padding: 3px 4px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.team-reference-page .personal-calendar-nav {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+  margin: 9px 0 5px;
+}
+
+.team-reference-page .personal-calendar-nav strong {
+  font-size: 12px;
+  text-align: center;
+}
+
+.team-reference-page .personal-calendar-nav button {
+  display: grid;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 18px;
+  line-height: 1;
+  place-items: center;
+}
+
+.team-reference-page .personal-calendar-nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.team-reference-page .personal-calendar-weekdays,
+.team-reference-page .personal-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.team-reference-page .personal-calendar-weekdays {
+  margin-bottom: 3px;
+}
+
+.team-reference-page .personal-calendar-weekdays span {
+  padding: 2px 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.team-reference-page .personal-calendar-grid {
+  gap: 2px 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.team-reference-page .personal-calendar-day {
+  position: relative;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.team-reference-page .personal-calendar-day:hover {
+  background: #eef4ff;
+}
+
+.team-reference-page .personal-calendar-day.outside-month {
+  color: #a2adbd;
+}
+
+.team-reference-page .personal-calendar-day.disabled {
+  color: #c5ccd7;
+  cursor: not-allowed;
+}
+
+.team-reference-page .personal-calendar-day.in-range {
+  background: #e4edff;
+}
+
+.team-reference-page .personal-calendar-day.range-start,
+.team-reference-page .personal-calendar-day.range-end {
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.team-reference-page .personal-calendar-day.today::after {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f59e0b;
+  content: "";
+}
+
+.team-reference-page .personal-calendar-day:focus-visible {
+  z-index: 1;
+  outline: 2px solid #f59e0b;
+  outline-offset: -2px;
+}
+
+.team-reference-page .personal-calendar-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #edf1f7;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.team-reference-page .personal-calendar-foot button {
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.team-reference-page .personal-range-error {
+  display: block;
+  min-height: 0;
+  margin-top: 3px;
+  color: var(--red);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.team-reference-page .personal-range-error:empty {
+  display: none;
+}
+
+.team-reference-page .team-gate {
+  padding: 10px 12px;
+  border: 1px dashed #cfd9ea;
+  border-radius: 9px;
+  background: #f8faff;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.team-reference-page .team-source-warning {
+  margin-bottom: 7px;
+  padding: 7px 10px;
+  border: 1px solid #e6c97a;
+  border-radius: 8px;
+  background: #fff9e8;
+  color: #7a5a00;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.team-reference-page .team-member-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.team-reference-page .team-member-tab {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fbfcff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-reference-page .team-member-tab:hover {
+  background: #f1f5fc;
+}
+
+.team-reference-page .team-member-tab.active {
+  border-color: var(--accent);
+  background: #edf3ff;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.team-reference-page .team-member-tab strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-reference-page .team-member-tab span {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.team-reference-page .team-member-tab.active span {
+  color: var(--accent);
+}
+
+.team-reference-page .personal-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.team-reference-page .personal-stat-grid article {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f9fbff;
+}
+
+.team-reference-page .personal-stat-grid span {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.team-reference-page .personal-stat-grid b {
+  overflow-wrap: anywhere;
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.team-reference-page .personal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+
+.team-reference-page .personal-panel {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.team-reference-page .personal-allocation-panel,
+.team-reference-page .personal-heatmap-panel {
+  grid-column: 1 / -1;
+}
+
+.team-reference-page .personal-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.team-reference-page .personal-panel-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.team-reference-page .personal-panel-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.team-reference-page .personal-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-empty {
+  padding: 8px 9px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.team-reference-page .personal-allocation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-reference-page .personal-session-allocation-section {
+  grid-column: 1 / -1;
+}
+
+.team-reference-page .personal-composition-allocation-section .personal-pie-legend,
+.team-reference-page .personal-project-allocation-section .personal-pie-legend,
+.team-reference-page .personal-host-allocation-section .personal-pie-legend {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-content: start;
+}
+
+.team-reference-page .personal-session-allocation-section .personal-pie-legend {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-content: start;
+}
+
+.team-reference-page .personal-allocation-grid section {
+  min-width: 0;
+  padding: 7px;
+  border-radius: 9px;
+  background: #f8faff;
+}
+
+.team-reference-page .personal-allocation-grid h4 {
+  margin: 0 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.team-reference-page .personal-pie-wrap {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-pie {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  overflow: visible;
+  box-shadow: inset 0 0 0 1px rgba(31, 55, 95, 0.08);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.team-reference-page .personal-pie:hover {
+  transform: translateY(-1px);
+}
+
+.team-reference-page .personal-pie:focus-visible {
+  outline: 3px solid rgba(52, 89, 166, 0.28);
+  outline-offset: 3px;
+}
+
+.team-reference-page .personal-pie.selected {
+  box-shadow:
+    inset 0 0 0 1px rgba(31, 55, 95, 0.08),
+    0 0 0 4px rgba(52, 89, 166, 0.12);
+}
+
+.team-reference-page .personal-pie::after,
+.team-reference-page .personal-pie-center {
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.team-reference-page .personal-pie::after {
+  box-shadow: 0 0 0 1px #edf1f7;
+  content: "";
+}
+
+.team-reference-page .personal-pie-center {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.team-reference-page .personal-pie-center b {
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+
+.team-reference-page .personal-pie-center span {
+  color: var(--muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.team-reference-page .personal-pie-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.team-reference-page .personal-pie-slice {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 1;
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  transition:
+    transform 0.22s ease,
+    opacity 0.22s ease,
+    filter 0.22s ease,
+    stroke-width 0.22s ease;
+  vector-effect: non-scaling-stroke;
+}
+
+.team-reference-page .personal-pie-slice:hover {
+  filter: brightness(1.06);
+}
+
+.team-reference-page .personal-pie.has-selection .personal-pie-slice:not(.popped) {
+  opacity: 0.58;
+}
+
+.team-reference-page .personal-pie-slice.popped {
+  stroke-width: 2;
+  opacity: 1;
+  filter: drop-shadow(0 5px 7px rgba(31, 55, 95, 0.28));
+}
+
+.team-reference-page .personal-pie-legend {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-pie-legend-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 6px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-reference-page .personal-pie-legend-row:hover,
+.team-reference-page .personal-pie-legend-row:focus-visible {
+  background: #eef3ff;
+  outline: none;
+}
+
+.team-reference-page .personal-pie-legend-row.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.team-reference-page .personal-pie-legend-row.active span,
+.team-reference-page .personal-pie-legend-row.active b,
+.team-reference-page .personal-pie-legend-row.active small {
+  color: #fff !important;
+}
+
+.team-reference-page .personal-pie-legend-row i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+}
+
+.team-reference-page .personal-pie-legend-label {
+  position: relative;
+  min-width: 0;
+}
+
+.team-reference-page .personal-pie-legend-short {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-reference-page .personal-pie-legend-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: none;
+  width: max-content;
+  max-width: min(360px, 70vw);
+  padding: 6px 8px;
+  border: 1px solid #d5deeb;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  white-space: normal;
+  box-shadow: 0 8px 24px rgba(31, 55, 95, 0.16);
+}
+
+.team-reference-page .personal-pie-legend-row:hover .personal-pie-legend-tooltip,
+.team-reference-page .personal-pie-legend-row:focus-visible .personal-pie-legend-tooltip {
+  display: block;
+}
+
+.team-reference-page .personal-pie-legend-row span {
+  min-width: 0;
+  color: #41506a;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.team-reference-page .personal-pie-legend-row b {
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.team-reference-page .personal-pie-legend-row small {
+  grid-column: 2 / 4;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.team-reference-page .personal-pie-detail {
+  grid-column: 1 / -1;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f3f6fc;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.team-reference-page .personal-pie-detail b {
+  color: var(--accent);
+}
+
+.team-reference-page .personal-heatmap-head {
+  align-items: flex-start;
+}
+
+.team-reference-page .personal-heat-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 6px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.team-reference-page .personal-heat-legend i {
+  display: inline-block;
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.team-reference-page .personal-heat-legend i.outside {
+  border: 1px solid #e1e5eb;
+  background: repeating-linear-gradient(135deg, #f7f8fa 0 3px, #edf0f4 3px 5px);
+}
+
+.team-reference-page .personal-heat-legend i.empty {
+  background: #d5dce6;
+}
+
+.team-reference-page .personal-heat-legend i.scale {
+  background: linear-gradient(90deg, #bfdbfe, #1e40af);
+}
+
+.team-reference-page .personal-heatmap-detail {
+  min-height: 20px;
+  margin: 0 0 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #f6f8fc;
+  color: #53627d;
+  font-size: 10.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.team-reference-page .personal-heatmap-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-reference-page .personal-heat-day {
+  display: grid;
+  grid-template-columns: 102px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 0;
+  border-top: 1px solid #edf1f7;
+}
+
+.team-reference-page .personal-heat-day:first-child {
+  border-top: 0;
+}
+
+.team-reference-page .personal-heat-day-meta {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-heat-day-meta strong {
+  color: #34415a;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.team-reference-page .personal-heat-day-meta span {
+  color: var(--accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.team-reference-page .personal-heat-half-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.team-reference-page .personal-heat-half-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.team-reference-page .personal-heat-hour-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-heat-hour {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.team-reference-page .personal-heat-hour-label {
+  color: #7a879b;
+  font-size: 7.5px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.team-reference-page .personal-heat-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  height: 18px;
+}
+
+.team-reference-page .personal-heat-cell {
+  min-width: 3px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    filter 0.12s ease,
+    outline-color 0.12s ease;
+}
+
+.team-reference-page .personal-heat-cell:hover {
+  filter: brightness(1.08);
+}
+
+.team-reference-page .personal-heat-cell:focus-visible,
+.team-reference-page .personal-heat-cell.selected {
+  z-index: 2;
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
+}
+
+.team-reference-page .personal-heat-cell.outside {
+  background: repeating-linear-gradient(135deg, #f7f8fa 0 2px, #edf0f4 2px 4px);
+  box-shadow: inset 0 0 0 1px rgba(216, 222, 231, 0.55);
+}
+
+.team-reference-page .personal-heat-cell.empty {
+  background: #e1e6ee;
+}
+
+.team-reference-page .personal-heat-cell.level-1 {
+  background: #bfdbfe;
+}
+
+.team-reference-page .personal-heat-cell.level-2 {
+  background: #60a5fa;
+}
+
+.team-reference-page .personal-heat-cell.level-3 {
+  background: #2563eb;
+}
+
+.team-reference-page .personal-heat-cell.level-4 {
+  background: #1e40af;
+}
+
+.team-reference-page .personal-heat-cell.active {
+  box-shadow: inset 0 0 0 1px rgba(30, 64, 175, 0.18);
+}
+
+.team-reference-page .personal-heat-mobile-half-label {
+  display: none;
+  color: #7a879b;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .team-reference-page .team-page {
+    padding: 8px 12px 18px;
+  }
+
+  .team-reference-page .personal-console {
+    padding: 10px;
+  }
+
+  .team-reference-page .personal-stat-grid {
+    gap: 5px;
+  }
+
+  .team-reference-page .personal-stat-grid article {
+    padding: 6px 8px;
+  }
+
+  .team-reference-page .personal-stat-grid b {
+    font-size: 14px;
+  }
+
+  .team-reference-page .personal-panel {
+    padding: 8px;
+  }
+
+  .team-reference-page .personal-panel-head p {
+    display: none;
+  }
+
+  .team-reference-page .personal-allocation-grid {
+    gap: 6px;
+  }
+
+  .team-reference-page .personal-allocation-grid section {
+    padding: 6px;
+  }
+
+  .team-reference-page .personal-composition-allocation-section .personal-pie-legend,
+  .team-reference-page .personal-project-allocation-section .personal-pie-legend,
+  .team-reference-page .personal-host-allocation-section .personal-pie-legend {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .team-reference-page .personal-session-allocation-section .personal-pie-legend {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .team-reference-page .personal-pie-wrap {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .team-reference-page .personal-pie {
+    width: 82px;
+    height: 82px;
+  }
+
+  .team-reference-page .personal-pie::after,
+  .team-reference-page .personal-pie-center {
+    inset: 19px;
+  }
+
+  .team-reference-page .personal-pie-legend-row {
+    min-height: 22px;
+    padding: 2px 4px;
+  }
+
+  .team-reference-page .personal-pie-legend-row small {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .team-reference-page .portal-header {
+    padding: 8px 12px;
+  }
+
+  .team-reference-page .route-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .team-reference-page .team-page-header .header-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .team-reference-page .team-page-header-compact .header-row {
+    top: 8px;
+    right: 12px;
+    flex-direction: row;
+  }
+
+  .team-reference-page .team-page-header-compact .route-nav {
+    padding-right: 0;
+  }
+
+  .team-reference-page .team-page-title h1 {
+    margin: 2px 0;
+    font-size: 19px;
+  }
+
+  .team-reference-page .team-page-title p,
+  .team-reference-page .team-page-status {
+    display: none;
+  }
+
+  .team-reference-page .team-page {
+    padding: 6px 8px 16px;
+  }
+
+  .team-reference-page .team-console-head {
+    flex-wrap: wrap;
+  }
+
+  .team-reference-page .personal-date-picker {
+    flex: 1 1 240px;
+  }
+
+  .team-reference-page .team-member-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .team-reference-page .personal-heatmap-head {
+    display: grid;
+    gap: 4px;
+  }
+
+  .team-reference-page .personal-heat-legend {
+    justify-content: flex-start;
+  }
+
+  .team-reference-page .personal-heat-day {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+    padding: 5px 0;
+  }
+
+  .team-reference-page .personal-heat-day-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .team-reference-page .personal-heat-half-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .team-reference-page .personal-heat-half-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+    column-gap: 4px;
+  }
+
+  .team-reference-page .personal-heat-mobile-half-label {
+    display: block;
+    padding-top: 11px;
+  }
+}
+
+@media (max-width: 520px) {
+  .team-reference-page .personal-calendar-popover {
+    position: fixed;
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  .team-reference-page .personal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-reference-page .personal-stat-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .team-reference-page .personal-stat-grid article {
+    grid-column: span 2;
+  }
+
+  .team-reference-page .personal-stat-grid article:nth-child(4),
+  .team-reference-page .personal-stat-grid article:nth-child(5) {
+    grid-column: span 3;
+  }
+
+  .team-reference-page .personal-allocation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-reference-page .personal-session-allocation-section {
+    grid-column: auto;
+  }
+
+  .team-reference-page .personal-pie-wrap {
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .team-reference-page .personal-pie {
+    width: 78px;
+    height: 78px;
+  }
+
+  .team-reference-page .personal-pie::after,
+  .team-reference-page .personal-pie-center {
+    inset: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-reference-page *,
+  .team-reference-page *::before,
+  .team-reference-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

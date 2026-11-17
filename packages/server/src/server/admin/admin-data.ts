@@ -281,6 +281,7 @@ export function buildTeamInsights(input: {
   start: string;
   end: string;
   timeZone?: string;
+  accountName?: string;
 }): TeamInsights {
   const startMs = Date.parse(input.start);
   const endMs = Date.parse(input.end);
@@ -324,6 +325,7 @@ export function buildTeamInsights(input: {
       endMs,
       timeZone,
       projectLabel,
+      accountName: input.accountName?.trim() || "本机",
     }),
   );
   const unassigned = buildMember({
@@ -336,6 +338,7 @@ export function buildTeamInsights(input: {
     endMs,
     timeZone,
     projectLabel,
+    accountName: input.accountName?.trim() || "本机",
     unassignedOnly: true,
   });
   const summary = members.reduce(
@@ -408,6 +411,7 @@ function buildMember(input: {
   endMs: number;
   timeZone: string;
   projectLabel: (agentId: string) => string;
+  accountName: string;
   unassignedOnly?: boolean;
 }): MemberInsights {
   const agentById = new Map(input.snapshot.agents.map((agent) => [agent.id, agent]));
@@ -428,9 +432,11 @@ function buildMember(input: {
   );
   const allocation = allocateIntervals(intervals, input.startMs, input.endMs);
   const projects = new Map<string, number>();
+  const accounts = new Map<string, number>();
   for (const [sessionId, seconds] of Object.entries(allocation.sessionSeconds)) {
     const label = input.projectLabel(sessionId);
     projects.set(label, (projects.get(label) ?? 0) + seconds);
+    accounts.set(input.accountName, (accounts.get(input.accountName) ?? 0) + seconds);
   }
   const usage = input.usages.reduce(
     (total, entry) => ({
@@ -450,6 +456,7 @@ function buildMember(input: {
     seconds: allocation.totalSeconds,
     sessions: ownedSessions.length,
     projects: bucketEntries(Object.fromEntries(projects), allocation.totalSeconds),
+    accounts: bucketEntries(Object.fromEntries(accounts), allocation.totalSeconds),
     timeComponents: Object.entries(allocation.componentSeconds)
       .map(([key, seconds]) => ({
         key,

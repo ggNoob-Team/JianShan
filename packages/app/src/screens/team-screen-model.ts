@@ -1,9 +1,68 @@
-import type { TeamInsights, TeamMemberInsights } from "@getpaseo/protocol/team-insights";
+import type {
+  TeamInsights,
+  TeamMemberInsights,
+  TeamMetricBucket,
+} from "@getpaseo/protocol/team-insights";
 
 export interface TeamInsightsRequest {
   start: string;
   end: string;
   timeZone: string;
+}
+
+export interface TeamDateRange {
+  startDate: string;
+  endDate: string;
+  days: number;
+}
+
+export const TEAM_DATE_PRESETS = [1, 2, 7, 30] as const;
+
+const DAY_MS = 86_400_000;
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function createTeamDateRange(days: number, nowMs = Date.now()): TeamDateRange {
+  const end = startOfLocalDay(new Date(nowMs));
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - days + 1);
+  return {
+    startDate: localDateKey(start),
+    endDate: localDateKey(end),
+    days,
+  };
+}
+
+export function formatTeamDateRange(range: TeamDateRange): string {
+  const start = new Date(`${range.startDate}T00:00:00`);
+  const end = new Date(`${range.endDate}T00:00:00`);
+  const startLabel = `${start.getFullYear()}.${String(start.getMonth() + 1).padStart(2, "0")}.${String(start.getDate()).padStart(2, "0")}`;
+  const endLabel =
+    start.getFullYear() === end.getFullYear()
+      ? `${String(end.getMonth() + 1).padStart(2, "0")}.${String(end.getDate()).padStart(2, "0")}`
+      : `${end.getFullYear()}.${String(end.getMonth() + 1).padStart(2, "0")}.${String(end.getDate()).padStart(2, "0")}`;
+  return `${startLabel}–${endLabel} · ${range.days} 天`;
+}
+
+export function buildTeamInsightsRequestForRange(input: {
+  range: TeamDateRange;
+  timeZone?: string;
+}): TeamInsightsRequest {
+  const start = new Date(`${input.range.startDate}T00:00:00`);
+  const end = new Date(`${input.range.endDate}T00:00:00`);
+  return {
+    start: start.toISOString(),
+    end: new Date(end.getTime() + DAY_MS - 1).toISOString(),
+    timeZone: input.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
 }
 
 export function buildTeamInsightsRequest(input: {
@@ -22,6 +81,190 @@ export function buildTeamInsightsRequest(input: {
 
 export function listTeamMembers(team: TeamInsights): TeamMemberInsights[] {
   return [...team.members, team.unassigned];
+}
+
+export interface TeamHostInsights {
+  serverId: string;
+  label: string;
+  team: TeamInsights;
+}
+
+interface MemberAccumulator {
+  id: string;
+  name: string;
+  seconds: number;
+  sessions: number;
+  timeComponents: Map<string, { label: string; seconds: number }>;
+  projects: Map<string, { label: string; seconds: number }>;
+  accounts: Map<string, { label: string; seconds: number }>;
+  sessionDistribution: Map<string, { label: string; seconds: number }>;
+  heatmap: Map<string, number[]>;
+  questionCount: number;
+  acceptedQuestionCount: number;
+  completedTurns: number;
+  tokenDataAvailable: boolean;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  totalCostUsd: number;
+  lastActiveAt: string | null;
+}
+
+function addBucket(
+  buckets: Map<string, { label: string; seconds: number }>,
+  key: string,
+  label: string,
+  seconds: number,
+): void {
+  if (seconds <= 0) return;
+  const current = buckets.get(key);
+  buckets.set(key, { label: current?.label ?? label, seconds: (current?.seconds ?? 0) + seconds });
+}
+
+function finishBuckets(
+  buckets: Map<string, { label: string; seconds: number }>,
+  totalSeconds: number,
+): TeamMetricBucket[] {
+  return [...buckets.entries()]
+    .map(([key, value]) => ({
+      key,
+      label: value.label,
+      seconds: value.seconds,
+      share: totalSeconds > 0 ? value.seconds / totalSeconds : 0,
+    }))
+    .sort((left, right) => right.seconds - left.seconds);
+}
+
+function accumulatorFor(
+  values: Map<string, MemberAccumulator>,
+  member: TeamMemberInsights,
+): MemberAccumulator {
+  const existing = values.get(member.id);
+  if (existing) return existing;
+  const created: MemberAccumulator = {
+    id: member.id,
+    name: member.name,
+    seconds: 0,
+    sessions: 0,
+    timeComponents: new Map(),
+    projects: new Map(),
+    accounts: new Map(),
+    sessionDistribution: new Map(),
+    heatmap: new Map(),
+    questionCount: 0,
+    acceptedQuestionCount: 0,
+    completedTurns: 0,
+    tokenDataAvailable: false,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    totalCostUsd: 0,
+    lastActiveAt: null,
+  };
+  values.set(member.id, created);
+  return created;
+}
+
+function addMember(
+  values: Map<string, MemberAccumulator>,
+  member: TeamMemberInsights,
+  host: { serverId: string; label: string },
+): void {
+  const accumulator = accumulatorFor(values, member);
+  accumulator.seconds += member.seconds;
+  accumulator.sessions += member.sessions;
+  for (const row of member.timeComponents)
+    addBucket(accumulator.timeComponents, row.key, row.label, row.seconds);
+  for (const row of member.projects)
+    addBucket(accumulator.projects, row.label, row.label, row.seconds);
+  for (const row of member.sessionDistribution)
+    addBucket(
+      accumulator.sessionDistribution,
+      `${host.serverId}:${row.key}`,
+      row.label,
+      row.seconds,
+    );
+  addBucket(accumulator.accounts, host.serverId, host.label, member.seconds);
+  accumulator.questionCount += member.questionCount;
+  accumulator.acceptedQuestionCount += member.acceptedQuestionCount;
+  accumulator.completedTurns += member.completedTurns;
+  accumulator.tokenDataAvailable ||= member.tokenDataAvailable;
+  accumulator.inputTokens += member.inputTokens;
+  accumulator.cachedInputTokens += member.cachedInputTokens;
+  accumulator.outputTokens += member.outputTokens;
+  accumulator.totalCostUsd += member.totalCostUsd;
+  if (
+    member.lastActiveAt &&
+    (!accumulator.lastActiveAt ||
+      Date.parse(member.lastActiveAt) > Date.parse(accumulator.lastActiveAt))
+  ) {
+    accumulator.lastActiveAt = member.lastActiveAt;
+  }
+  for (const day of member.heatmap) {
+    const slots = accumulator.heatmap.get(day.date) ?? Array.from({ length: 96 }, () => 0);
+    for (let index = 0; index < slots.length; index += 1) {
+      slots[index] = (slots[index] ?? 0) + (day.slots[index] ?? 0);
+    }
+    accumulator.heatmap.set(day.date, slots);
+  }
+}
+
+function finishMember(accumulator: MemberAccumulator): TeamMemberInsights {
+  return {
+    id: accumulator.id,
+    name: accumulator.name,
+    seconds: accumulator.seconds,
+    sessions: accumulator.sessions,
+    projects: finishBuckets(accumulator.projects, accumulator.seconds),
+    accounts: finishBuckets(accumulator.accounts, accumulator.seconds),
+    timeComponents: finishBuckets(accumulator.timeComponents, accumulator.seconds),
+    sessionDistribution: finishBuckets(accumulator.sessionDistribution, accumulator.seconds),
+    questionCount: accumulator.questionCount,
+    acceptedQuestionCount: accumulator.acceptedQuestionCount,
+    completedTurns: accumulator.completedTurns,
+    tokenDataAvailable: accumulator.tokenDataAvailable,
+    inputTokens: accumulator.inputTokens,
+    cachedInputTokens: accumulator.cachedInputTokens,
+    outputTokens: accumulator.outputTokens,
+    totalCostUsd: accumulator.totalCostUsd,
+    lastActiveAt: accumulator.lastActiveAt,
+    heatmap: [...accumulator.heatmap.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, slots]) => ({ date, slots })),
+  };
+}
+
+export function mergeTeamInsightsForHosts(entries: TeamHostInsights[]): TeamInsights | null {
+  const first = entries[0]?.team;
+  if (!first) return null;
+  const members = new Map<string, MemberAccumulator>();
+  const unassigned = new Map<string, MemberAccumulator>();
+  for (const { label, serverId, team } of entries) {
+    for (const member of team.members) addMember(members, member, { serverId, label });
+    addMember(unassigned, team.unassigned, { serverId, label });
+  }
+  const mergedMembers = [...members.values()]
+    .map(finishMember)
+    .sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
+  const mergedUnassigned = finishMember(
+    [...unassigned.values()][0] ?? accumulatorFor(unassigned, first.unassigned),
+  );
+  const allMembers = [...mergedMembers, mergedUnassigned];
+  return {
+    ...first,
+    members: mergedMembers,
+    unassigned: mergedUnassigned,
+    summary: {
+      totalSeconds: allMembers.reduce((sum, member) => sum + member.seconds, 0),
+      sessions: allMembers.reduce((sum, member) => sum + member.sessions, 0),
+      questions: allMembers.reduce((sum, member) => sum + member.questionCount, 0),
+      completedTurns: allMembers.reduce((sum, member) => sum + member.completedTurns, 0),
+      inputTokens: allMembers.reduce((sum, member) => sum + member.inputTokens, 0),
+      cachedInputTokens: allMembers.reduce((sum, member) => sum + member.cachedInputTokens, 0),
+      outputTokens: allMembers.reduce((sum, member) => sum + member.outputTokens, 0),
+      totalCostUsd: allMembers.reduce((sum, member) => sum + member.totalCostUsd, 0),
+    },
+  };
 }
 
 export function selectTeamMember(

@@ -3,59 +3,171 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
-    <title>见山团队</title>
+    <title>见山 · 团队管理</title>
     <link rel="stylesheet" href="/style.css" />
-    <script src="/team.js" defer></script>
+    <link rel="stylesheet" href="/team-reference.css" />
+    <script src="/team-reference.js" defer></script>
   </head>
-  <body>
-    <main class="public-team-page">
-      <header class="public-team-header">
-        <div class="brand-lockup">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" role="img">
-              <path d="M3 24 13 7l6 9 3-4 7 12H3Z" />
-            </svg>
-          </span>
-          <span>
-            <strong>见山团队</strong>
-            <small>实时查看团队投入与成员会话</small>
-          </span>
+  <body class="reference-team-body" data-team-mode="public">
+    <div class="team-reference-page">
+      <header class="portal-header team-page-header">
+        <nav class="route-nav" aria-label="页面导航">
+          <button class="active" type="button">团队管理</button>
+        </nav>
+        <div class="header-row">
+          <div class="team-page-title">
+            <nav class="breadcrumb" aria-label="面包屑">
+              <ol>
+                <li><span>见山治理</span></li>
+                <li><span aria-current="page">团队管理</span></li>
+              </ol>
+            </nav>
+            <h1>团队管理</h1>
+            <p>选择成员，查看其个人管理视图</p>
+          </div>
+          <div class="team-page-status">
+            <span id="team-member-count" class="badge">0 人团队</span>
+          </div>
         </div>
-        <button id="theme-toggle" class="icon-button" type="button" aria-label="切换深浅色">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="4" />
-            <path
-              d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
-            />
-          </svg>
-        </button>
       </header>
-
-      <section class="public-team-shell" aria-labelledby="team-heading">
-        <div class="section-heading team-heading-row">
-          <div>
-            <p class="eyebrow">成员工作台</p>
-            <h1 id="team-heading">团队管理</h1>
-            <p>选择成员，查看其当前会话、提问和模型消耗。此页面无需登录。</p>
+      <div class="team-page">
+        <section id="team-workbench" class="team-console personal-console" aria-label="团队工作台">
+          <div class="team-console-head">
+            <span id="team-cache-status" class="team-cache-status"></span>
+            <div id="personal-range-picker" class="personal-date-picker">
+              <button
+                id="personal-range-trigger"
+                class="personal-range-trigger"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="personal-range-popover"
+              >
+                <span class="personal-range-trigger-label">分析范围</span>
+                <strong id="personal-range-value">最近 7 天</strong>
+                <span class="personal-range-chevron" aria-hidden="true">⌄</span>
+              </button>
+              <div
+                id="personal-range-popover"
+                class="personal-calendar-popover"
+                role="dialog"
+                aria-label="选择分析日期范围"
+                hidden
+              >
+                <div class="personal-calendar-quick" role="group" aria-label="快捷日期范围">
+                  <button type="button" data-personal-quick-days="1">最近 1 天</button>
+                  <button type="button" data-personal-quick-days="2">最近 2 天</button>
+                  <button type="button" data-personal-quick-days="7">最近 7 天</button>
+                  <button type="button" data-personal-quick-days="30">最近 30 天</button>
+                </div>
+                <div class="personal-calendar-nav">
+                  <button type="button" data-personal-calendar-shift="-1" aria-label="上个月">
+                    ‹
+                  </button>
+                  <strong id="personal-calendar-month">选择日期</strong>
+                  <button type="button" data-personal-calendar-shift="1" aria-label="下个月">
+                    ›
+                  </button>
+                </div>
+                <div class="personal-calendar-weekdays" aria-hidden="true">
+                  <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span
+                  ><span>六</span><span>日</span>
+                </div>
+                <div
+                  id="personal-calendar-grid"
+                  class="personal-calendar-grid"
+                  role="grid"
+                  aria-label="分析日期日历"
+                ></div>
+                <div class="personal-calendar-foot">
+                  <span>按住并拖动可选择连续日期</span>
+                  <button type="button" data-personal-calendar-close>取消</button>
+                </div>
+              </div>
+              <span id="personal-range-error" class="personal-range-error" role="status"></span>
+            </div>
+            <button id="team-refresh" class="ghost" type="button">刷新</button>
           </div>
-          <div class="date-tools" role="group" aria-label="统计时间范围">
-            <button class="segmented-button" data-days="1" type="button" aria-pressed="false">
-              1 天
-            </button>
-            <button class="segmented-button active" data-days="7" type="button" aria-pressed="true">
-              7 天
-            </button>
-            <button class="segmented-button" data-days="30" type="button" aria-pressed="false">
-              30 天
-            </button>
+          <div id="team-gate" class="team-gate">正在加载团队数据…</div>
+          <div id="team-source-warning" class="team-source-warning" hidden></div>
+          <div id="team-dashboard" hidden>
+            <div
+              id="team-member-tabs"
+              class="team-member-tabs"
+              role="tablist"
+              aria-label="团队成员"
+            ></div>
+            <div class="personal-stat-grid">
+              <article><span>估算投入</span><b id="team-total-time">0 分钟</b></article>
+              <article><span>会话</span><b id="team-count-sessions">0</b></article>
+              <article><span>项目</span><b id="team-count-projects">0</b></article>
+              <article><span>账户</span><b id="team-count-accounts">0</b></article>
+              <article><span>完成轮次</span><b id="team-count-turns">0</b></article>
+            </div>
+            <div class="personal-grid">
+              <article class="personal-panel personal-allocation-panel">
+                <div class="personal-panel-head">
+                  <div>
+                    <h3>时间分布</h3>
+                    <p>所选成员的输入、AI 运行、思考阅读和并行会话已统一去重。</p>
+                  </div>
+                </div>
+                <div class="personal-allocation-grid">
+                  <section
+                    class="personal-allocation-section personal-composition-allocation-section"
+                  >
+                    <h4>时间构成</h4>
+                    <div id="team-pie-composition" class="personal-list personal-scroll">
+                      <div class="personal-empty">选择成员后加载。</div>
+                    </div>
+                  </section>
+                  <section class="personal-allocation-section personal-project-allocation-section">
+                    <h4>项目</h4>
+                    <div id="team-pie-projects" class="personal-list personal-scroll">
+                      <div class="personal-empty">选择成员后加载。</div>
+                    </div>
+                  </section>
+                  <section class="personal-allocation-section personal-host-allocation-section">
+                    <h4>账户</h4>
+                    <div id="team-pie-accounts" class="personal-list personal-scroll">
+                      <div class="personal-empty">选择成员后加载。</div>
+                    </div>
+                  </section>
+                  <section class="personal-allocation-section personal-session-allocation-section">
+                    <h4>会话</h4>
+                    <div id="team-pie-sessions" class="personal-list personal-scroll">
+                      <div class="personal-empty">选择成员后加载。</div>
+                    </div>
+                  </section>
+                </div>
+              </article>
+              <article class="personal-panel personal-heatmap-panel">
+                <div class="personal-panel-head personal-heatmap-head">
+                  <div>
+                    <h3>时间热力图</h3>
+                    <p id="personal-heatmap-window">每格 15 分钟，颜色越深表示投入越满。</p>
+                  </div>
+                  <div class="personal-heat-legend" aria-label="热力颜色图例">
+                    <span>范围外</span><i class="outside"></i><span>空缺</span><i class="empty"></i
+                    ><span>低</span><i class="scale"></i><span>满 15 分钟</span>
+                  </div>
+                </div>
+                <div
+                  id="personal-heatmap-detail"
+                  class="personal-heatmap-detail"
+                  role="status"
+                  aria-live="polite"
+                >
+                  悬停、聚焦或点击时间格查看投入详情。
+                </div>
+                <div id="personal-heatmap-list" class="personal-heatmap-list">
+                  <div class="personal-empty">尚未加载时间热力。</div>
+                </div>
+              </article>
+            </div>
           </div>
-        </div>
-        <div id="team-tabs" class="member-tabs" role="tablist" aria-label="团队成员"></div>
-        <div id="team-content" class="team-content">
-          <div class="empty-state">正在加载团队数据…</div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </div>
+    </div>
   </body>
 </html>

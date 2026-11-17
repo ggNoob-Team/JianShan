@@ -3,7 +3,7 @@
 // oxlint-disable no-async-endpoint-handlers
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import * as QRCode from "qrcode";
@@ -153,7 +153,7 @@ function createAdminApp(input: {
       const start = readQueryString(req, "start") ?? startOfDaysAgo(7);
       const end = readQueryString(req, "end") ?? new Date().toISOString();
       const timeZone = readQueryString(req, "timeZone") ?? undefined;
-      res.json(buildTeamInsights({ snapshot, start, end, timeZone }));
+      res.json(buildTeamInsights({ snapshot, start, end, timeZone, accountName: hostname() }));
     } catch (error) {
       next(error);
     }
@@ -468,7 +468,7 @@ function createAdminApp(input: {
       const start = readQueryString(req, "start") ?? startOfDaysAgo(7);
       const end = readQueryString(req, "end") ?? new Date().toISOString();
       const timeZone = readQueryString(req, "timeZone") ?? undefined;
-      res.json(buildTeamInsights({ snapshot, start, end, timeZone }));
+      res.json(buildTeamInsights({ snapshot, start, end, timeZone, accountName: hostname() }));
     } catch (error) {
       next(error);
     }

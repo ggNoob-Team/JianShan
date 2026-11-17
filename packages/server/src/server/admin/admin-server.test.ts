@@ -165,7 +165,7 @@ describe("admin server", () => {
 
     const page = await fetch(new URL("/team", handle.url));
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain("见山团队");
+    expect(await page.text()).toContain("见山 · 团队管理");
 
     const team = await fetch(new URL("/api/team/public", handle.url));
     expect(team.status).toBe(200);

@@ -3,10 +3,14 @@ import type { TeamInsights, TeamMemberInsights } from "@getpaseo/protocol/team-i
 
 import {
   buildTeamInsightsRequest,
+  buildTeamInsightsRequestForRange,
+  createTeamDateRange,
   formatTeamDuration,
+  formatTeamDateRange,
   formatTeamNumber,
   heatLevel,
   listTeamMembers,
+  mergeTeamInsightsForHosts,
   selectTeamMember,
 } from "./team-screen-model";
 
@@ -16,6 +20,7 @@ const member: TeamMemberInsights = {
   seconds: 540,
   sessions: 2,
   projects: [],
+  accounts: [],
   timeComponents: [],
   sessionDistribution: [],
   questionCount: 3,
@@ -71,10 +76,82 @@ describe("team screen model", () => {
     });
   });
 
+  it("builds inclusive calendar ranges for the client date picker", () => {
+    const range = createTeamDateRange(7, new Date(2026, 10, 13, 12).getTime());
+    expect(range).toEqual({
+      startDate: "2026-11-07",
+      endDate: "2026-11-13",
+      days: 7,
+    });
+    expect(formatTeamDateRange(range)).toBe("2026.11.07–11.13 · 7 天");
+    expect(
+      buildTeamInsightsRequestForRange({
+        range,
+        timeZone: "Asia/Shanghai",
+      }),
+    ).toEqual({
+      start: new Date("2026-11-07T00:00:00").toISOString(),
+      end: new Date(new Date("2026-11-13T00:00:00").getTime() + 86_400_000 - 1).toISOString(),
+      timeZone: "Asia/Shanghai",
+    });
+  });
+
   it("lists members with the unassigned bucket and preserves a valid selection", () => {
     expect(listTeamMembers(team).map((entry) => entry.name)).toEqual(["书记", "未分配"]);
     expect(selectTeamMember(team, "unassigned")?.name).toBe("未分配");
     expect(selectTeamMember(team, "missing")?.name).toBe("书记");
+  });
+
+  it("aggregates member usage across named hosts and uses hosts as accounts", () => {
+    const merged = mergeTeamInsightsForHosts([
+      {
+        serverId: "srv_a",
+        label: "办公室",
+        team: {
+          ...team,
+          members: [
+            {
+              ...member,
+              seconds: 300,
+              accounts: [],
+              projects: [{ key: "a", label: "见山", seconds: 300, share: 1 }],
+              sessionDistribution: [
+                { key: "session_1", label: "同一会话编号", seconds: 300, share: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        serverId: "srv_b",
+        label: "家里",
+        team: {
+          ...team,
+          members: [
+            {
+              ...member,
+              seconds: 180,
+              accounts: [],
+              projects: [{ key: "a", label: "见山", seconds: 180, share: 1 }],
+              sessionDistribution: [
+                { key: "session_1", label: "同一会话编号", seconds: 180, share: 1 },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(merged?.members[0]?.seconds).toBe(480);
+    expect(merged?.members[0]?.accounts.map((row) => [row.label, row.seconds])).toEqual([
+      ["办公室", 300],
+      ["家里", 180],
+    ]);
+    expect(merged?.members[0]?.projects).toEqual([
+      { key: "见山", label: "见山", seconds: 480, share: 1 },
+    ]);
+    expect(merged?.members[0]?.sessionDistribution).toHaveLength(2);
+    expect(merged?.members[0]?.sessionDistribution.map((row) => row.seconds)).toEqual([300, 180]);
   });
 
   it("formats the same values and heat levels as the admin page", () => {

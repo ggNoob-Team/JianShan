@@ -14,7 +14,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { RotateCw } from "lucide-react-native";
+import { CalendarRange, RotateCw } from "lucide-react-native";
 import type {
   TeamHeatmapDay,
   TeamInsights,
@@ -25,62 +25,84 @@ import { BackHeader } from "@/components/headers/back-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { PressHighlight } from "@/components/ui/press-highlight";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { useHostRuntimeClient } from "@/runtime/host-runtime";
+import {
+  getHostRuntimeStore,
+  useHostRuntimeConnectionStatuses,
+  useHosts,
+} from "@/runtime/host-runtime";
 import { StyleSheet } from "react-native-unistyles";
 
+import { TeamDateRangeSheet } from "./team-date-range-sheet";
+import { TeamPieChart } from "./team-pie-chart";
 import {
-  buildTeamInsightsRequest,
+  buildTeamInsightsRequestForRange,
+  createTeamDateRange,
   formatTeamDuration,
-  formatTeamNumber,
+  formatTeamDateRange,
   heatLevel,
   listTeamMembers,
+  mergeTeamInsightsForHosts,
   selectTeamMember,
+  type TeamDateRange,
 } from "./team-screen-model";
-
-type TeamRange = "1" | "7" | "30";
-
-const TEAM_RANGE_OPTIONS: { value: TeamRange; label: string; testID: string }[] = [
-  { value: "1", label: "1 天", testID: "team-range-1" },
-  { value: "7", label: "7 天", testID: "team-range-7" },
-  { value: "30", label: "30 天", testID: "team-range-30" },
-];
 
 const SOURCE_LABELS: Record<string, string> = {
   input: "输入表达",
-  agent: "AI 运行",
+  agent: "AI 运行/查看",
   thinking: "思考/阅读",
 };
+const SOURCE_ORDER = ["input", "agent", "thinking"];
 
-export function TeamScreen({ serverId }: { serverId: string }): ReactElement {
-  const client = useHostRuntimeClient(serverId);
+function timeComponentLabel(row: TeamMetricBucket): string {
+  return SOURCE_LABELS[row.key] ?? row.label;
+}
+
+export function TeamScreen({ serverId: _serverId }: { serverId: string }): ReactElement {
+  const hosts = useHosts();
+  const hostIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
+  const connectionStatuses = useHostRuntimeConnectionStatuses(hostIds);
   const { width } = useWindowDimensions();
   const isWide = width >= 1100;
-  const [range, setRange] = useState<TeamRange>("7");
+  const [range, setRange] = useState<TeamDateRange>(() => createTeamDateRange(7));
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [team, setTeam] = useState<TeamInsights | null>(null);
   const [activeMemberId, setActiveMemberId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadTeam = useCallback(async () => {
-    if (!client) {
-      setIsLoading(false);
-      setError("当前主机未连接");
-      return;
-    }
     setIsLoading(true);
     setError(null);
-    const request = buildTeamInsightsRequest({ days: Number(range), nowMs: Date.now() });
+    const request = buildTeamInsightsRequestForRange({ range });
     try {
-      const payload = await client.getDaemonTeamInsights({ ...request, timeout: 5_000 });
-      setTeam(payload.team);
-      setActiveMemberId((current) => selectTeamMember(payload.team, current)?.id ?? null);
+      const store = getHostRuntimeStore();
+      const connectedHosts = hosts.filter(
+        (host) => connectionStatuses.get(host.serverId) === "online",
+      );
+      const results = await Promise.allSettled(
+        connectedHosts.map(async (host) => {
+          const hostClient = store.getClient(host.serverId);
+          if (!hostClient) throw new Error(`${host.label} 尚未连接`);
+          const payload = await hostClient.getDaemonTeamInsights({
+            ...request,
+            timeout: 5_000,
+          });
+          return { serverId: host.serverId, label: host.label, team: payload.team };
+        }),
+      );
+      const connectedTeams = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      const merged = mergeTeamInsightsForHosts(connectedTeams);
+      if (!merged) throw new Error("没有已连接的 Host");
+      setTeam(merged);
+      setActiveMemberId((current) => selectTeamMember(merged, current)?.id ?? null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "团队数据加载失败");
     } finally {
       setIsLoading(false);
     }
-  }, [client, range]);
+  }, [connectionStatuses, hosts, range]);
 
   useEffect(() => {
     void loadTeam();
@@ -92,6 +114,8 @@ export function TeamScreen({ serverId }: { serverId: string }): ReactElement {
     [activeMemberId, team],
   );
   const handleRefresh = useCallback(() => void loadTeam(), [loadTeam]);
+  const openDatePicker = useCallback(() => setDatePickerVisible(true), []);
+  const closeDatePicker = useCallback(() => setDatePickerVisible(false), []);
   const headerActions = useMemo(
     () => (
       <Button
@@ -135,7 +159,7 @@ export function TeamScreen({ serverId }: { serverId: string }): ReactElement {
           onSelect={setActiveMemberId}
         />
         {error ? <Text style={styles.inlineError}>{error}</Text> : null}
-        <MemberContent member={activeMember} team={team} isWide={isWide} />
+        <MemberContent member={activeMember} team={team} />
       </>
     );
   } else {
@@ -148,7 +172,7 @@ export function TeamScreen({ serverId }: { serverId: string }): ReactElement {
 
   return (
     <View style={styles.container}>
-      <BackHeader title="团队" rightContent={headerActions} />
+      <BackHeader title="团队管理" rightContent={headerActions} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -158,22 +182,34 @@ export function TeamScreen({ serverId }: { serverId: string }): ReactElement {
         <View style={styles.content}>
           <View style={[styles.headingRow, !isWide && styles.headingRowCompact]}>
             <View style={styles.headingCopy}>
-              <Text style={styles.eyebrow}>成员工作台</Text>
+              <Text style={styles.eyebrow}>见山治理 / 团队管理</Text>
               <Text style={styles.title}>团队管理</Text>
-              <Text style={styles.description}>选择成员，查看其当前会话、提问和模型消耗。</Text>
+              <Text style={styles.description}>选择成员，查看其个人管理视图</Text>
             </View>
-            <SegmentedControl
-              size="sm"
-              value={range}
-              onValueChange={setRange}
-              options={TEAM_RANGE_OPTIONS}
-              testID="team-range"
-            />
+            <View style={[styles.headingActions, !isWide && styles.headingActionsCompact]}>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={CalendarRange}
+                onPress={openDatePicker}
+                style={styles.dateRangeButton}
+                textStyle={styles.dateRangeText}
+                testID="team-date-range-trigger"
+              >
+                {formatTeamDateRange(range)}
+              </Button>
+            </View>
           </View>
 
           {body}
         </View>
       </ScrollView>
+      <TeamDateRangeSheet
+        visible={datePickerVisible}
+        range={range}
+        onClose={closeDatePicker}
+        onApply={setRange}
+      />
     </View>
   );
 }
@@ -239,44 +275,69 @@ function MemberTab({
 function MemberContent({
   member,
   team,
-  isWide,
 }: {
   member: TeamMemberInsights;
   team: TeamInsights;
-  isWide: boolean;
 }): ReactElement {
+  const timeComponents = useMemo(
+    () =>
+      [...member.timeComponents].sort(
+        (left, right) => SOURCE_ORDER.indexOf(left.key) - SOURCE_ORDER.indexOf(right.key),
+      ),
+    [member.timeComponents],
+  );
   return (
     <>
       <View style={styles.statGrid}>
         <MetricStat label="估算投入" value={formatTeamDuration(member.seconds)} />
-        <MetricStat label="提问" value={String(member.questionCount)} />
-        <MetricStat label="完成轮次" value={String(member.completedTurns)} />
-        <MetricStat
-          label="Token"
-          value={
-            member.tokenDataAvailable
-              ? formatTeamNumber(member.inputTokens + member.outputTokens)
-              : "—"
-          }
-        />
         <MetricStat label="会话" value={String(member.sessions)} />
+        <MetricStat label="项目" value={String(member.projects.length)} />
+        <MetricStat label="账户" value={String(member.accounts.length)} />
+        <MetricStat label="完成轮次" value={String(member.completedTurns)} />
       </View>
 
-      <View style={[styles.detailGrid, !isWide && styles.detailGridCompact]}>
-        <Panel style={styles.detailPanel}>
-          <PanelHeading title="时间与分布" note="并行会话已去重" />
-          <View style={styles.allocationGrid}>
-            <Allocation title="时间构成" rows={member.timeComponents} />
-            <Allocation title="项目" rows={member.projects} />
-            <Allocation title="会话" rows={member.sessionDistribution} />
-            <TokenDetails member={member} />
+      <Panel>
+        <PanelHeading title="时间分布" note="并行会话已去重" />
+        <View style={styles.chartGrid}>
+          <View style={styles.chartPanel}>
+            <TeamPieChart
+              title="时间构成"
+              rows={timeComponents}
+              totalSeconds={member.seconds}
+              labelFor={timeComponentLabel}
+              testID="team-time-pie"
+            />
           </View>
-        </Panel>
-        <Panel style={styles.heatmapPanel}>
-          <PanelHeading title="时间热力图" note={`每格 15 分钟 · ${team.timeZone}`} />
-          <Heatmap days={member.heatmap} />
-        </Panel>
-      </View>
+          <View style={styles.chartPanel}>
+            <TeamPieChart
+              title="项目"
+              rows={member.projects}
+              totalSeconds={member.seconds}
+              testID="team-project-pie"
+            />
+          </View>
+          <View style={styles.chartPanel}>
+            <TeamPieChart
+              title="账户"
+              rows={member.accounts}
+              totalSeconds={member.seconds}
+              testID="team-account-pie"
+            />
+          </View>
+        </View>
+        <TeamPieChart
+          title="会话"
+          note={`${member.sessions} 个会话`}
+          rows={member.sessionDistribution}
+          totalSeconds={member.seconds}
+          testID="team-session-pie"
+        />
+      </Panel>
+
+      <Panel>
+        <PanelHeading title="时间热力图" note={`每格 15 分钟 · ${team.timeZone}`} />
+        <Heatmap days={member.heatmap} />
+      </Panel>
     </>
   );
 }
@@ -309,69 +370,17 @@ function PanelHeading({ title, note }: { title: string; note: string }): ReactEl
   );
 }
 
-function Allocation({ title, rows }: { title: string; rows: TeamMetricBucket[] }): ReactElement {
-  return (
-    <View style={styles.allocation}>
-      <Text style={styles.allocationTitle}>{title}</Text>
-      <View style={styles.allocationList}>
-        {rows.length === 0 ? (
-          <Text style={styles.muted}>暂无数据</Text>
-        ) : (
-          rows.map((row) => {
-            const share = Math.round(row.share * 100);
-            return (
-              <View key={row.key} style={styles.allocationRow}>
-                <View style={styles.allocationLabels}>
-                  <Text numberOfLines={1} style={styles.allocationLabel}>
-                    {SOURCE_LABELS[row.key] ?? row.label}
-                  </Text>
-                  <Text style={styles.allocationShare}>{share}%</Text>
-                </View>
-                <View style={styles.allocationTrack}>
-                  <View style={[styles.allocationFill, { width: `${Math.max(2, share)}%` }]} />
-                </View>
-              </View>
-            );
-          })
-        )}
-      </View>
-    </View>
-  );
-}
-
-function TokenDetails({ member }: { member: TeamMemberInsights }): ReactElement {
-  const rows = [
-    ["输入", member.tokenDataAvailable ? formatTeamNumber(member.inputTokens) : "尚未采集"],
-    [
-      "缓存输入",
-      member.tokenDataAvailable ? formatTeamNumber(member.cachedInputTokens) : "尚未采集",
-    ],
-    ["输出", member.tokenDataAvailable ? formatTeamNumber(member.outputTokens) : "尚未采集"],
-    ["费用", member.tokenDataAvailable ? `$${member.totalCostUsd.toFixed(4)}` : "尚未采集"],
-  ];
-  return (
-    <View style={styles.allocation}>
-      <Text style={styles.allocationTitle}>Token 明细</Text>
-      <View style={styles.allocationList}>
-        {rows.map(([label, value]) => (
-          <View key={label} style={styles.tokenRow}>
-            <Text style={styles.muted}>{label}</Text>
-            <Text style={styles.tokenValue}>{value}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function Heatmap({ days }: { days: TeamHeatmapDay[] }): ReactElement {
-  if (days.length === 0) {
+  const activeDays = [...days]
+    .filter((day) => day.slots.some((seconds) => seconds > 0))
+    .sort((left, right) => right.date.localeCompare(left.date));
+  if (activeDays.length === 0) {
     return <Text style={styles.muted}>当前范围没有可用的时间数据。</Text>;
   }
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="team-heatmap">
       <View style={styles.heatmapDays}>
-        {days.map((day) => (
+        {activeDays.map((day) => (
           <View key={day.date} style={styles.heatmapRow}>
             <Text style={styles.heatmapDate}>{day.date.slice(5)}</Text>
             <View style={styles.heatmapSlots}>
@@ -434,6 +443,24 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     minWidth: 0,
     gap: theme.spacing[1],
+  },
+  headingActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  headingActionsCompact: {
+    width: "100%",
+    justifyContent: "flex-start",
+  },
+  dateRangeButton: {
+    maxWidth: "100%",
+  },
+  dateRangeText: {
+    fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
   },
   eyebrow: {
     color: theme.colors.accent,
@@ -545,16 +572,15 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.semibold,
     fontVariant: ["tabular-nums"],
   },
-  detailGrid: {
+  chartGrid: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: theme.spacing[4],
   },
-  detailGridCompact: {
-    flexDirection: "column",
-  },
-  detailPanel: {
-    flex: 1.05,
+  chartPanel: {
+    flexGrow: 1,
+    flexBasis: 260,
+    minWidth: 240,
   },
   heatmapPanel: {
     flex: 0.95,
