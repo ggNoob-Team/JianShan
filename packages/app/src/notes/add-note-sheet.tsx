@@ -162,10 +162,17 @@ export function AddNoteSheet({
     void handleSubmit();
   }, [handleSubmit]);
 
-  const header = useMemo<SheetHeader>(
-    () => ({ title: t("notes.addEntryTitle"), subtitle: draft?.projectName }),
-    [draft?.projectName, t],
-  );
+  const header = useMemo<SheetHeader>(() => {
+    const projectName = draft?.projectName.trim();
+    return {
+      title: t("notes.addEntryTitle"),
+      subtitle: projectName ? (
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {projectName}
+        </Text>
+      ) : undefined,
+    };
+  }, [draft?.projectName, t]);
 
   return (
     <AdaptiveModalSheet
@@ -300,6 +307,10 @@ const styles = StyleSheet.create((theme) => ({
   body: {
     gap: theme.spacing[3],
     paddingBottom: theme.spacing[2],
+  },
+  subtitle: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
   },
   picker: {
     gap: theme.spacing[1],

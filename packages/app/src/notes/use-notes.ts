@@ -9,7 +9,8 @@ import { mergeNotes, type HostNote } from "./notes-model";
 
 /**
  * Notes change when the user acts, and every response carries the note it
- * wrote, so the cache only has to survive incidental remounts.
+ * wrote. The workspace dialog keeps its scoped observer mounted so the list is
+ * already cached before the first open; refresh is the explicit network path.
  */
 const NOTES_STALE_TIME_MS = 15_000;
 
@@ -46,12 +47,24 @@ export function useNotesHosts(): NotesHost[] {
 export interface NotesListResult {
   notes: HostNote[];
   isLoading: boolean;
+  isRefreshing: boolean;
+  error: Error | null;
   unsupportedHostLabels: string[];
-  refresh: () => void;
+  refresh: () => Promise<void>;
 }
 
-export function useNotesList(): NotesListResult {
-  const hosts = useNotesHosts();
+export interface NotesListOptions {
+  /** Scope a surface such as the workspace notes dialog to one host. */
+  serverId?: string;
+}
+
+export function useNotesList(options: NotesListOptions = {}): NotesListResult {
+  const allHosts = useNotesHosts();
+  const hosts = useMemo(
+    () =>
+      options.serverId ? allHosts.filter((host) => host.serverId === options.serverId) : allHosts,
+    [allHosts, options.serverId],
+  );
   const supportedHosts = useMemo(() => hosts.filter((host) => host.supportsNotes), [hosts]);
   const queries = useFetchQueries(
     supportedHosts.map((host) => ({
@@ -84,15 +97,19 @@ export function useNotesList(): NotesListResult {
   }, [queries, supportedHosts]);
 
   const queryClient = useQueryClient();
-  const refresh = useCallback(() => {
-    for (const host of supportedHosts) {
-      void queryClient.invalidateQueries({ queryKey: notesListQueryKey(host.serverId) });
-    }
+  const refresh = useCallback(async () => {
+    await Promise.all(
+      supportedHosts.map((host) =>
+        queryClient.invalidateQueries({ queryKey: notesListQueryKey(host.serverId) }),
+      ),
+    );
   }, [queryClient, supportedHosts]);
 
   return {
     notes,
     isLoading: supportedHosts.length > 0 && queries.some((query) => query.isLoading),
+    isRefreshing: queries.some((query) => query.isFetching),
+    error: queries.find((query) => query.error)?.error ?? null,
     unsupportedHostLabels,
     refresh,
   };

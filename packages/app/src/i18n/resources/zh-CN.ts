@@ -365,6 +365,9 @@ export const zhCN: TranslationResources = {
   },
   notes: {
     title: "笔记",
+    refresh: "刷新笔记",
+    refreshing: "正在刷新笔记…",
+    loadFailed: "无法加载笔记。",
     emptyTitle: "还没有笔记",
     emptyDescription: "在对话里添加笔记:长按选中文字后点顶部的笔记图标,或点回复下方的便签图标。",
     projectEmptyTitle: "这个项目还没有笔记",

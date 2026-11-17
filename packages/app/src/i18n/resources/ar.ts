@@ -365,6 +365,9 @@ export const ar: TranslationResources = {
   },
   notes: {
     title: "الملاحظات",
+    refresh: "تحديث الملاحظات",
+    refreshing: "جارٍ تحديث الملاحظات…",
+    loadFailed: "تعذّر تحميل الملاحظات.",
     emptyTitle: "لا ملاحظات بعد",
     emptyDescription:
       "أضف ملاحظة من محادثة وكيل: اضغط ضغطاً مطولاً على النص ثم اضغط زر الملاحظات في الأعلى، أو استخدم الزر أسفل الرد.",

@@ -40,6 +40,24 @@ export function useNotesCaptureOptional(): NotesCapture | null {
 }
 
 /**
+ * Re-provides the capture bridge inside a bottom sheet portal. Gorhom renders
+ * sheet content at its host, so a provider between the portal root and the
+ * caller is otherwise invisible to the AddNoteButton.
+ */
+export function useNotesCaptureContextBridge(): (children: ReactNode) => ReactNode {
+  const capture = useContext(NotesCaptureContext);
+  return useCallback(
+    (children: ReactNode) =>
+      capture ? (
+        <NotesCaptureContext.Provider value={capture}>{children}</NotesCaptureContext.Provider>
+      ) : (
+        children
+      ),
+    [capture],
+  );
+}
+
+/**
  * The bridge between a captured block and the daemon. It owns the sheet so a
  * caller only has to hand over text; the project is resolved from the workspace
  * the agent is running in, which is what makes the note follow the project

@@ -371,6 +371,9 @@ export const es: TranslationResources = {
   },
   notes: {
     title: "Notas",
+    refresh: "Actualizar notas",
+    refreshing: "Actualizando notas…",
+    loadFailed: "No se pudieron cargar las notas.",
     emptyTitle: "Aún no hay notas",
     emptyDescription:
       "Añade un fragmento desde un chat de agente y se convertirá en una nota de ese proyecto.",

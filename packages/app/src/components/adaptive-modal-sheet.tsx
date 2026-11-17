@@ -27,6 +27,7 @@ import { isWeb } from "@/constants/platform";
 import { useKeyboardVisibility } from "@/hooks/use-keyboard-visibility";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AdaptiveTextInput } from "@/components/adaptive-text-input";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 export { AdaptiveTextInput, type AdaptiveTextInputProps } from "@/components/adaptive-text-input";
 
 // Horizontal indent token shared by the sheet header (title, back arrow,
@@ -131,6 +132,9 @@ const styles = StyleSheet.create((theme) => ({
   closeButton: {
     padding: theme.spacing[SHEET_HEADER_CLOSE_PADDING_SCALE],
     borderRadius: theme.borderRadius.lg,
+  },
+  disabledIconButton: {
+    opacity: theme.opacity[50],
   },
   searchRow: {
     flexDirection: "row",
@@ -296,24 +300,38 @@ export function SheetHeaderIconButton({
   accessibilityLabel,
   onPress,
   testID,
+  busy = false,
+  disabled = false,
 }: {
   icon: LucideIcon;
   accessibilityLabel: string;
   onPress: () => void;
   testID?: string;
+  /** Shows progress and prevents a duplicate press while the action is running. */
+  busy?: boolean;
+  disabled?: boolean;
 }) {
   const { theme } = useUnistyles();
+  const isDisabled = disabled || busy;
+  const color = theme.colors.foregroundMuted;
+  const accessibilityState = useMemo(() => ({ disabled: isDisabled, busy }), [busy, isDisabled]);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={styles.closeButton}
+      accessibilityState={accessibilityState}
+      style={[styles.closeButton, isDisabled ? styles.disabledIconButton : null]}
+      disabled={isDisabled}
       onPress={onPress}
       testID={testID}
     >
-      {({ pressed }) => (
-        <Icon size={16} color={pressed ? theme.colors.foreground : theme.colors.foregroundMuted} />
-      )}
+      {({ pressed }) =>
+        busy ? (
+          <LoadingSpinner size={16} color={color} />
+        ) : (
+          <Icon size={16} color={pressed ? theme.colors.foreground : color} />
+        )
+      }
     </Pressable>
   );
 }

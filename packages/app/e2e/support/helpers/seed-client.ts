@@ -1,5 +1,6 @@
 import path from "node:path";
 import { readFileSync } from "node:fs";
+import type { NoteRecordPayload } from "@getpaseo/protocol/messages";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { withProjectOwnership } from "./project-ownership";
@@ -140,6 +141,20 @@ export interface SeedDaemonClient {
       firstPromptPreview?: string | null;
     }>;
   }>;
+  createNote(options: {
+    projectId: string;
+    text: string;
+    title?: string | null;
+    comment?: string | null;
+    source?: { workspaceId: string | null; agentId: string | null };
+  }): Promise<NoteRecordPayload>;
+  updateNote(options: {
+    noteId: string;
+    projectId: string;
+    title?: string | null;
+    text?: string;
+    comment?: string | null;
+  }): Promise<NoteRecordPayload | null>;
   updateAgent(agentId: string, updates: { name?: string }): Promise<void>;
   setAgentMode(agentId: string, modeId: string): Promise<unknown>;
   waitForAgentUpsert(

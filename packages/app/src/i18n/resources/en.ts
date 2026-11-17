@@ -362,6 +362,9 @@ export const en = {
   },
   notes: {
     title: "Notes",
+    refresh: "Refresh notes",
+    refreshing: "Refreshing notes…",
+    loadFailed: "Could not load notes.",
     emptyTitle: "No notes yet",
     emptyDescription:
       "Add a note from an agent chat: long-press text and tap the note button in the header, or use the button under a reply.",

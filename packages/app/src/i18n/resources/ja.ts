@@ -370,6 +370,9 @@ export const ja: TranslationResources = {
   },
   notes: {
     title: "ノート",
+    refresh: "ノートを更新",
+    refreshing: "ノートを更新中…",
+    loadFailed: "ノートを読み込めませんでした。",
     emptyTitle: "ノートはまだありません",
     emptyDescription:
       "エージェントのチャットから抜粋を追加すると、そのプロジェクトのノートになります。",

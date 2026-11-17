@@ -366,6 +366,9 @@ export const ko: TranslationResources = {
   },
   notes: {
     title: "노트",
+    refresh: "노트 새로고침",
+    refreshing: "노트 새로고침 중…",
+    loadFailed: "노트를 불러오지 못했습니다.",
     emptyTitle: "노트가 없습니다",
     emptyDescription:
       "에이전트 대화에서 노트를 추가하세요. 텍스트를 길게 눌러 상단 노트 버튼을 누르거나 답변 아래 버튼을 사용하세요.",

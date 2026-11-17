@@ -369,6 +369,9 @@ export const ptBR: TranslationResources = {
   },
   notes: {
     title: "Notas",
+    refresh: "Atualizar notas",
+    refreshing: "Atualizando notas…",
+    loadFailed: "Não foi possível carregar as notas.",
     emptyTitle: "Nenhuma nota ainda",
     emptyDescription:
       "Adicione um trecho de um chat de agente e ele se torna uma nota desse projeto.",

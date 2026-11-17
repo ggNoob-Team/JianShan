@@ -371,6 +371,9 @@ export const fr: TranslationResources = {
   },
   notes: {
     title: "Notes",
+    refresh: "Actualiser les notes",
+    refreshing: "Actualisation des notes…",
+    loadFailed: "Impossible de charger les notes.",
     emptyTitle: "Aucune note",
     emptyDescription:
       "Ajoutez un extrait depuis un chat d'agent et il deviendra une note pour ce projet.",
