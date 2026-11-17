@@ -1,4 +1,22 @@
-const ENGLISH_RELEASE_NOTES = `## 0.13.8 - 2026-11-16
+const ENGLISH_RELEASE_NOTES = `## 0.13.9 - 2026-11-17
+
+Worktree-first Git workspaces, per-client host registrations, prefetched workspace notes, and a team analytics refresh.
+
+### Added
+
+- Git workspaces now default to worktrees, so new workspaces get an isolated checkout.
+- Workspace notes open in a prefetched dialog instead of waiting for a separate load.
+- The team analytics dashboard now matches the admin reference layout.
+
+### Fixed
+
+- Host registrations are isolated per client, so one client's pairing cannot leak into another client's host list.
+
+### Improved
+
+- Added a second HarmonyOS AppGallery test link to the download page.
+
+## 0.13.8 - 2026-11-16
 
 Team roles, an embedded team view, steadier directory sync, and full Codex history on resume.
 
@@ -40,7 +58,25 @@ JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup,
 - Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
 `;
 
-const CHINESE_RELEASE_NOTES = `## 0.13.8 - 2026-11-16
+const CHINESE_RELEASE_NOTES = `## 0.13.9 - 2026-11-17
+
+Git 工作区默认使用 worktree、按客户端隔离主机注册、预取工作区笔记，以及团队分析看板更新。
+
+### 新增
+
+- 新建 Git 工作区默认使用 worktree，获得独立的工作目录。
+- 工作区笔记改为预取后在对话框中打开，减少等待。
+- 团队分析看板已与管理员参考布局对齐。
+
+### 修复
+
+- 主机注册按客户端隔离，避免一个客户端的配对信息影响另一个客户端。
+
+### 改进
+
+- 下载页新增第二个 HarmonyOS AppGallery 测试入口。
+
+## 0.13.8 - 2026-11-16
 
 角色配对、内嵌团队视图、更稳定的目录同步，以及恢复完整的 Codex 历史记录。
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.13.9 - 2026-11-17
+
+Worktree-first Git workspaces, per-client host registrations, prefetched workspace notes, and a team analytics refresh.
+
+### Added
+
+- Git workspaces now default to worktrees, so new workspaces get an isolated checkout.
+- Workspace notes open in a prefetched dialog instead of waiting for a separate load.
+- The team analytics dashboard now matches the admin reference layout.
+
+### Fixed
+
+- Host registrations are isolated per client, so one client's pairing cannot leak into another client's host list.
+
+### Improved
+
+- Added a second HarmonyOS AppGallery test link to the download page.
+
 ## 0.13.8 - 2026-11-16
 
 Team roles, an embedded team view, steadier directory sync, and full Codex history on resume.
