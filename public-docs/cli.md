@@ -67,7 +67,9 @@ A completed query exits with status `0`, including when individual reports are u
 ## Connected hosts
 
 `--host` selects the daemon whose saved connections you manage. Registrations use their
-`registrationId`, not their label.
+`registrationId`, not their label. The CLI keeps a stable client identity per Paseo home, and the
+daemon returns only registrations created by that client. Other CLI or app clients sharing the
+daemon remain isolated.
 
 ```sh
 paseo --host localhost:6767 host add 'ssh://deploy@build-box' --label build-box --meta team=infra

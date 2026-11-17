@@ -1527,7 +1527,7 @@ export class VoiceAssistantWebSocketServer {
       sourceId:
         lifecycle.kind === "ephemeral-plugin"
           ? `plugin:${lifecycle.pluginId}`
-          : admission.principalId,
+          : clientHostSourceId(admission.principalId, clientId),
       connectionLogger,
       onMessage: (msg) => {
         if (!connection) {
@@ -1976,7 +1976,7 @@ export class VoiceAssistantWebSocketServer {
     const sourceId =
       hello.routed && producer
         ? `route:${[principalId, producer.serverId, producer.sourceId].map(encodeURIComponent).join(":")}`
-        : principalId;
+        : clientHostSourceId(principalId, hello.clientId);
     connection.session.setHostSource(sourceId);
   }
 
@@ -3069,6 +3069,10 @@ function createWebSocketConnectionIdentity(
 
 function sessionConnectionKey(principalId: string, clientId: string): string {
   return JSON.stringify([principalId, clientId]);
+}
+
+function clientHostSourceId(principalId: string, clientId: string): string {
+  return `client:${encodeURIComponent(principalId)}:${encodeURIComponent(clientId)}`;
 }
 
 function toConnectionLogFields(identity: WebSocketConnectionIdentity): Record<string, string> {

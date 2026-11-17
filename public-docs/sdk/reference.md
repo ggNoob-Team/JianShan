@@ -223,9 +223,14 @@ await client.hosts.remove(registration.registrationId);
 ```
 
 `list()` returns `{ self: { serverId, label }, hosts }`. Each host includes its registration and server
-IDs, label, authenticated source, string metadata, enabled state, connection status, safe target
+IDs, label, client source, string metadata, enabled state, connection status, safe target
 description, last-online/retry timestamps, and an actionable error. Credentials are never returned.
 A valid but unreachable connection is saved and retried. Invalid syntax fails without saving.
+
+The daemon scopes registrations to the calling client source. Another client sharing the same daemon
+cannot list, update, remove, or open this client's hosts, even when both clients use the same daemon
+credential. A foreign `serverId` fails with `host_unknown`; a foreign `registrationId` cannot be
+mutated.
 
 `update(registrationId, patch)` accepts `label`, `metadata`, `enabled`, `connection`, and
 `replaceIdentity`. Metadata replaces the whole map. Replacing a connection preserves the expected

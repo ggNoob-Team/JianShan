@@ -19,20 +19,30 @@ async function daemon(
   cleanup.push(() => instance.close());
   return instance;
 }
-async function api(instance: TestPaseoDaemon) {
+async function connectApi(instance: TestPaseoDaemon, clientId = crypto.randomUUID()) {
   const client = createHostClient(`127.0.0.1:${instance.port}`, {
-    clientId: crypto.randomUUID(),
+    clientId,
     reconnect: { enabled: false },
   });
   await client.connect();
-  expect(client.getLastServerInfoMessage()).toMatchObject({ sourceId: "owner" });
+  expect(client.getLastServerInfoMessage()).toMatchObject({
+    sourceId: `client:owner:${encodeURIComponent(clientId)}`,
+  });
   expect(client.getLastServerInfoMessage()).not.toHaveProperty("principalId");
   const paseo = createPaseoApi(client);
-  cleanup.push(async () => {
+  let closed = false;
+  const close = async () => {
+    if (closed) return;
+    closed = true;
     await paseo.dispose();
     await client.close();
-  });
-  return { paseo, client };
+  };
+  return { paseo, client, clientId, close };
+}
+async function api(instance: TestPaseoDaemon, clientId = crypto.randomUUID()) {
+  const connected = await connectApi(instance, clientId);
+  cleanup.push(connected.close);
+  return connected;
 }
 async function online(paseo: ReturnType<typeof createPaseoApi>): Promise<HostDirectory> {
   let directory!: HostDirectory;
@@ -50,7 +60,7 @@ async function online(paseo: ReturnType<typeof createPaseoApi>): Promise<HostDir
 
 test("SDK saves unreachable hosts, rejects syntax and preserves source identity without exposing secrets", async () => {
   const a = await daemon();
-  const { paseo } = await api(a);
+  const { paseo, clientId } = await api(a);
   await expect(paseo.hosts.add({ connection: "ssh://-bad" })).rejects.toMatchObject({
     code: "invalid_connection",
   });
@@ -74,7 +84,7 @@ test("SDK saves unreachable hosts, rejects syntax and preserves source identity 
     registrationId: expect.stringMatching(/^hst_/),
     serverId: null,
     label: "Unavailable",
-    source: { id: "owner", key: "stable" },
+    source: { id: `client:owner:${encodeURIComponent(clientId)}`, key: "stable" },
     metadata: { team: "infra" },
     enabled: true,
   });
@@ -144,12 +154,15 @@ test("ordinary routed APIs isolate scopes and enforce one-hop, disable and origi
 test("routed authority is bounded by the caller, with isolated simultaneous sessions", async () => {
   const b = await daemon();
   const a = await daemon();
-  const owner = await api(a);
+  const clientId = crypto.randomUUID();
+  const owner = await connectApi(a, clientId);
+  cleanup.push(owner.close);
   await owner.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
   const directory = await online(owner.paseo);
   const serverId = directory.hosts[0]!.serverId!;
+  await owner.close();
   const viewerClient = createHostClient(`127.0.0.1:${a.port}`, {
-    clientId: "overlapping",
+    clientId,
     sessionPermissions: ["daemon.read", "workspace.read"],
     reconnect: { enabled: false },
   });
@@ -167,7 +180,7 @@ test("routed authority is bounded by the caller, with isolated simultaneous sess
   await expect(viewer.hosts.add({ connection: "127.0.0.1:1" })).rejects.toMatchObject({
     code: "permission_denied",
   });
-  expect((await owner.paseo.hosts.list()).hosts).toHaveLength(1);
+  expect((await viewer.hosts.list()).hosts).toHaveLength(1);
   await remote.dispose();
 });
 
@@ -255,6 +268,45 @@ test("host registrations are scoped to their authenticated source", async () => 
   ).rejects.toMatchObject({ code: "host_unknown", serverId: "srv-owner" });
 });
 
+test("clients sharing a daemon cannot see or mutate each other's host registrations", async () => {
+  const shared = await daemon();
+  const first = await api(shared);
+  const second = await api(shared);
+
+  const saved = await first.paseo.hosts.add({
+    connection: "127.0.0.1:1",
+    label: "Private host",
+  });
+
+  expect((await first.paseo.hosts.list()).hosts).toMatchObject([
+    { registrationId: saved.registrationId, label: "Private host" },
+  ]);
+  expect((await second.paseo.hosts.list()).hosts).toEqual([]);
+
+  const observation = second.paseo.hosts.observe();
+  cleanup.push(() => observation.release());
+  expect((await observation.ready).hosts).toEqual([]);
+
+  await expect(second.paseo.hosts.remove(saved.registrationId)).rejects.toMatchObject({
+    code: "permission_denied",
+  });
+});
+
+test("clients sharing a daemon cannot route another client's host", async () => {
+  const shared = await daemon();
+  const destination = await daemon();
+  const first = await api(shared);
+  const second = await api(shared);
+
+  await first.paseo.hosts.add({ connection: `127.0.0.1:${destination.port}` });
+  const serverId = (await online(first.paseo)).hosts[0]!.serverId!;
+
+  await expect(second.paseo.hosts.client(serverId)).rejects.toMatchObject({
+    code: "host_unknown",
+  });
+  expect((await second.paseo.hosts.list()).hosts).toEqual([]);
+});
+
 test("a remote client inspects and runs a local job through a connected host", async () => {
   const b = await daemon();
   const a = await daemon();
@@ -299,12 +351,15 @@ test("a remote client inspects and runs a local job through a connected host", a
 test("SDK host clients preserve ordinary permission RPC errors", async () => {
   const b = await daemon();
   const a = await daemon();
-  const owner = await api(a);
+  const originClientId = crypto.randomUUID();
+  const owner = await connectApi(a, originClientId);
+  cleanup.push(owner.close);
   await owner.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
   const serverId = (await online(owner.paseo)).hosts[0]!.serverId!;
-  const clients = [a, b].map((host) =>
+  await owner.close();
+  const clients = [a, b].map((host, index) =>
     createHostClient(`127.0.0.1:${host.port}`, {
-      clientId: crypto.randomUUID(),
+      clientId: index === 0 ? originClientId : crypto.randomUUID(),
       sessionPermissions: ["daemon.read", "workspace.read"],
       reconnect: { enabled: false },
     }),
@@ -355,11 +410,15 @@ test("distinct origin sessions cannot collide through a caller-selected route sc
   });
   const firstOrigin = await api(a);
   const secondOrigin = await api(a);
+  await firstOrigin.paseo.hosts.add({ connection: wire.connection });
+  await secondOrigin.paseo.hosts.add({ connection: wire.connection });
+  await online(firstOrigin.paseo);
+  await online(secondOrigin.paseo);
   const first = await RoutePeer.open(firstOrigin.client, serverId);
   const second = await RoutePeer.open(secondOrigin.client, serverId);
   await first.subscribeTerminal(one.id);
   await second.subscribeTerminal(two.id);
-  expect(wire.connections()).toBe(1);
+  expect(wire.connections()).toBe(3);
   first.input("FIRST_ONLY\n");
   second.input("SECOND_ONLY\n");
   await expect.poll(() => first.output()).toContain("FIRST_ONLY");
@@ -393,7 +452,7 @@ test("distinct origin sessions cannot collide through a caller-selected route sc
   const json = wire.frames
     .filter((frame) => !frame.binary)
     .map((frame) => JSON.parse(frame.bytes.toString()));
-  expect(json.filter((frame) => frame.type === "hello")).toHaveLength(1);
+  expect(json.filter((frame) => frame.type === "hello")).toHaveLength(3);
   expect(json.some((frame) => frame.message?.type === "hosts.link.open.request")).toBe(true);
   expect(
     json.some((frame) => frame.message?.binary === true || frame.message?.payload?.binary === true),
@@ -474,7 +533,7 @@ class RoutePeer {
     );
     if (info?.type !== "status") throw new Error("Missing routed server info");
     expect(info.payload).toMatchObject({
-      sourceId: `route:owner:${origin.getLastServerInfoMessage()!.serverId}:owner`,
+      sourceId: `route:owner:${origin.getLastServerInfoMessage()!.serverId}:${encodeURIComponent(origin.getLastServerInfoMessage()!.sourceId!)}`,
     });
     expect(info.payload).not.toHaveProperty("principalId");
     return peer;
@@ -597,7 +656,8 @@ test("disabled host configuration and source survive a fresh daemon instance", a
   cleanup.push(() => rm(root, { recursive: true, force: true }));
   const a = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
   cleanup.push(() => a.close());
-  const { paseo } = await api(a);
+  const clientId = crypto.randomUUID();
+  const { paseo } = await api(a, clientId);
   const host = await paseo.hosts.add({
     connection: "tcp://127.0.0.1:1?password=secret",
     label: "Persistent",
@@ -611,13 +671,13 @@ test("disabled host configuration and source survive a fresh daemon instance", a
   await a.close();
   const restarted = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
   cleanup.push(() => restarted.close());
-  const next = await api(restarted);
+  const next = await api(restarted, clientId);
   expect((await next.paseo.hosts.list()).hosts).toEqual([
     expect.objectContaining({
       registrationId: host.registrationId,
       label: "Persistent",
       metadata: { team: "infra" },
-      source: { id: "owner", key: "stable" },
+      source: { id: `client:owner:${encodeURIComponent(clientId)}`, key: "stable" },
       enabled: false,
       status: "disabled",
     }),
@@ -644,14 +704,17 @@ test("server plugins use ordinary remote SDK operations and retain qualified sou
     `
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
-const operate = defineRpc({ name: "operate", input: z.object({ serverId: z.string(), path: z.string() }), output: z.object({ workspaceId: z.string(), registrationId: z.string(), sourceId: z.string() }) });
+const operate = defineRpc({ name: "operate", input: z.object({ serverId: z.string(), path: z.string() }), output: z.object({ workspaceId: z.string(), registrationId: z.string(), visibleRegistrationId: z.string(), sourceId: z.string() }) });
 export default function contribute(server) {
   server.handle(operate, async (input, context) => {
     const remote = await context.paseo.hosts.client(input.serverId);
     try {
       const workspace = await remote.workspaces.create({ source: { kind: "directory", path: input.path }, title: "Plugin remote workspace" });
       const host = await remote.hosts.add({ connection: "127.0.0.1:1", sourceKey: "plugin-stable", metadata: { team: "plugin" } });
-      return { workspaceId: workspace.id, registrationId: host.registrationId, sourceId: host.source.id };
+      const directory = await remote.hosts.list();
+      const visibleRegistrationId = directory.hosts.find((entry) => entry.registrationId === host.registrationId)?.registrationId;
+      if (!visibleRegistrationId) throw new Error("Plugin source could not see its own registration");
+      return { workspaceId: workspace.id, registrationId: host.registrationId, visibleRegistrationId, sourceId: host.source.id };
     } finally { await remote.dispose(); }
   });
   return () => {};
@@ -666,17 +729,13 @@ export default function contribute(server) {
   expect(result).toEqual({
     workspaceId: expect.stringMatching(/^wks_/),
     registrationId: expect.stringMatching(/^hst_/),
+    visibleRegistrationId: expect.any(String),
     sourceId: `route:owner:${a.daemon.getServerId()}:plugin%3Aconnected-host-test`,
   });
+  expect(result.visibleRegistrationId).toBe(result.registrationId);
   const direct = await api(b);
   expect((await direct.paseo.workspaces.list()).entries).toHaveLength(1);
-  expect((await direct.paseo.hosts.list()).hosts[0]).toMatchObject({
-    source: {
-      id: `route:owner:${a.daemon.getServerId()}:plugin%3Aconnected-host-test`,
-      key: "plugin-stable",
-    },
-    metadata: { team: "plugin" },
-  });
+  expect((await direct.paseo.hosts.list()).hosts).toEqual([]);
   await client.removePlugin("connected-host-test");
   expect((await direct.paseo.workspaces.list()).entries).toHaveLength(1);
 });
@@ -756,11 +815,14 @@ test("CLI host commands manage the selected daemon and emit secret-free structur
 test("resuming an A session with narrower grants terminates existing routes and restores observations with current authority", async () => {
   const b = await daemon();
   const a = await daemon();
-  const admin = await api(a);
+  const clientId = "resumed-authority";
+  const admin = await connectApi(a, clientId);
+  cleanup.push(admin.close);
   await admin.paseo.hosts.add({ connection: `127.0.0.1:${b.port}` });
   const serverId = (await online(admin.paseo)).hosts[0]!.serverId!;
+  await admin.close();
   const origin = createHostClient(`127.0.0.1:${a.port}`, {
-    clientId: "resumed-authority",
+    clientId,
     reconnect: { enabled: false },
   });
   await origin.connect();
@@ -777,7 +839,7 @@ test("resuming an A session with narrower grants terminates existing routes and 
     update() {},
   });
   const restricted = createHostClient(`127.0.0.1:${a.port}`, {
-    clientId: "resumed-authority",
+    clientId,
     sessionPermissions: ["daemon.read", "workspace.read"],
     reconnect: { enabled: false },
   });
@@ -980,7 +1042,8 @@ test("disposing an origin during routed handshake settles acquisition and closes
   const address = http.address();
   if (!address || typeof address === "string") throw new Error("Missing pending endpoint port");
   const a = await daemon();
-  const { paseo } = await api(a);
+  const clientId = crypto.randomUUID();
+  const { paseo } = await api(a, clientId);
   await paseo.hosts.add({ connection: `127.0.0.1:${address.port}` });
   await online(paseo);
   const pending = paseo.hosts.client("srv_pending");
@@ -992,7 +1055,7 @@ test("disposing an origin during routed handshake settles acquisition and closes
   expect(ws.clients.size).toBe(1);
   expect(connections).toBe(1);
   routeClosed = false;
-  const next = await api(a);
+  const next = await api(a, clientId);
   await expect(next.paseo.hosts.client("srv_pending")).rejects.toMatchObject({
     code: "host_offline",
     serverId: "srv_pending",

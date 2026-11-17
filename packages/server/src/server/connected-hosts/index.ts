@@ -286,7 +286,11 @@ export class ConnectedHosts {
             "self_host",
             "This connection reaches this daemon. Remove it or replace the connection.",
           );
-        if (this.rows.find((entry) => entry.serverId === info.serverId) !== row)
+        if (
+          this.rows.find(
+            (entry) => entry.source.id === row.source.id && entry.serverId === info.serverId,
+          ) !== row
+        )
           throw new HostError(
             "duplicate_host",
             "Another registration already owns this daemon. Remove the duplicate registration.",
@@ -299,7 +303,11 @@ export class ConnectedHosts {
         // Pin and persist under the same writer as management to prevent discovery races.
         await this.mutate(async () => {
           if (stopped) return;
-          if (this.rows.find((entry) => entry.serverId === info.serverId) !== row)
+          if (
+            this.rows.find(
+              (entry) => entry.source.id === row.source.id && entry.serverId === info.serverId,
+            ) !== row
+          )
             throw new HostError("duplicate_host", "Another registration already owns this daemon");
           const next = {
             ...row,

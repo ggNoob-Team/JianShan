@@ -229,6 +229,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, "test-stubs/gorhom-bottom-sheet.ts"),
       },
       {
+        find: /^@gorhom\/bottom-sheet\/lib\/module\/contexts$/,
+        replacement: path.resolve(__dirname, "test-stubs/gorhom-bottom-sheet.ts"),
+      },
+      {
         find: /^react-native-reanimated\/scripts\/validate-worklets-version$/,
         replacement: path.resolve(__dirname, "test-stubs/reanimated-validate-worklets-version.ts"),
       },

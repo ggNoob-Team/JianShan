@@ -32,9 +32,11 @@ A pairing invitation is neither. It is an expiring, single-use exchange that cre
 Agents and terminals use workspace authority. Both can execute code and mutate the workspace, so separate write permissions would claim an isolation boundary the daemon cannot enforce.
 
 Connected-host management uses `tunnel.manage`; registrations are visible and routable only to the
-authenticated source that created them. Listing or routing another source's hosts requires
-`access.manage`. Source-owned connection and metadata replacement requires the producer or
-`access.manage`. Routed operations retain both caller and link authority, see
+client source that created them. A normal client source combines the admitted principal with its
+stable `clientId`. `access.manage` does not widen ordinary client host visibility; trusted daemon
+tooling and server plugins retain cross-source administration. Source-owned connection and metadata
+replacement requires the producer or that trusted administration path. Routed operations retain both
+caller and link authority, see
 [Connected hosts](connected-hosts.md#ownership-and-authority).
 
 Owner, operator, and viewer are UI presets expanded into explicit permissions. Do not persist them as roles. Adding a permission must not silently widen an existing principal.

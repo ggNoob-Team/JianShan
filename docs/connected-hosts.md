@@ -10,10 +10,12 @@ Credentials live in A's `hosts.json`, written atomically with mode `0600` on POS
 target description. Replacement inputs never come back through a read API. Keep this file private
 when collecting diagnostics or backing up daemon state.
 
-Registrations are visible and routable only to the authenticated source that created them. A
-different principal on the same daemon cannot discover or open another source's host, even when it
-knows the `serverId`. The `access.manage` permission is the explicit cross-source administration
-override.
+Each registration belongs to the client source that created it. A normal source is the admitted
+principal plus the client's stable `clientId`, so two clients sharing one daemon stay isolated even
+when they use the same principal. A different client cannot discover, mutate, or open another
+source's host, even when it knows the `serverId` or `registrationId`. Trusted daemon tooling and
+server plugins retain cross-source administration; ordinary clients do not gain it from
+`access.manage`.
 
 The authenticated producer owns its source key. Repeating an unchanged add returns the saved entry,
 including a user's disabled state. Changed input requires an explicit update. Display labels and
@@ -29,9 +31,11 @@ Changing or resuming a parent's grants closes its existing channels; reconnect r
 current authority. A routed API cannot select a second hop, and saving a host grants no reverse access.
 
 A producer that registers a host through a routed API is qualified on B as
-`route:<B principal>:<A serverId>:<A producer>`, with each component percent-encoded. This namespace belongs to the authenticated link
-principal. An ordinary direct B consumer does not become that producer by supplying a source key.
-The optional `server_info.sourceId` reports this producer identity separately from the authenticated admission principal.
+`route:<B principal>:<A serverId>:<A producer>`, with each component percent-encoded. For an ordinary
+A client, `<A producer>` is its principal-plus-client source. This namespace belongs to the
+authenticated link principal. An ordinary direct B consumer does not become that producer by
+supplying a source key. The optional `server_info.sourceId` reports this producer identity separately
+from the authenticated admission principal.
 Trusted server plugins retain the authority of their runtime; they are not sandboxed by this feature.
 
 ## Delegating agents

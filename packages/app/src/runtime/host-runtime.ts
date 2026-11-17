@@ -2635,10 +2635,14 @@ export class HostRuntimeStore {
     const observation = client.observeHosts();
     const apply = (directory: HostDirectory) => {
       if (this.hostObservations.get(serverId)?.client !== client) return;
+      let next = this.hosts;
+      let changed = false;
+      const visibleServerIds = new Set<string>();
       for (const target of directory.hosts) {
         if (!target.serverId || target.serverId === serverId) continue;
-        const next = upsertHostConnectionInProfiles({
-          profiles: this.hosts,
+        visibleServerIds.add(target.serverId);
+        const upserted = upsertHostConnectionInProfiles({
+          profiles: next,
           serverId: target.serverId,
           label: target.label ?? undefined,
           connection: {
@@ -2647,15 +2651,56 @@ export class HostRuntimeStore {
             originServerId: serverId,
           },
         });
-        if (next !== this.hosts) {
-          this.setHostsAndSync(next);
-          void this.persistHosts();
+        if (upserted !== next) {
+          next = upserted;
+          changed = true;
         }
-        if (!this.fleetDirectoryDemand.has(target.serverId))
+      }
+
+      const now = new Date().toISOString();
+      next = next.flatMap((profile) => {
+        const routedConnections = profile.connections.filter(
+          (connection) => connection.type === "routed" && connection.originServerId === serverId,
+        );
+        if (routedConnections.length === 0 || visibleServerIds.has(profile.serverId)) {
+          return [profile];
+        }
+        const removedIds = new Set(routedConnections.map((connection) => connection.id));
+        const remaining = profile.connections.filter(
+          (connection) => !removedIds.has(connection.id),
+        );
+        changed = true;
+        if (remaining.length === 0) return [];
+        return [
+          {
+            ...profile,
+            connections: remaining,
+            preferredConnectionId:
+              profile.preferredConnectionId && removedIds.has(profile.preferredConnectionId)
+                ? (remaining[0]?.id ?? null)
+                : profile.preferredConnectionId,
+            updatedAt: now,
+          },
+        ];
+      });
+
+      if (changed) {
+        this.setHostsAndSync(next);
+        void this.persistHosts();
+      }
+
+      for (const targetServerId of visibleServerIds) {
+        if (!this.fleetDirectoryDemand.has(targetServerId))
           this.fleetDirectoryDemand.set(
-            target.serverId,
-            this.acquireDirectoryDemand(target.serverId),
+            targetServerId,
+            this.acquireDirectoryDemand(targetServerId),
           );
+      }
+      for (const [targetServerId, release] of this.fleetDirectoryDemand) {
+        const target = next.find((profile) => profile.serverId === targetServerId);
+        if (target?.connections.some((connection) => connection.type === "routed")) continue;
+        release();
+        this.fleetDirectoryDemand.delete(targetServerId);
       }
     };
     const unsubscribe = observation.subscribe({

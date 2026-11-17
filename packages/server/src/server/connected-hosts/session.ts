@@ -94,7 +94,13 @@ export class ConnectedHostSession {
     });
   }
   private async execute(message: SessionInboundMessage): Promise<void> {
-    const actor = { ...this.actor, manageSources: this.permissions().includes("access.manage") };
+    const actor = {
+      ...this.actor,
+      // Ordinary clients own only the registrations created by their stable client source.
+      // Trusted server plugins retain daemon-wide authority for internal administration.
+      manageSources:
+        this.actor.sourceId.startsWith("plugin:") && this.permissions().includes("access.manage"),
+    };
     switch (message.type) {
       case "hosts.list.request":
         return this.list(message, actor);

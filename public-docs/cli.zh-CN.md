@@ -65,6 +65,8 @@ paseo usage ls --quiet
 ## 已连接的主机 {#connected-hosts}
 
 `--host` 选择要管理其已保存连接的 daemon。请用注册项的 `registrationId`，不要用标签。
+CLI 会在每个 Paseo home 中保留稳定客户端身份，daemon 只返回该客户端创建的注册项。其他共享
+同一个 daemon 的 CLI 或 App 客户端与它相互隔离。
 
 ```sh
 paseo --host localhost:6767 host add 'ssh://deploy@build-box' --label build-box --meta team=infra

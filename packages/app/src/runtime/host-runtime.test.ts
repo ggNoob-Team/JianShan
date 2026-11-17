@@ -172,9 +172,21 @@ class FakeDaemonClient {
     self: { serverId: "srv_test", label: "test" },
     hosts: [],
   });
+  private hostUpdateListeners = new Set<(message: SessionOutboundMessage) => void>();
 
   observeHosts() {
-    return subscriptionFixture(this.hostDirectory, () => () => {});
+    return subscriptionFixture(this.hostDirectory, (receive) => {
+      this.hostUpdateListeners.add(receive);
+      return () => this.hostUpdateListeners.delete(receive);
+    });
+  }
+
+  hostsChanged(directory: HostDirectory): void {
+    const message = {
+      type: "hosts.changed",
+      payload: { subscriptionId: "test-host-subscription", directory },
+    } satisfies SessionOutboundMessage;
+    for (const listener of this.hostUpdateListeners) listener(message);
   }
 
   public ownedSubscriptions = true;
@@ -1904,6 +1916,88 @@ describe("HostRuntimeStore", () => {
       }
     },
   );
+
+  it("prunes routed hosts when their origin no longer advertises them", async () => {
+    const originHost = makeHost({ serverId: "srv_origin", label: "Origin" });
+    const routed: HostConnection = {
+      id: "via:srv_origin",
+      type: "routed",
+      originServerId: "srv_origin",
+    };
+    const leakedHost = makeHost({
+      serverId: "srv_leaked",
+      label: "Leaked",
+      connections: [routed],
+      preferredConnectionId: routed.id,
+    });
+    const origin = new FakeDaemonClient();
+    origin.setConnectionState({ status: "connected" });
+    origin.connectedHosts = true;
+    const emptyDirectory: HostDirectory = {
+      self: { serverId: "srv_origin", label: "Origin" },
+      hosts: [],
+    };
+    origin.hostDirectory = Promise.resolve(emptyDirectory);
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage({
+        "@paseo:daemon-registry": JSON.stringify([originHost, leakedHost]),
+        "@paseo:e2e": "1",
+      }),
+      deps: {
+        createClient: ({ host }) =>
+          (host.serverId === "srv_origin"
+            ? origin
+            : new FakeDaemonClient()) as unknown as DaemonClient,
+        connectToDaemon: async ({ host }) => ({
+          client: (host.serverId === "srv_origin"
+            ? origin
+            : makeConnectedProbeClient(5)) as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: host.label,
+        }),
+        getClientId: async () => "cid_prune_routed_hosts",
+      },
+    });
+    const hostServerIds = () => store.getHosts().map((host) => host.serverId);
+
+    try {
+      await store.boot();
+      await waitForHostOnline(store, "srv_origin");
+      await vi.waitFor(() => expect(hostServerIds()).toEqual(["srv_origin"]));
+
+      origin.hostsChanged({
+        ...emptyDirectory,
+        hosts: [
+          {
+            registrationId: "reg_discovered",
+            serverId: "srv_discovered",
+            label: "Discovered",
+            source: { id: "client:owner:other", key: "stable" },
+            metadata: {},
+            enabled: true,
+            status: "online",
+            targetDescription: "discovered:6767",
+            lastOnlineAt: null,
+            nextRetryAt: null,
+            error: null,
+          },
+        ],
+      });
+      await vi.waitFor(() =>
+        expect(store.getHosts()).toContainEqual(
+          expect.objectContaining({
+            serverId: "srv_discovered",
+            connections: [{ id: "via:srv_origin", type: "routed", originServerId: "srv_origin" }],
+          }),
+        ),
+      );
+
+      origin.hostsChanged(emptyDirectory);
+      await vi.waitFor(() => expect(hostServerIds()).toEqual(["srv_origin"]));
+    } finally {
+      store.syncHosts([]);
+    }
+  });
 
   it.each(["active", "inactive", "background"] as const)(
     "keeps reconnect enabled through inactive/background and resumes immediately (mounted %s)",
