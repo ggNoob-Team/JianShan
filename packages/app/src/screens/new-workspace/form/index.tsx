@@ -10,6 +10,7 @@ import type { LaunchTarget } from "@/new-workspace-launch/target";
 import type { HostProjectListItem } from "@/projects/host-projects";
 import type { HostProfile } from "@/types/host-connection";
 import type { PickerItem } from "../../new-workspace-picker-item";
+import type { WorkspaceIsolation } from "../isolation";
 import {
   FIELD_BADGE_HEIGHT,
   FIELD_HEIGHT,
@@ -20,7 +21,6 @@ import { branchIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
 import { LaunchControl } from "./launch-control";
 import { AddProjectOption, IsolationOption, ProjectOption, RefOption } from "./options";
 
-type Isolation = "local" | "worktree";
 type RenderOption = NonNullable<ComboboxProps["renderOption"]>;
 
 interface PickerControl {
@@ -53,9 +53,9 @@ export interface NewWorkspaceFormProps {
     onAddHost: () => void;
   };
   isolation: PickerControl & {
-    effectiveIsolation: Isolation;
-    canCreateWorktree: boolean;
-    onSelect: (isolation: Isolation) => void;
+    effectiveIsolation: WorkspaceIsolation;
+    availableIsolations: readonly WorkspaceIsolation[];
+    showIsolationField: boolean;
   };
   base: PickerControl & {
     selectedSourceDirectory: string | null;
@@ -128,20 +128,21 @@ function useIsolationPicker(
   isPending: boolean,
 ): { options: ComboboxOption[]; onSelect: (id: string) => void; renderOption: RenderOption } {
   const { t } = useTranslation();
-  const { canCreateWorktree, onSelect, onOpenChange } = isolation;
-  // "New worktree" is omitted entirely (not disabled) when the project isn't a
-  // git checkout, since worktree isolation is impossible there.
+  const { availableIsolations, onOpenChange } = isolation;
   const options = useMemo<ComboboxOption[]>(() => {
-    const local = { id: "local", label: t("newWorkspace.isolation.local") };
-    if (!canCreateWorktree) return [local];
-    return [local, { id: "worktree", label: t("newWorkspace.isolation.worktree") }];
-  }, [canCreateWorktree, t]);
+    return availableIsolations.map((value) => ({
+      id: value,
+      label:
+        value === "worktree"
+          ? t("newWorkspace.isolation.worktree")
+          : t("newWorkspace.isolation.local"),
+    }));
+  }, [availableIsolations, t]);
   const handleSelect = useCallback(
-    (id: string) => {
-      onSelect(id === "worktree" ? "worktree" : "local");
+    (_id: string) => {
       onOpenChange(false);
     },
-    [onOpenChange, onSelect],
+    [onOpenChange],
   );
   const renderOption = useCallback<RenderOption>(
     (row) => <IsolationOption {...row} disabled={isPending} />,
@@ -244,7 +245,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       />
     </HostPicker>
   );
-  const isolationField = isolation.canCreateWorktree ? (
+  const isolationField = isolation.showIsolationField ? (
     <FieldTrigger
       ref={isolation.anchorRef}
       variant={variant}

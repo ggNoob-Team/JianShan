@@ -86,6 +86,7 @@ import {
   getWorkspaceNamingAttachments,
   remapDraftCwdToWorkspace,
 } from "./new-workspace-fork-context";
+import { resolveNewWorkspaceIsolation } from "./new-workspace/isolation";
 import {
   buildPickerOptionData,
   defaultBasePickerItem,
@@ -182,45 +183,11 @@ function noopClearDraft() {}
 // Stable reference so the keyboard-action handler doesn't re-register each render.
 const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = ["workspace.project.pick"];
 
-interface WorkspaceIsolationState {
-  isolation: "local" | "worktree";
-  setIsolation: (value: "local" | "worktree") => void;
-  effectiveIsolation: "local" | "worktree";
-  canCreateWorktree: boolean;
-  showRefPicker: boolean;
-}
-
-// Preserve the user's worktree choice while route metadata is provisional. Once
-// the authoritative placement arrives, unsupported projects fall back to local.
 function useWorkspaceIsolation(input: {
   supportsMultiplicity: boolean;
   worktreeSupport: "supported" | "unsupported" | "unknown";
-}): WorkspaceIsolationState {
-  const { supportsMultiplicity, worktreeSupport } = input;
-  // The last isolation choice is remembered alongside the other New Workspace
-  // form preferences (provider, model, mode). A manual in-screen pick overrides
-  // the remembered default until the screen remounts.
-  const { preferences, updatePreferences } = useFormPreferences();
-  const [manualIsolation, setManualIsolation] = useState<"local" | "worktree" | null>(null);
-  const isolation = manualIsolation ?? preferences.isolation ?? "local";
-  const canCreateWorktree = supportsMultiplicity && worktreeSupport !== "unsupported";
-  const isWorktree = isolation === "worktree" && canCreateWorktree;
-
-  const setIsolation = useCallback(
-    (value: "local" | "worktree") => {
-      setManualIsolation(value);
-      void updatePreferences({ isolation: value });
-    },
-    [updatePreferences],
-  );
-
-  return {
-    isolation,
-    setIsolation,
-    effectiveIsolation: isWorktree ? "worktree" : "local",
-    canCreateWorktree,
-    showRefPicker: !supportsMultiplicity || isWorktree,
-  };
+}): ReturnType<typeof resolveNewWorkspaceIsolation> {
+  return resolveNewWorkspaceIsolation(input);
 }
 
 function normalizeBranchDetails(
@@ -908,10 +875,9 @@ export function NewWorkspaceScreen({
   const isStillOnCreateScreen = useNewWorkspaceScreenPresence();
 
   // Launch target: what the composer submits to (chat agent, or a terminal
-  // profile). Mirrors useWorkspaceIsolation's pattern below: the derived
-  // value reads live from preferences until the user manually picks
-  // something in this screen, so the async preferences load doesn't race a
-  // frozen useState initializer.
+  // profile). The derived value reads live from preferences until the user
+  // manually picks something in this screen, so the async preferences load
+  // doesn't race a frozen useState initializer.
   const { preferences: formPreferences, updatePreferences: updateFormPreferences } =
     useFormPreferences();
   const { config: daemonConfig } = useDaemonConfig(selectedServerId);
@@ -1036,13 +1002,17 @@ export function NewWorkspaceScreen({
 
   const worktreeSupport = selectedProject
     ? getWorktreeSupportForHostProject({ project: selectedProject, serverId: selectedServerId })
-    : "unsupported";
+    : "unknown";
   const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
-  const { effectiveIsolation, setIsolation, canCreateWorktree, showRefPicker } =
-    useWorkspaceIsolation({
-      supportsMultiplicity: supportsWorkspaceMultiplicity,
-      worktreeSupport,
-    });
+  const {
+    isolation: effectiveIsolation,
+    availableIsolations,
+    showIsolationField,
+    showRefPicker,
+  } = useWorkspaceIsolation({
+    supportsMultiplicity: supportsWorkspaceMultiplicity,
+    worktreeSupport,
+  });
 
   const branchSuggestionsQuery = useQuery({
     queryKey: [
@@ -1143,9 +1113,8 @@ export function NewWorkspaceScreen({
 
   const handleSelectProjectOption = useCallback(
     (id: string) => {
-      // selectProjectOption enforces selectability (worktree-only when
-      // multiplicity is off, any project when it's on); don't re-gate here on
-      // canCreateWorktree or non-git projects become unselectable.
+      // selectProjectOption enforces selectability. Project kind controls isolation after selection;
+      // re-gating here would make non-git projects unselectable.
       selectProjectOption(id);
       setProjectPickerOpen(false);
       clearPickerSelectionForTargetChange(selectedProjectOptionId, id);
@@ -1492,8 +1461,8 @@ export function NewWorkspaceScreen({
       openState: isolationPickerOpen,
       onOpenChange: handleIsolationPickerOpenChange,
       effectiveIsolation,
-      canCreateWorktree,
-      onSelect: setIsolation,
+      availableIsolations,
+      showIsolationField,
     },
     base: {
       anchorRef: pickerAnchorRef,
