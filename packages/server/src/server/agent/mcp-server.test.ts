@@ -1752,6 +1752,7 @@ describe("create_agent MCP tool", () => {
       cwd: existingCwd,
       provider: "codex",
       currentModeId: "full-access",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
     const server = await createAgentMcpServer({
       agentManager,
@@ -1808,6 +1809,139 @@ describe("create_agent MCP tool", () => {
       }),
       undefined,
       { workspaceId: "wks_existing" },
+    );
+  });
+
+  it("marks agent-scoped creation as virtual and inherits the caller role", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const parent = createManagedAgent({
+      id: "role-parent",
+      cwd: "/tmp/role-parent",
+      workspaceId: "wks_role",
+      createdBy: { clientId: "cid-role", clientName: "书记" },
+    });
+    spies.agentManager.getAgent.mockReturnValue(parent);
+    spies.agentManager.createAgent.mockResolvedValue(
+      createManagedAgent({
+        id: "role-child",
+        cwd: "/tmp/role-parent",
+        workspaceId: "wks_role",
+        config: { title: "Child" },
+      }),
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: parent.id,
+      listActiveWorkspaces: async () => [
+        { workspaceId: "wks_role", cwd: "/tmp/role-parent", kind: "directory" },
+      ],
+      logger,
+    });
+
+    await registeredTool(server, "create_agent").handler({
+      ...subagentCurrentWorkspace(),
+      title: "Child",
+      provider: "codex/gpt-5.4",
+      initialPrompt: "Do work",
+    });
+
+    expect(spies.agentManager.createAgent).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.objectContaining({
+        createdBy: { clientId: "cid-role", clientName: "书记", virtual: true },
+      }),
+    );
+  });
+
+  it("rejects agent-scoped creation when the caller has no assigned role", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue(
+      createManagedAgent({
+        id: "unassigned-parent",
+        cwd: "/tmp/unassigned-parent",
+        workspaceId: "wks_unassigned",
+        createdBy: { clientId: "unassigned-client", clientName: "   " },
+      }),
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: "unassigned-parent",
+      listActiveWorkspaces: async () => [
+        { workspaceId: "wks_unassigned", cwd: "/tmp/unassigned-parent", kind: "directory" },
+      ],
+      logger,
+    });
+
+    await expect(
+      registeredTool(server, "create_agent").handler({
+        ...subagentCurrentWorkspace(),
+        title: "Child without role",
+        provider: "codex/gpt-5.4",
+        initialPrompt: "Do work",
+      }),
+    ).rejects.toThrow("请联系管理员分配角色");
+    expect(spies.agentManager.createAgent).not.toHaveBeenCalled();
+  });
+
+  it("passes the inherited virtual role when an agent mints a new workspace", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const parent = createManagedAgent({
+      id: "workspace-owner-parent",
+      cwd: existingCwd,
+      workspaceId: "wks_owner_parent",
+      createdBy: { clientId: "cid-owner", clientName: "书记" },
+    });
+    spies.agentManager.getAgent.mockReturnValue(parent);
+    spies.agentManager.createAgent.mockResolvedValue(
+      createManagedAgent({
+        id: "workspace-owner-child",
+        cwd: existingCwd,
+        workspaceId: "workspace-created",
+        config: { title: "Child" },
+      }),
+    );
+    const ensureWorkspace = vi.fn(
+      async (
+        _cwd: string,
+        _firstAgentContext: unknown,
+        context?: { callerWorkspaceId?: string; createdBy?: Record<string, unknown> },
+      ) => {
+        expect(context).toEqual({
+          callerWorkspaceId: parent.workspaceId,
+          createdBy: { clientId: "cid-owner", clientName: "书记", virtual: true },
+        });
+        return "workspace-created";
+      },
+    );
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: parent.id,
+      ensureWorkspaceForCreate: ensureWorkspace,
+      logger,
+    });
+
+    await registeredTool(server, "create_agent").handler({
+      ...detachedDirectoryWorkspace(existingCwd),
+      title: "Child",
+      provider: "codex/gpt-5.4",
+      initialPrompt: "Do work",
+    });
+
+    expect(ensureWorkspace).toHaveBeenCalledTimes(1);
+    expect(spies.agentManager.createAgent).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.objectContaining({
+        workspaceId: "workspace-created",
+        createdBy: { clientId: "cid-owner", clientName: "书记", virtual: true },
+      }),
     );
   });
 
@@ -2362,6 +2496,62 @@ describe("create_agent MCP tool", () => {
     ]);
   });
 
+  it("marks an agent-created worktree workspace as virtual", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const parent = createManagedAgent({
+      id: "worktree-owner-parent",
+      cwd: REPO_CWD,
+      workspaceId: "wks_worktree_parent",
+      createdBy: { clientId: "cid-worktree", clientName: "书记" },
+    });
+    spies.agentManager.getAgent.mockReturnValue(parent);
+    const receivedInputs: CreatePaseoWorktreeInput[] = [];
+    const createPaseoWorktree: CreatePaseoWorktreeWorkflowFn = async (input) => {
+      receivedInputs.push(input);
+      return {
+        worktree: { branchName: "owner-worktree", worktreePath: TARGET_CWD },
+        intent: { kind: "branch-off", branchName: "owner-worktree", baseBranch: "main" },
+        workspace: createPersistedWorkspaceRecord({
+          workspaceId: "ws-owner-worktree",
+          projectId: "project-owner-worktree",
+          cwd: TARGET_CWD,
+          kind: "worktree",
+          displayName: "owner-worktree",
+          createdAt: "2026-07-18T00:00:00.000Z",
+          updatedAt: "2026-07-18T00:00:00.000Z",
+        }),
+        repoRoot: REPO_CWD,
+        created: true,
+      };
+    };
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: parent.id,
+      createPaseoWorktree,
+      logger,
+    });
+
+    const response = await invokeToolWithParsedInput(registeredTool(server, "create_workspace"), {
+      isolation: "worktree",
+      path: REPO_CWD,
+      worktreeSlug: "owner-worktree",
+      baseBranch: "main",
+    });
+
+    expect(receivedInputs[0]).toEqual(
+      expect.objectContaining({
+        createdBy: { clientId: "cid-worktree", clientName: "书记", virtual: true },
+      }),
+    );
+    expect(response.structuredContent.createdBy).toEqual({
+      clientId: "cid-worktree",
+      clientName: "书记",
+      virtual: true,
+    });
+  });
+
   it("preserves branch checkout and pull request checkout workspace modes", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const createPaseoWorktree = vi.fn(async (input: CreatePaseoWorktreeInput) => ({
@@ -2768,6 +2958,58 @@ describe("create_agent MCP tool", () => {
     expect(listed.structuredContent.workspaces).toEqual([]);
   });
 
+  it("marks an agent-created workspace as virtual with the caller role", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const workspace = createPersistedWorkspaceRecord({
+      workspaceId: "ws-virtual",
+      projectId: "project-1",
+      cwd: process.cwd(),
+      kind: "directory",
+      displayName: "virtual workspace",
+      createdAt: "2026-07-17T00:00:00.000Z",
+      updatedAt: "2026-07-17T00:00:00.000Z",
+    });
+    spies.agentManager.getAgent.mockReturnValue(
+      createManagedAgent({
+        id: "parent-with-role",
+        cwd: process.cwd(),
+        workspaceId: "ws-parent",
+        createdBy: { clientId: "cid-role", clientName: "书记" },
+      }),
+    );
+    const upsert = vi.fn(async () => undefined);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: "parent-with-role",
+      workspaceRegistry: {
+        get: vi.fn(async () => workspace),
+        list: vi.fn(async () => [workspace]),
+        upsert,
+      },
+      createDirectoryWorkspace: async () => workspace,
+      logger,
+    });
+
+    const created = await invokeToolWithParsedInput(registeredTool(server, "create_workspace"), {
+      isolation: "local",
+      path: process.cwd(),
+    });
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws-virtual",
+        createdBy: { clientId: "cid-role", clientName: "书记", virtual: true },
+      }),
+    );
+    expect(created.structuredContent.createdBy).toEqual({
+      clientId: "cid-role",
+      clientName: "书记",
+      virtual: true,
+    });
+  });
+
   it("accepts custom provider IDs in create_agent input validation", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const server = await createAgentMcpServer({
@@ -2801,6 +3043,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_voice",
       provider: "codex",
       currentModeId: "full-access",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
     spies.agentManager.createAgent.mockResolvedValue({
       id: "child-agent",
@@ -2836,13 +3079,14 @@ describe("create_agent MCP tool", () => {
         cwd: subdir,
       }),
       undefined,
-      {
+      expect.objectContaining({
+        createdBy: { clientId: "test-client", clientName: "测试角色", virtual: true },
         labels: {
           [PARENT_AGENT_ID_LABEL]: "voice-agent",
           source: "voice",
         },
         workspaceId: "wks_voice",
-      },
+      }),
     );
     await rm(baseDir, { recursive: true, force: true });
   });
@@ -2856,6 +3100,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "codex",
       currentModeId: "full-access",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
 
     const server = await createAgentMcpServer({
@@ -2903,6 +3148,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "codex",
       currentModeId: "full-access",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent;
     const childAgent = {
       id: "child-agent",
@@ -2955,7 +3201,10 @@ describe("create_agent MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "claude", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
       const server = await createAgentMcpServer({
         agentManager,
@@ -2993,6 +3242,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "codex",
       currentModeId: "full-access",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
     spies.agentManager.createAgent.mockResolvedValue({
       id: "detached-agent",
@@ -3028,12 +3278,13 @@ describe("create_agent MCP tool", () => {
         cwd: existingCwd,
       }),
       undefined,
-      {
+      expect.objectContaining({
+        createdBy: { clientId: "test-client", clientName: "测试角色", virtual: true },
         labels: {
           source: "handoff",
         },
         workspaceId: "wks_parent",
-      },
+      }),
     );
   });
 
@@ -3046,6 +3297,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "claude",
       currentModeId: "bypassPermissions",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
     spies.agentManager.createAgent.mockResolvedValue({
       id: "child-agent",
@@ -3089,12 +3341,13 @@ describe("create_agent MCP tool", () => {
         featureValues: { fast_mode: true },
       }),
       undefined,
-      {
+      expect.objectContaining({
+        createdBy: { clientId: "test-client", clientName: "测试角色", virtual: true },
         labels: {
           [PARENT_AGENT_ID_LABEL]: "parent-agent",
         },
         workspaceId: "wks_parent",
-      },
+      }),
     );
   });
 
@@ -3106,6 +3359,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "codex",
       currentModeId: null,
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
       config: {
         providerOptions: {
           sandbox_mode: "workspace-write",
@@ -3169,7 +3423,10 @@ describe("create_agent MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "codex", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
 
       const server = await createAgentMcpServer({
@@ -3361,6 +3618,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "claude",
       currentModeId: "bypassPermissions",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent;
     spies.agentManager.getAgent.mockReturnValue(parentAgent);
     spies.agentManager.createAgent.mockResolvedValue({
@@ -3414,6 +3672,7 @@ describe("create_agent MCP tool", () => {
       workspaceId: "wks_parent",
       provider: "claude",
       currentModeId: "bypassPermissions",
+      createdBy: { clientId: "test-client", clientName: "测试角色" },
     } as ManagedAgent);
     spies.agentManager.createAgent.mockResolvedValue({
       id: "child-agent",
@@ -4107,7 +4366,10 @@ describe("send_agent_prompt MCP tool", () => {
         const parent = await agentManager.createAgent(
           { provider: "claude", cwd: existingCwd },
           undefined,
-          { workspaceId: "wks_parent" },
+          {
+            workspaceId: "wks_parent",
+            createdBy: { clientId: "test-client", clientName: "测试角色" },
+          },
         );
         const child = await agentManager.createAgent(
           { provider: "codex", cwd: existingCwd, title: "Retry child" },
@@ -4186,7 +4448,10 @@ describe("send_agent_prompt MCP tool", () => {
         const parent = await agentManager.createAgent(
           { provider: "claude", cwd: existingCwd },
           undefined,
-          { workspaceId: "wks_parent" },
+          {
+            workspaceId: "wks_parent",
+            createdBy: { clientId: "test-client", clientName: "测试角色" },
+          },
         );
         const child = await agentManager.createAgent(
           { provider: "codex", cwd: existingCwd },
@@ -4263,7 +4528,10 @@ describe("send_agent_prompt MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "claude", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
       const child = await agentManager.createAgent(
         { provider: "codex", cwd: existingCwd },
@@ -4318,7 +4586,10 @@ describe("send_agent_prompt MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "claude", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
       const server = await createAgentMcpServer({
         agentManager,
@@ -4384,7 +4655,10 @@ describe("send_agent_prompt MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "claude", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
       const child = await agentManager.createAgent(
         { provider: "codex", cwd: existingCwd },
@@ -4445,7 +4719,10 @@ describe("send_agent_prompt MCP tool", () => {
       const parent = await agentManager.createAgent(
         { provider: "claude", cwd: existingCwd },
         undefined,
-        { workspaceId: "wks_parent" },
+        {
+          workspaceId: "wks_parent",
+          createdBy: { clientId: "test-client", clientName: "测试角色" },
+        },
       );
       const child = await agentManager.createAgent(
         { provider: "codex", cwd: existingCwd },
@@ -4525,7 +4802,10 @@ describe("send_agent_prompt MCP tool to an OMP child", () => {
     const parent = await agentManager.createAgent(
       { provider: "claude", cwd: existingCwd },
       undefined,
-      { workspaceId: "wks_parent" },
+      {
+        workspaceId: "wks_parent",
+        createdBy: { clientId: "test-client", clientName: "测试角色" },
+      },
     );
     const child = await agentManager.createAgent(
       { provider: "omp", cwd: existingCwd, title: "OMP child" },

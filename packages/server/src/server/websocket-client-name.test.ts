@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { newSessionClientName, resumedClientName } from "./websocket-client-name";
 
 describe("newSessionClientName", () => {
-  it("defaults mobile sessions without a name", () => {
-    expect(newSessionClientName("mobile", undefined)).toBe("JianShan");
-    expect(newSessionClientName("mobile", "   ")).toBe("JianShan");
+  it("does not invent a mobile role when no name is supplied", () => {
+    expect(newSessionClientName("mobile", undefined)).toBeUndefined();
+    expect(newSessionClientName("mobile", "   ")).toBeUndefined();
   });
 
   it("keeps an explicit mobile name", () => {

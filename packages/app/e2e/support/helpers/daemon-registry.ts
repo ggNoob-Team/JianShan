@@ -26,12 +26,14 @@ export function buildSeededHost(input: {
   serverId: string;
   endpoint: string;
   label?: string;
+  clientName?: string;
   nowIso: string;
 }) {
   const connection = buildDirectTcpConnection(input.endpoint);
   return {
     serverId: input.serverId,
     label: input.label ?? TEST_HOST_LABEL,
+    clientName: input.clientName ?? "测试角色",
     connections: [connection],
     preferredConnectionId: connection.id,
     createdAt: input.nowIso,

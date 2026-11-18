@@ -144,9 +144,10 @@ test("creation progresses before agent readiness and continues after the disconn
 
 async function connectCreationPeer(
   port: number,
-  identity: { clientType?: "mobile" | "browser" | "cli"; clientName?: string } = {},
+  identity: { clientType?: "mobile" | "browser" | "cli"; clientName?: string | null } = {},
 ) {
   const timeout = 30_000;
+  const clientName = identity.clientName === undefined ? "测试角色" : identity.clientName;
   const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   const frames: SessionOutboundMessage[] = [];
   socket.on("message", (data) => {
@@ -162,7 +163,7 @@ async function connectCreationPeer(
       type: "hello",
       clientType: identity.clientType ?? "browser",
       clientId: randomUUID(),
-      ...(identity.clientName ? { clientName: identity.clientName } : {}),
+      ...(clientName ? { clientName } : {}),
       protocolVersion: 1,
       appVersion: "0.8.0",
     }),
@@ -273,12 +274,12 @@ test.each(["create_agent_request", "agent.create.request"] as const)(
   60000,
 );
 
-const CLIENT_NAME_REQUIRED_MESSAGE =
-  "Client name is required before creating a session. Pair this client again with a name.";
+const CLIENT_NAME_REQUIRED_MESSAGE = "请联系管理员分配角色";
 
 test.each([
   {
     type: "agent.create.request" as const,
+    clientType: "mobile" as const,
     request: (directory: string) => ({
       type: "agent.create.request" as const,
       requestId: "unnamed-modern-agent",
@@ -289,6 +290,7 @@ test.each([
   },
   {
     type: "workspace.create.request" as const,
+    clientType: "mobile" as const,
     request: (directory: string) => ({
       type: "workspace.create.request" as const,
       requestId: "unnamed-workspace-agent",
@@ -302,6 +304,7 @@ test.each([
   },
   {
     type: "create_agent_request" as const,
+    clientType: "mobile" as const,
     request: (directory: string) => ({
       type: "create_agent_request" as const,
       requestId: "unnamed-legacy-agent",
@@ -309,47 +312,60 @@ test.each([
       initialPrompt: "Create without a client name",
     }),
   },
-])("$type rejects an unnamed mobile client before creating anything", async ({ type, request }) => {
-  const directory = await mkdtemp(join(tmpdir(), "creation-unnamed-mobile-"));
-  let sessions = 0;
-  const daemon = await createCreationDaemon({
-    agentClients: createTestAgentClients({
-      beforeCreateSession: async (config) => {
-        if (!config.internal) sessions++;
-      },
+  {
+    type: "workspace.create.request" as const,
+    clientType: "browser" as const,
+    request: (directory: string) => ({
+      type: "workspace.create.request" as const,
+      requestId: "unnamed-empty-workspace",
+      idempotencyKey: "unnamed-empty-workspace",
+      source: { kind: "directory" as const, path: directory },
     }),
-  });
-  const peer = await connectCreationPeer(daemon.port, { clientType: "mobile" });
-  try {
-    const response = await peer.request(request(directory));
-
-    if (type === "agent.create.request") {
-      expect(response).toMatchObject({
-        type: "agent.create.response",
-        payload: { error: CLIENT_NAME_REQUIRED_MESSAGE },
-      });
-    } else if (type === "workspace.create.request") {
-      expect(response).toMatchObject({
-        type: "workspace.create.response",
-        payload: { error: CLIENT_NAME_REQUIRED_MESSAGE, errorCode: "client_name_required" },
-      });
-    } else {
-      expect(response).toMatchObject({
-        type: "status",
-        payload: {
-          status: "agent_create_failed",
-          error: CLIENT_NAME_REQUIRED_MESSAGE,
-          errorCode: "client_name_required",
+  },
+])(
+  "$type rejects an unnamed $clientType client before creating anything",
+  async ({ type, clientType, request }) => {
+    const directory = await mkdtemp(join(tmpdir(), "creation-unnamed-mobile-"));
+    let sessions = 0;
+    const daemon = await createCreationDaemon({
+      agentClients: createTestAgentClients({
+        beforeCreateSession: async (config) => {
+          if (!config.internal) sessions++;
         },
-      });
+      }),
+    });
+    const peer = await connectCreationPeer(daemon.port, { clientType, clientName: null });
+    try {
+      const response = await peer.request(request(directory));
+
+      if (type === "agent.create.request") {
+        expect(response).toMatchObject({
+          type: "agent.create.response",
+          payload: { error: CLIENT_NAME_REQUIRED_MESSAGE },
+        });
+      } else if (type === "workspace.create.request") {
+        expect(response).toMatchObject({
+          type: "workspace.create.response",
+          payload: { error: CLIENT_NAME_REQUIRED_MESSAGE, errorCode: "client_name_required" },
+        });
+      } else {
+        expect(response).toMatchObject({
+          type: "status",
+          payload: {
+            status: "agent_create_failed",
+            error: CLIENT_NAME_REQUIRED_MESSAGE,
+            errorCode: "client_name_required",
+          },
+        });
+      }
+      expect(sessions).toBe(0);
+    } finally {
+      peer.close();
+      await daemon.close();
+      await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
-    expect(sessions).toBe(0);
-  } finally {
-    peer.close();
-    await daemon.close();
-    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  }
-});
+  },
+);
 
 test("a named mobile client can still create an agent", async () => {
   const directory = await mkdtemp(join(tmpdir(), "creation-named-mobile-"));

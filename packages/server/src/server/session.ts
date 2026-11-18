@@ -1339,13 +1339,13 @@ export class Session {
   }
 
   private assertCanCreateSession(): void {
-    if (this.clientType !== "mobile" || this.clientName) {
+    if (
+      this.clientName?.trim() ||
+      (this.clientType !== "mobile" && this.clientType !== "browser")
+    ) {
       return;
     }
-    throw new SessionRequestError(
-      "client_name_required",
-      "Client name is required before creating a session. Pair this client again with a name.",
-    );
+    throw new SessionRequestError("client_name_required", "请联系管理员分配角色");
   }
 
   private currentActor(): AgentActor {
@@ -4585,9 +4585,7 @@ export class Session {
         )
       : undefined;
     try {
-      if (request.agent) {
-        this.assertCanCreateSession();
-      }
+      this.assertCanCreateSession();
       if (
         request.agent &&
         !this.authorization.allowsPermission("workspace.write") &&

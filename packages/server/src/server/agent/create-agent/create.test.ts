@@ -265,22 +265,26 @@ test("mcp create stamps the new worktree's workspaceId, not the parent's", async
         kind: "session",
         config: { provider: "codex", cwd: workdir },
         workspaceId: "ws-parent",
+        actor: { clientId: "client-parent", clientName: "书记" },
         labels: {},
         provisionalTitle: null,
         firstAgentContext: { attachments: [] },
       },
     );
 
+    const createPaseoWorktree = vi.fn(
+      fakeWorktreeCreator({
+        repoRoot: workdir,
+        createdWorkspaceId: "ws-new-worktree",
+      }),
+    );
     const { snapshot: child } = await createAgentCommand(
       {
         agentManager,
         agentStorage: storage,
         logger,
         providerSnapshotManager,
-        createPaseoWorktree: fakeWorktreeCreator({
-          repoRoot: workdir,
-          createdWorkspaceId: "ws-new-worktree",
-        }),
+        createPaseoWorktree,
       },
       {
         kind: "mcp",
@@ -296,6 +300,12 @@ test("mcp create stamps the new worktree's workspaceId, not the parent's", async
     const storedChild = await storage.get(child.id);
     expect(storedChild?.workspaceId).toBe("ws-new-worktree");
     expect(child.cwd).toBe(join(workdir, "worktree", "packages", "app"));
+    expect(createPaseoWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createdBy: { clientId: "client-parent", clientName: "书记", virtual: true },
+      }),
+      expect.anything(),
+    );
   } finally {
     await removeRealAgentManagerWorkdir({ agentManager, storage, workdir });
   }

@@ -22,6 +22,8 @@ export function resolvePairingRole(value: PairingRole | null | undefined): Pairi
 export const AgentActorSchema = z.object({
   clientId: z.string().min(1),
   clientName: ClientNameSchema.optional(),
+  /** The role was inherited by an agent-created session rather than chosen by a user. */
+  virtual: z.boolean().optional(),
 });
 
 export type AgentActor = z.infer<typeof AgentActorSchema>;

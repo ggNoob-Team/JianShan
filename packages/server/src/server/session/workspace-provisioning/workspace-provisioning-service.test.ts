@@ -176,6 +176,7 @@ test("background workspace creation preserves hooks, inheritance and durable vis
   expect(child.background).toBe(true);
   expect(visible.background).toBe(false);
   expect(human.background).toBe(false);
+  expect(human.createdBy).toBeUndefined();
   expect(events).toEqual(Array(4).fill("workspace.created"));
   const reloaded = new FileBackedWorkspaceRegistry(
     path.join(tmpDir, "projects", "workspaces.json"),
@@ -183,6 +184,47 @@ test("background workspace creation preserves hooks, inheritance and durable vis
   );
   await reloaded.initialize();
   expect((await reloaded.get(child.workspaceId))?.background).toBe(true);
+});
+
+test("agent-created workspaces persist the inherited virtual role", async () => {
+  const dir = path.join(tmpDir, "agent-owned");
+  const createdBy = {
+    clientId: "client-role",
+    clientName: "书记",
+    virtual: true,
+  };
+
+  const workspace = await provisioning.createWorkspaceForDirectory(dir, null, undefined, {
+    createdBy,
+  });
+
+  expect(workspace.createdBy).toEqual(createdBy);
+  const reloaded = new FileBackedWorkspaceRegistry(
+    path.join(tmpDir, "projects", "workspaces.json"),
+    logger,
+  );
+  await reloaded.initialize();
+  expect((await reloaded.get(workspace.workspaceId))?.createdBy).toEqual(createdBy);
+});
+
+test("agent-created worktree workspaces persist the inherited virtual role", async () => {
+  const repo = path.join(tmpDir, "repo");
+  const worktree = path.join(tmpDir, "worktree");
+  gitRoots.add(repo);
+  const createdBy = { clientId: "client-role", clientName: "书记", virtual: true };
+
+  const workspace = await provisioning.createWorkspaceForWorktree({
+    sourceCwd: repo,
+    repoRoot: repo,
+    cwd: worktree,
+    worktreeRoot: worktree,
+    branch: "feature",
+    baseBranch: "main",
+    title: null,
+    createdBy,
+  });
+
+  expect(workspace.createdBy).toEqual(createdBy);
 });
 
 test("re-opening an active workspace by exact path returns the same record without duplicating", async () => {

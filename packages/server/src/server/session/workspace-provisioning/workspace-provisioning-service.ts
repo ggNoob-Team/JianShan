@@ -2,6 +2,7 @@ import type { PluginLifecycle } from "../../plugins/lifecycle/index.js";
 import { describeHookWorkspace } from "../../plugins/lifecycle/index.js";
 import { basename, resolve } from "node:path";
 import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import type { Logger } from "pino";
 import {
   generateWorkspaceId,
@@ -28,6 +29,7 @@ export interface ResolveOrCreateWorkspaceIdInput {
   initialTitle: string | null;
   background?: boolean;
   callerWorkspaceId?: string;
+  createdBy?: AgentActor;
 }
 
 export interface ImportWorkspaceInput {
@@ -54,6 +56,7 @@ export interface CreateWorktreeWorkspaceInput {
   untrustedSource?: UntrustedWorkspaceSource;
   background?: boolean;
   callerWorkspaceId?: string;
+  createdBy?: AgentActor;
 }
 
 export interface WorkspaceProvisioningService {
@@ -72,6 +75,7 @@ export interface WorkspaceProvisioningService {
       workspaceId?: string;
       background?: boolean;
       callerWorkspaceId?: string;
+      createdBy?: AgentActor;
     },
   ): Promise<PersistedWorkspaceRecord>;
   createWorkspaceForWorktree(
@@ -244,6 +248,7 @@ export function createWorkspaceProvisioningService(deps: {
       workspaceId?: string;
       background?: boolean;
       callerWorkspaceId?: string;
+      createdBy?: AgentActor;
     },
   ): Promise<PersistedWorkspaceRecord> {
     const normalizedCwd = resolve(cwd);
@@ -261,6 +266,7 @@ export function createWorkspaceProvisioningService(deps: {
       createdAt: timestamp,
       updatedAt: timestamp,
       background: await resolveBackground(context),
+      ...(context?.createdBy ? { createdBy: context.createdBy } : {}),
     });
     await workspaceRegistry.upsert(workspace, {
       expectsInitialAgent: context?.expectsInitialAgent,
@@ -296,6 +302,7 @@ export function createWorkspaceProvisioningService(deps: {
       title: input.title,
       createdAt: timestamp,
       updatedAt: timestamp,
+      ...(input.createdBy ? { createdBy: input.createdBy } : {}),
       ...(input.untrustedSource ? { untrustedSource: input.untrustedSource } : {}),
       background: await resolveBackground(input),
     });
@@ -383,6 +390,7 @@ export function createWorkspaceProvisioningService(deps: {
         expectsInitialAgent: true,
         background: input.background,
         callerWorkspaceId: input.callerWorkspaceId,
+        ...(input.createdBy ? { createdBy: input.createdBy } : {}),
       })
     ).workspaceId;
   }

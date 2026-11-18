@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { writeJsonFileAtomic } from "./atomic-file.js";
 import { areEquivalentPaths } from "../utils/path.js";
+import { AgentActorSchema } from "@getpaseo/protocol/agent-actor";
 import {
   generateProjectId,
   type PersistedProjectKind,
@@ -101,6 +102,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
+  createdBy: AgentActorSchema.optional(),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
   // Public discovery visibility. Contents retain their ordinary lifecycle.
   background: z.boolean().optional().default(false),
@@ -685,6 +687,7 @@ export function createPersistedWorkspaceRecord(input: {
   autoArchivedChangeRequestUrl?: string | null;
   pinnedAt?: string | null;
   labels?: string[];
+  createdBy?: z.infer<typeof AgentActorSchema>;
   untrustedSource?: UntrustedWorkspaceSource;
   background?: boolean;
 }): PersistedWorkspaceRecord {

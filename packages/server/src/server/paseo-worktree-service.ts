@@ -27,6 +27,7 @@ import type { WorktreeCreationIntent } from "./resolve-worktree-creation-intent.
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import { buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import { runWithGitCommandPriority } from "../utils/run-git-command.js";
 
 export interface CreatePaseoWorktreeInput extends CreateWorktreeCoreInput {
@@ -35,6 +36,7 @@ export interface CreatePaseoWorktreeInput extends CreateWorktreeCoreInput {
   title?: string;
   background?: boolean;
   callerWorkspaceId?: string;
+  createdBy?: AgentActor;
 }
 
 export interface CreatePaseoWorktreeResult {
@@ -105,6 +107,7 @@ async function createPaseoWorktreeWithPriority(
       expectsInitialAgent: Boolean(input.firstAgentContext),
       background: input.background,
       callerWorkspaceId: input.callerWorkspaceId,
+      ...(input.createdBy ? { createdBy: input.createdBy } : {}),
       ...(createdWorktree.intent.kind === "checkout-change-request" &&
       createdWorktree.intent.headRepository
         ? {
