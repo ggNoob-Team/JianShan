@@ -10,6 +10,13 @@ The remote agent discovers daemons with `list_hosts`, then calls `inspect_local_
 target `serverId`. The response lists the target platform, workspace IDs, and the `local.jobs`
 capability.
 
+For open-ended work such as building, installing, launching, or testing on another device, prefer
+`create_agent` with the target host's `serverId` and workspace ID. Describe the desired outcome,
+constraints, and success criteria, then let the local agent inspect the machine and choose its own
+commands. The caller is notified when that child agent finishes, fails, or needs permission, and can
+read its activity for the result. Use local jobs when the caller already knows the exact deterministic
+command it needs to run.
+
 Use `start_local_job` with one of those workspace IDs. It runs asynchronously and returns a `jobId`.
 The agent can then:
 

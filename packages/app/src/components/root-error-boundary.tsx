@@ -27,10 +27,15 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
   }
 
   componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
-    console.error("[RootErrorBoundary] Unhandled render error", {
-      error: formatCaughtValue(error),
-      componentStack: errorInfo.componentStack,
-    });
+    console.error(
+      [
+        "[RootErrorBoundary] Unhandled render error",
+        formatCaughtValue(error),
+        errorInfo.componentStack ? `Component stack:${errorInfo.componentStack}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
   }
 
   render() {

@@ -18,6 +18,35 @@ export function buildWorkspaceAgentActivityIndex(
   agents: ReadonlyMap<string, Agent>,
   previous?: ReadonlyMap<string, WorkspaceAgentActivity>,
 ): Map<string, WorkspaceAgentActivity> {
+  const creatorByWorkspaceId = buildWorkspaceCreatorNames(agents);
+  const activityByWorkspaceId = buildLatestWorkspaceActivity(
+    agents,
+    creatorByWorkspaceId,
+    previous,
+  );
+
+  for (const [workspaceId, activity] of activityByWorkspaceId) {
+    const previousActivity = previous?.get(workspaceId);
+    if (
+      previousActivity?.agentId === activity.agentId &&
+      previousActivity.status === activity.status &&
+      previousActivity.createdByName === activity.createdByName
+    ) {
+      activityByWorkspaceId.set(workspaceId, previousActivity);
+    }
+  }
+
+  if (previous && areWorkspaceAgentActivityIndexesIdentical(previous, activityByWorkspaceId)) {
+    return previous instanceof Map ? previous : new Map(previous);
+  }
+  return activityByWorkspaceId;
+}
+
+function buildLatestWorkspaceActivity(
+  agents: ReadonlyMap<string, Agent>,
+  creatorByWorkspaceId: ReadonlyMap<string, string>,
+  previous?: ReadonlyMap<string, WorkspaceAgentActivity>,
+): Map<string, WorkspaceAgentActivity> {
   const activityByWorkspaceId = new Map<string, WorkspaceAgentActivity>();
   const latestActivityAtByWorkspaceId = new Map<string, Date>();
 
@@ -44,25 +73,34 @@ export function buildWorkspaceAgentActivityIndex(
       agentId: agent.id,
       status,
       enteredAt,
-      createdByName: agent.createdBy?.clientName ?? null,
+      createdByName:
+        creatorByWorkspaceId.get(agent.workspaceId) ??
+        previous?.get(agent.workspaceId)?.createdByName ??
+        null,
     });
   }
+  return activityByWorkspaceId;
+}
 
-  for (const [workspaceId, activity] of activityByWorkspaceId) {
-    const previousActivity = previous?.get(workspaceId);
-    if (
-      previousActivity?.agentId === activity.agentId &&
-      previousActivity.status === activity.status &&
-      previousActivity.createdByName === activity.createdByName
-    ) {
-      activityByWorkspaceId.set(workspaceId, previousActivity);
+function buildWorkspaceCreatorNames(agents: ReadonlyMap<string, Agent>): Map<string, string> {
+  const creatorByWorkspaceId = new Map<string, { createdAt: Date; name: string }>();
+
+  // Activity follows the newest root agent, but creator identity belongs to the
+  // workspace and must survive later agents that have no actor metadata.
+  for (const agent of agents.values()) {
+    const name = agent.createdBy?.clientName;
+    if (!agent.workspaceId || !name) {
+      continue;
+    }
+    const current = creatorByWorkspaceId.get(agent.workspaceId);
+    if (!current || agent.createdAt < current.createdAt) {
+      creatorByWorkspaceId.set(agent.workspaceId, { createdAt: agent.createdAt, name });
     }
   }
 
-  if (previous && areWorkspaceAgentActivityIndexesIdentical(previous, activityByWorkspaceId)) {
-    return previous instanceof Map ? previous : new Map(previous);
-  }
-  return activityByWorkspaceId;
+  return new Map(
+    Array.from(creatorByWorkspaceId, ([workspaceId, creator]) => [workspaceId, creator.name]),
+  );
 }
 
 function areWorkspaceAgentActivityIndexesIdentical(

@@ -10,6 +10,11 @@ Credentials live in A's `hosts.json`, written atomically with mode `0600` on POS
 target description. Replacement inputs never come back through a read API. Keep this file private
 when collecting diagnostics or backing up daemon state.
 
+Registrations are visible and routable only to the authenticated source that created them. A
+different principal on the same daemon cannot discover or open another source's host, even when it
+knows the `serverId`. The `access.manage` permission is the explicit cross-source administration
+override.
+
 The authenticated producer owns its source key. Repeating an unchanged add returns the saved entry,
 including a user's disabled state. Changed input requires an explicit update. Display labels and
 access can be changed by users with `tunnel.manage`; connection and metadata changes require the

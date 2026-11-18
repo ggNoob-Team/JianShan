@@ -44,6 +44,8 @@ vi.mock("@gorhom/portal", () => ({
 vi.mock("@gorhom/bottom-sheet", async () => {
   const { Portal } = await import("@gorhom/portal");
   return {
+    INITIAL_CONTAINER_LAYOUT: { height: 0, width: 0 },
+    useBottomSheetModalInternal: () => null,
     BottomSheetModalProvider: ({ children }: { children?: React.ReactNode }) =>
       React.createElement("div", { "data-bottom-sheet-provider": true }, children),
     BottomSheetModal: React.forwardRef(
@@ -57,7 +59,12 @@ vi.mock("@gorhom/bottom-sheet", async () => {
   };
 });
 
-import { IsolatedBottomSheetModal, type ContextBridge } from ".";
+vi.mock("@gorhom/bottom-sheet/lib/module/contexts", () => ({
+  BottomSheetModalInternalProvider: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("div", { "data-internal-provider": true }, children),
+}));
+
+import { IsolatedBottomSheetModal, SheetHostScope, type ContextBridge } from ".";
 import { useIsInsideBottomSheet } from "@/components/ui/bottom-sheet-scope";
 
 /** Renders whatever the portal is currently holding, from its own place in the tree. */
@@ -133,6 +140,28 @@ describe("IsolatedBottomSheetModal presentation", () => {
     });
 
     expect(stackBehaviors()).toEqual(["replace"]);
+  });
+});
+
+describe("SheetHostScope", () => {
+  it("renders with the internal provider implementation entry", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <SheetHostScope>
+          <div data-sheet-scope-content />
+        </SheetHostScope>,
+      );
+    });
+
+    expect(container.querySelector("[data-internal-provider]")).not.toBeNull();
+    expect(container.querySelector("[data-sheet-scope-content]")).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
   });
 });
 

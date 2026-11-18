@@ -497,7 +497,25 @@ function resolveHdc() {
 }
 
 function installHap(hapPath) {
-  run(resolveHdc(), ["install", "-r", hapPath]);
+  const hdc = resolveHdc();
+  log(`$ ${hdc} install -r ${hapPath}`);
+  const result = spawnSync(hdc, ["install", "-r", hapPath], {
+    encoding: "utf8",
+    shell: false,
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) {
+    fail(`failed to run ${hdc}: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    fail(`${hdc} exited with code ${result.status}`);
+  }
+  // hdc can exit 0 after "Connect server failed", so its process status alone
+  // is not sufficient proof that the package reached the device.
+  if (!/install bundle successfully/i.test(`${result.stdout}\n${result.stderr}`)) {
+    fail("hdc did not confirm that the package was installed");
+  }
 }
 
 /**

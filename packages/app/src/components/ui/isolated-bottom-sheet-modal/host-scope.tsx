@@ -1,8 +1,8 @@
-import {
-  BottomSheetModalInternalProvider,
-  INITIAL_CONTAINER_LAYOUT,
-  useBottomSheetModalInternal,
-} from "@gorhom/bottom-sheet";
+import { INITIAL_CONTAINER_LAYOUT, useBottomSheetModalInternal } from "@gorhom/bottom-sheet";
+// The internal provider is declared by the package's type tree but omitted from
+// its runtime root entry point. Importing the implementation module keeps the
+// provider and consumer on the same context object.
+import { BottomSheetModalInternalProvider } from "@gorhom/bottom-sheet/lib/module/contexts";
 import { PortalHost } from "@gorhom/portal";
 import { useCallback, useId, useMemo, useRef, type ReactNode } from "react";
 import {

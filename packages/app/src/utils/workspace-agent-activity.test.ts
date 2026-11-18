@@ -7,6 +7,7 @@ function agent(input: {
   workspaceId?: string;
   status?: Agent["status"];
   turn?: Agent["turn"];
+  createdAt?: string;
   updatedAt: string;
   attentionTimestamp?: string | null;
   requiresAttention?: boolean;
@@ -31,7 +32,7 @@ function agent(input: {
             cancellationRequestId: null,
           }
         : { phase: "idle", cancellationRequestId: null }),
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    createdAt: new Date(input.createdAt ?? "2026-01-01T00:00:00.000Z"),
     updatedAt: new Date(input.updatedAt),
     lastUserMessageAt: null,
     lastActivityAt: new Date(input.updatedAt),
@@ -161,6 +162,38 @@ describe("workspace agent activity index", () => {
         ],
       ]),
     );
+  });
+
+  it("keeps the earliest named creator when a newer root agent has none", () => {
+    const index = buildWorkspaceAgentActivityIndex(
+      new Map([
+        [
+          "creator",
+          agent({
+            id: "creator",
+            workspaceId: "workspace-a",
+            createdAt: "2026-06-01T09:00:00.000Z",
+            updatedAt: "2026-06-01T09:05:00.000Z",
+            archivedAt: "2026-06-01T09:10:00.000Z",
+            createdBy: { clientId: "client-harmony", clientName: "少爷" },
+          }),
+        ],
+        [
+          "newer",
+          agent({
+            id: "newer",
+            workspaceId: "workspace-a",
+            createdAt: "2026-06-01T10:00:00.000Z",
+            updatedAt: "2026-06-01T10:05:00.000Z",
+          }),
+        ],
+      ]),
+    );
+
+    expect(index.get("workspace-a")).toMatchObject({
+      agentId: "newer",
+      createdByName: "少爷",
+    });
   });
 
   it("does not let archived or child agents change root workspace activity", () => {

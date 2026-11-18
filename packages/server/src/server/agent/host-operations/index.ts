@@ -53,7 +53,7 @@ export interface ToolHosts {
 /** Daemon MCP has the daemon's authority, bounded by the destination's admission of its link. */
 export function createToolHosts(hosts: ConnectedHosts): ToolHosts {
   return {
-    directory: () => hosts.list(),
+    directory: () => hosts.listAll(),
     async use(serverId, action) {
       const lifetime = new AbortController();
       const transportFactory: DaemonTransportFactory = () => {
@@ -68,6 +68,7 @@ export function createToolHosts(hosts: ConnectedHosts): ToolHosts {
             serverId,
             scopeId: randomUUID(),
             sourceId: "mcp",
+            manageSources: true,
             originSessionId: "mcp",
             permissions: OWNER_PERMISSIONS,
             signal: lifetime.signal,
