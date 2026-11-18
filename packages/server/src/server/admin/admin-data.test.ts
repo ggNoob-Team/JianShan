@@ -9,6 +9,7 @@ import {
   deleteRole,
   discoverRoles,
   loadAdminSnapshot,
+  reorderRoles,
   upsertRole,
 } from "./admin-data.js";
 
@@ -134,6 +135,25 @@ describe("admin data projection", () => {
     );
   });
 
+  test("persists a custom role order for the admin and team views", async () => {
+    const home = await fixture();
+    const before = discoverRoles(await loadAdminSnapshot(home));
+    for (const role of before) await upsertRole(home, role.name, role.role);
+    const reversedIds = before.map((role) => role.id).toReversed();
+
+    await reorderRoles(home, reversedIds);
+
+    const snapshot = await loadAdminSnapshot(home);
+    expect(discoverRoles(snapshot).map((role) => role.id)).toEqual(reversedIds);
+    expect(
+      buildTeamInsights({
+        snapshot,
+        start: "2026-11-02T00:00:00.000Z",
+        end: "2026-11-02T00:05:00.000Z",
+      }).members.map((member) => member.id),
+    ).toEqual(reversedIds);
+  });
+
   test("groups questions and usage by pair name while sessions use createdBy", async () => {
     const home = await fixture();
     await upsertRole(home, "书记");
@@ -171,8 +191,49 @@ describe("admin data projection", () => {
         agentId: "agent-1",
         ownerName: "书记",
         ownerSource: "role",
+        ownerVirtual: false,
         workspaceTitle: "管理台工作区",
       }),
     ]);
+  });
+
+  test("marks inherited agent ownership as virtual", async () => {
+    const home = await fixture();
+    const snapshot = await loadAdminSnapshot(home);
+    snapshot.agents[0]!.createdBy = {
+      clientId: "client-a",
+      clientName: "书记",
+      virtual: true,
+    };
+
+    expect(buildTitleMap(snapshot)[0]).toMatchObject({
+      ownerName: "书记",
+      ownerVirtual: true,
+    });
+  });
+
+  test("shows an agent-created workspace without an agent as a virtual title row", async () => {
+    const home = await fixture();
+    const snapshot = await loadAdminSnapshot(home);
+    snapshot.workspaces.push({
+      workspaceId: "wks_virtual",
+      projectId: "prj_1",
+      cwd: "/workspace/virtual",
+      displayName: "virtual",
+      title: "Agent-created workspace",
+      createdBy: { clientId: "client-a", clientName: "书记", virtual: true },
+      updatedAt: "2026-11-02T00:03:00.000Z",
+    });
+
+    expect(buildTitleMap(snapshot)).toContainEqual(
+      expect.objectContaining({
+        agentId: "",
+        workspaceId: "wks_virtual",
+        workspaceTitle: "Agent-created workspace",
+        ownerName: "书记",
+        ownerSource: "role",
+        ownerVirtual: true,
+      }),
+    );
   });
 });

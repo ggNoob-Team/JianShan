@@ -20,6 +20,7 @@ import {
   deleteRole,
   discoverRoles,
   loadAdminSnapshot,
+  reorderRoles,
   upsertRole,
   type AdminAgentRecord,
   type AdminWorkspaceRecord,
@@ -356,6 +357,29 @@ function createAdminApp(input: {
     }
   });
 
+  app.put("/api/roles/order", async (req, res, next) => {
+    try {
+      const ids = Array.isArray(req.body?.ids)
+        ? req.body.ids.filter((id: unknown): id is string => typeof id === "string")
+        : [];
+      const snapshot = await loadAdminSnapshot(input.paseoHome);
+      const roles = discoverRoles(snapshot);
+      const expected = new Set(roles.map((role) => role.id));
+      if (ids.length !== expected.size || ids.some((id: string) => !expected.has(id))) {
+        res.status(400).json({ error: "角色排序数据无效，请刷新后重试" });
+        return;
+      }
+      for (const role of roles) await upsertRole(input.paseoHome, role.name, role.role);
+      await reorderRoles(input.paseoHome, ids);
+      const nextSnapshot = await loadAdminSnapshot(input.paseoHome);
+      res.json({
+        roles: discoverRoles(nextSnapshot).map((role) => serializeRole(role, nextSnapshot)),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/roles", async (req, res, next) => {
     try {
       const name = readString(req.body, "name");
@@ -511,6 +535,7 @@ function serializeAgent(
     status: agent.lastStatus ?? "closed",
     archived: Boolean(agent.archivedAt),
     ownerName: agent.createdBy?.clientName ?? "未分配",
+    ownerVirtual: agent.createdBy?.virtual === true,
     projectName:
       project?.customName || project?.displayName || workspace?.displayName || "未归属项目",
     workspaceId: agent.workspaceId ?? "",
@@ -559,7 +584,10 @@ function selectRoleActor(
   const known = actors
     .filter((entry) => entry.actor.clientName === name)
     .sort((left, right) => Date.parse(right.recordedAt) - Date.parse(left.recordedAt))[0]?.actor;
-  if (known) return known;
+  if (known) {
+    const { virtual: _virtual, ...manualActor } = known;
+    return manualActor;
+  }
   return {
     clientId: `role-${createHash("sha256").update(name).digest("hex").slice(0, 20)}`,
     clientName: name,

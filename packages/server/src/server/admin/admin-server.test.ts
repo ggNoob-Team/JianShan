@@ -82,6 +82,9 @@ describe("admin server", () => {
     const roleScriptText = await roleScript.text();
     expect(roleScriptText).toContain("data-role-regenerate");
     expect(roleScriptText).toContain("data-role-delete");
+    expect(roleScriptText).toContain("data-role-move");
+    expect(roleScriptText).toContain("badge virtual");
+    expect(roleScriptText).toContain("data-owner-agent");
 
     const unauthorized = await fetch(new URL("/api/roles", handle.url));
     expect(unauthorized.status).toBe(401);

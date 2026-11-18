@@ -393,12 +393,14 @@ async function loadRoles() {
   $("#roles-list").innerHTML =
     data.roles
       .map(
-        (role) => `<div class="role-row">
+        (role, index) => `<div class="role-row">
           <strong>${escapeHtml(role.name)} <span class="badge ${role.role === "admin" ? "success" : ""}">${roleLabel(role.role)}</span></strong>
           <small>${role.sessions ?? 0} 会话 · ${role.questions ?? 0} 提问 · ${
             role.lastActiveAt ? formatDate(role.lastActiveAt) : "尚未使用"
           }</small>
           <div class="role-row-actions">
+            <button class="text-button" data-role-move="${escapeHtml(role.id)}" data-role-direction="up" ${index === 0 ? "disabled" : ""}>↑</button>
+            <button class="text-button" data-role-move="${escapeHtml(role.id)}" data-role-direction="down" ${index === data.roles.length - 1 ? "disabled" : ""}>↓</button>
             <select data-role-value aria-label="${escapeHtml(role.name)} 的角色类型">
               <option value="member" ${role.role === "member" ? "selected" : ""}>成员</option>
               <option value="admin" ${role.role === "admin" ? "selected" : ""}>管理员</option>
@@ -409,6 +411,20 @@ async function loadRoles() {
         </div>`,
       )
       .join("") || `<div class="empty-state">尚未创建角色。输入名称生成第一个入口。</div>`;
+}
+
+async function moveRole(id, direction) {
+  const index = state.roles.findIndex((role) => role.id === id);
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || target < 0 || target >= state.roles.length) return;
+  const next = [...state.roles];
+  [next[index], next[target]] = [next[target], next[index]];
+  await api("/api/roles/order", {
+    method: "PUT",
+    body: JSON.stringify({ ids: next.map((role) => role.id) }),
+  });
+  await loadRoles();
+  toast("角色顺序已保存");
 }
 
 async function createRole(name, role) {
@@ -474,7 +490,10 @@ function renderAgents() {
               <strong>${escapeHtml(agent.title)}</strong>
               <small>${escapeHtml(agent.provider)}${agent.model ? ` · ${escapeHtml(agent.model)}` : ""} · ${formatDate(agent.updatedAt)}</small>
             </div>
-            <span class="badge ${agent.ownerName === "未分配" ? "warning" : ""}">${escapeHtml(agent.ownerName)}</span>
+            <span>
+              <span class="badge ${agent.ownerName === "未分配" ? "warning" : ""}">${escapeHtml(agent.ownerName)}</span>
+              ${agent.ownerVirtual ? '<span class="badge virtual">虚拟</span>' : ""}
+            </span>
             <span>${escapeHtml(agent.projectName)}</span>
             <span class="badge ${agent.status === "running" ? "success" : ""}">${escapeHtml(agent.status)}</span>
             <button class="text-button" data-owner-agent="${escapeHtml(agent.id)}" data-owner-current="${escapeHtml(agent.ownerName)}">转让</button>
@@ -505,7 +524,7 @@ async function transferOwner(agentId, name) {
     method: "POST",
     body: JSON.stringify({ name }),
   });
-  await loadAgents();
+  await Promise.all([loadAgents(), loadTitles()]);
   toast("负责人已转让并记录审计");
 }
 
@@ -536,10 +555,13 @@ function renderTitles() {
               <strong>${escapeHtml(item.workspaceTitle || "未命名 Workspace")}</strong>
               <small>${escapeHtml(item.agentTitle || "无会话标题")}</small>
             </div>
-            <span class="badge ${item.ownerSource === "unassigned" ? "warning" : ""}">${escapeHtml(item.ownerName)}</span>
+            <span>
+              <span class="badge ${item.ownerSource === "unassigned" ? "warning" : ""}">${escapeHtml(item.ownerName)}</span>
+              ${item.ownerVirtual ? '<span class="badge virtual">虚拟</span>' : ""}
+            </span>
             <span>${sourceLabel[item.ownerSource]}</span>
             <span>${formatDate(item.updatedAt)}</span>
-            <span></span>
+            ${item.agentId ? `<button class="text-button" data-owner-agent="${escapeHtml(item.agentId)}" data-owner-current="${escapeHtml(item.ownerName)}">转让</button>` : "<span></span>"}
           </div>`,
         )
         .join("") || `<div class="empty-state">没有匹配的标题。</div>`
@@ -667,6 +689,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = event.target.closest("[data-owner-agent]");
     if (!button) return;
     openOwnerDialog(button.dataset.ownerAgent, button.dataset.ownerCurrent);
+  });
+  $("#titles-table").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-owner-agent]");
+    if (!button) return;
+    openOwnerDialog(button.dataset.ownerAgent, button.dataset.ownerCurrent);
+  });
+  $("#roles-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-role-move]");
+    if (!button) return;
+    void moveRole(button.dataset.roleMove, button.dataset.roleDirection).catch((error) =>
+      setGlobalError(error.message),
+    );
   });
   $("#owner-form").addEventListener("submit", async (event) => {
     event.preventDefault();

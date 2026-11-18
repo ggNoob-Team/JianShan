@@ -68,6 +68,7 @@ export interface AdminRoleRecord {
   id: string;
   name: string;
   role: PairingRole;
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -95,6 +96,9 @@ export interface AdminWorkspaceRecord {
   cwd: string;
   displayName: string;
   title?: string | null;
+  createdBy?: AgentActor;
+  createdAt?: string;
+  updatedAt?: string;
   archivedAt?: string | null;
 }
 
@@ -117,6 +121,7 @@ export interface TitleMapItem {
   providerTitle: string;
   ownerName: string;
   ownerSource: "role" | "manual" | "unassigned";
+  ownerVirtual: boolean;
   updatedAt: string;
 }
 
@@ -183,12 +188,15 @@ export async function upsertRole(
   const roles = await loadRoleRecords(paseoHome);
   const now = new Date().toISOString();
   const existing = roles.find((item) => item.name === normalized);
+  const nextSortOrder =
+    roles.reduce((maximum, item) => Math.max(maximum, item.sortOrder ?? -1), -1) + 1;
   const record: AdminRoleRecord = existing
     ? { ...existing, role, deletedAt: null, updatedAt: now }
     : {
         id: roleId(normalized),
         name: normalized,
         role,
+        sortOrder: nextSortOrder,
         createdAt: now,
         updatedAt: now,
       };
@@ -259,7 +267,12 @@ export async function loadOwnershipAudit(paseoHome: string): Promise<OwnershipAu
 export function discoverRoles(snapshot: AdminSnapshot): AdminRoleRecord[] {
   const values = new Map<string, AdminRoleRecord>();
   const deleted = new Set(snapshot.deletedRoleNames);
-  for (const role of snapshot.roles) values.set(role.name, role);
+  let nextSortOrder = 0;
+  for (const role of snapshot.roles) {
+    const sortOrder = role.sortOrder ?? nextSortOrder;
+    values.set(role.name, { ...role, sortOrder });
+    nextSortOrder = Math.max(nextSortOrder, sortOrder + 1);
+  }
   const add = (actor: AgentActor | undefined) => {
     const name = actor?.clientName?.trim();
     if (!name || deleted.has(name) || values.has(name)) return;
@@ -267,13 +280,39 @@ export function discoverRoles(snapshot: AdminSnapshot): AdminRoleRecord[] {
       id: roleId(name),
       name,
       role: DEFAULT_PAIRING_ROLE,
+      sortOrder: nextSortOrder++,
       createdAt: "",
       updatedAt: "",
     });
   };
   for (const agent of snapshot.agents) add(agent.createdBy);
   for (const actor of snapshot.actors) add(actor.actor);
-  return [...values.values()].sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
+  for (const workspace of snapshot.workspaces) add(workspace.createdBy);
+  return [...values.values()].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+}
+
+export async function reorderRoles(
+  paseoHome: string,
+  orderedIds: string[],
+): Promise<AdminRoleRecord[]> {
+  const roles = await loadRoleRecords(paseoHome);
+  const active = roles.filter((role) => !role.deletedAt);
+  const byId = new Map(active.map((role) => [role.id, role]));
+  const ordered: AdminRoleRecord[] = [];
+  for (const id of orderedIds) {
+    const role = byId.get(id);
+    if (!role) continue;
+    ordered.push(role);
+    byId.delete(id);
+  }
+  ordered.push(...byId.values());
+  const orderById = new Map(ordered.map((role, index) => [role.id, index]));
+  for (const role of roles) {
+    const sortOrder = orderById.get(role.id);
+    if (sortOrder !== undefined) role.sortOrder = sortOrder;
+  }
+  await writePrivateJson(resolveRolesPath(paseoHome), roles);
+  return ordered.map((role, index) => Object.assign({}, role, { sortOrder: index }));
 }
 
 export function buildTeamInsights(input: {
@@ -378,27 +417,57 @@ export function buildTeamInsights(input: {
 export function buildTitleMap(snapshot: AdminSnapshot): TitleMapItem[] {
   const workspaces = new Map(snapshot.workspaces.map((item) => [item.workspaceId, item]));
   const manualAgentIds = new Set(snapshot.ownershipAudit.map((item) => item.agentId));
-  return snapshot.agents
+  const agentRows = snapshot.agents
     .filter((agent) => !agent.internal)
     .map((agent) => {
       const workspace = agent.workspaceId ? workspaces.get(agent.workspaceId) : undefined;
-      const ownerName = agent.createdBy?.clientName?.trim() ?? "";
-      let ownerSource: TitleMapItem["ownerSource"] = "unassigned";
-      if (ownerName) {
-        ownerSource = manualAgentIds.has(agent.id) ? "manual" : "role";
-      }
+      const owner = resolveTitleOwner(agent, manualAgentIds);
       return {
         agentId: agent.id,
         workspaceId: agent.workspaceId ?? "",
         agentTitle: agent.title?.trim() ?? "",
         workspaceTitle: workspace?.title?.trim() || workspace?.displayName?.trim() || "",
         providerTitle: agent.title?.trim() ?? "",
-        ownerName: ownerName || "未分配",
-        ownerSource,
+        ownerName: owner.ownerName,
+        ownerSource: owner.ownerSource,
+        ownerVirtual: owner.ownerVirtual,
         updatedAt: agent.lastActivityAt ?? agent.updatedAt,
       } satisfies TitleMapItem;
-    })
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+    });
+  const representedWorkspaceIds = new Set(
+    agentRows.map((item) => item.workspaceId).filter((workspaceId) => workspaceId.length > 0),
+  );
+  const workspaceRows = snapshot.workspaces.flatMap((workspace) => {
+    const ownerName = workspace.createdBy?.clientName?.trim();
+    if (!ownerName || representedWorkspaceIds.has(workspace.workspaceId)) return [];
+    return [
+      {
+        agentId: "",
+        workspaceId: workspace.workspaceId,
+        agentTitle: "",
+        workspaceTitle: workspace.title?.trim() || workspace.displayName?.trim() || "",
+        providerTitle: "",
+        ownerName,
+        ownerSource: "role" as const,
+        ownerVirtual: workspace.createdBy?.virtual === true,
+        updatedAt: workspace.updatedAt ?? workspace.createdAt ?? "",
+      } satisfies TitleMapItem,
+    ];
+  });
+  return [...agentRows, ...workspaceRows].sort(
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+  );
+}
+
+function resolveTitleOwner(agent: AdminAgentRecord, manualAgentIds: ReadonlySet<string>) {
+  const ownerName = agent.createdBy?.clientName?.trim();
+  let ownerSource: TitleMapItem["ownerSource"] = "unassigned";
+  if (ownerName) ownerSource = manualAgentIds.has(agent.id) ? "manual" : "role";
+  return {
+    ownerName: ownerName || "未分配",
+    ownerSource,
+    ownerVirtual: agent.createdBy?.virtual === true,
+  };
 }
 
 function buildMember(input: {
