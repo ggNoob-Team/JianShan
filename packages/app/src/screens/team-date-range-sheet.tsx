@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { StyleSheet } from "react-native-unistyles";
 
+import { teamAccentColor, teamAccentForeground } from "./team-accent";
 import {
   TEAM_DATE_PRESETS,
   createTeamDateRange,
@@ -372,7 +373,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface3,
   },
   daySelected: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor: teamAccentColor(theme),
   },
   dayToday: {
     borderWidth: 1,
@@ -387,10 +388,10 @@ const styles = StyleSheet.create((theme) => ({
     fontVariant: ["tabular-nums"],
   },
   dayTextInRange: {
-    color: theme.colors.accent,
+    color: teamAccentColor(theme),
   },
   dayTextSelected: {
-    color: theme.colors.accentForeground,
+    color: teamAccentForeground(theme),
     fontWeight: theme.fontWeight.semibold,
   },
   footer: {

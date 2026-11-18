@@ -5,6 +5,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TeamMetricBucket } from "@getpaseo/protocol/team-insights";
 import type { Theme } from "@/styles/theme";
 
+import { teamAccentColor } from "./team-accent";
 import { formatTeamDuration } from "./team-screen-model";
 
 const VIEW_BOX = 120;
@@ -53,7 +54,7 @@ interface TeamPiePalette {
 
 const chartPaletteMapping = (theme: Theme): TeamPiePalette => ({
   palette: [
-    theme.colors.accent,
+    teamAccentColor(theme),
     theme.colors.statusSuccess,
     theme.colors.palette.blue[400],
     theme.colors.statusMerged,
@@ -240,7 +241,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
   },
   legendShare: {
-    color: theme.colors.accent,
+    color: teamAccentColor(theme),
     fontSize: theme.fontSize.sm,
     fontVariant: ["tabular-nums"],
   },

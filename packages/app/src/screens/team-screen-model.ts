@@ -243,9 +243,7 @@ export function mergeTeamInsightsForHosts(entries: TeamHostInsights[]): TeamInsi
     for (const member of team.members) addMember(members, member, { serverId, label });
     addMember(unassigned, team.unassigned, { serverId, label });
   }
-  const mergedMembers = [...members.values()]
-    .map(finishMember)
-    .sort((left, right) => right.seconds - left.seconds || left.name.localeCompare(right.name));
+  const mergedMembers = [...members.values()].map(finishMember);
   const mergedUnassigned = finishMember(
     [...unassigned.values()][0] ?? accumulatorFor(unassigned, first.unassigned),
   );

@@ -33,6 +33,7 @@ import {
 import { StyleSheet } from "react-native-unistyles";
 
 import { TeamDateRangeSheet } from "./team-date-range-sheet";
+import { teamAccentColor } from "./team-accent";
 import { TeamPieChart } from "./team-pie-chart";
 import {
   buildTeamInsightsRequestForRange,
@@ -409,299 +410,302 @@ function Heatmap({ days }: { days: TeamHeatmapDay[] }): ReactElement {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.surface0,
-  },
-  scroll: {
-    flex: 1,
-    minHeight: 0,
-  },
-  scrollContent: {
-    paddingHorizontal: { xs: theme.spacing[3], md: theme.spacing[6] },
-    paddingTop: theme.spacing[4],
-    paddingBottom: theme.spacing[8],
-  },
-  content: {
-    width: "100%",
-    maxWidth: 1320,
-    alignSelf: "center",
-    gap: theme.spacing[4],
-  },
-  headingRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: theme.spacing[4],
-  },
-  headingRowCompact: {
-    flexDirection: "column",
-    gap: theme.spacing[3],
-  },
-  headingCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: theme.spacing[1],
-  },
-  headingActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: theme.spacing[2],
-  },
-  headingActionsCompact: {
-    width: "100%",
-    justifyContent: "flex-start",
-  },
-  dateRangeButton: {
-    maxWidth: "100%",
-  },
-  dateRangeText: {
-    fontSize: theme.fontSize.sm,
-    fontVariant: ["tabular-nums"],
-  },
-  eyebrow: {
-    color: theme.colors.accent,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize["2xl"],
-    fontWeight: theme.fontWeight.semibold,
-  },
-  description: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.base,
-    lineHeight: 22,
-  },
-  spinner: {
-    color: theme.colors.foregroundMuted,
-  },
-  centered: {
-    minHeight: 320,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.spacing[3],
-  },
-  emptyState: {
-    minHeight: 260,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.spacing[3],
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing[6],
-  },
-  emptyTitle: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
-  },
-  muted: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
-  inlineError: {
-    color: theme.colors.destructive,
-    fontSize: theme.fontSize.sm,
-  },
-  memberTabs: {
-    flexDirection: "row",
-    gap: theme.spacing[2],
-    paddingBottom: theme.spacing[1],
-  },
-  memberTab: {
-    minWidth: 138,
-    paddingVertical: theme.spacing[3],
-    paddingHorizontal: theme.spacing[3],
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.surface1,
-    gap: theme.spacing[1],
-  },
-  memberTabActive: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.surface2,
-  },
-  memberTabHighlight: {
-    backgroundColor: theme.colors.surface2,
-  },
-  memberName: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-  },
-  memberNameActive: {
-    color: theme.colors.accent,
-  },
-  memberMeta: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
-  statGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[3],
-  },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 148,
-    minWidth: 140,
-    padding: theme.spacing[4],
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.surface1,
-    gap: theme.spacing[2],
-  },
-  statLabel: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
-  statValue: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.semibold,
-    fontVariant: ["tabular-nums"],
-  },
-  chartGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[4],
-  },
-  chartPanel: {
-    flexGrow: 1,
-    flexBasis: 260,
-    minWidth: 240,
-  },
-  heatmapPanel: {
-    flex: 0.95,
-  },
-  panel: {
-    width: "100%",
-    minWidth: 0,
-    padding: theme.spacing[4],
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xl,
-    backgroundColor: theme.colors.surface1,
-    gap: theme.spacing[4],
-  },
-  panelHeading: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing[3],
-  },
-  panelTitle: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.semibold,
-  },
-  allocationGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing[4],
-  },
-  allocation: {
-    flexGrow: 1,
-    flexBasis: 230,
-    minWidth: 0,
-    gap: theme.spacing[2],
-  },
-  allocationTitle: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.medium,
-  },
-  allocationList: {
-    gap: theme.spacing[2],
-  },
-  allocationRow: {
-    gap: theme.spacing[1],
-  },
-  allocationLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing[2],
-  },
-  allocationLabel: {
-    flex: 1,
-    minWidth: 0,
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
-  allocationShare: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    fontVariant: ["tabular-nums"],
-  },
-  allocationTrack: {
-    height: 5,
-    overflow: "hidden",
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.surface3,
-  },
-  allocationFill: {
-    height: "100%",
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.accent,
-  },
-  tokenRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing[3],
-  },
-  tokenValue: {
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.sm,
-    fontVariant: ["tabular-nums"],
-  },
-  heatmapDays: {
-    minWidth: 760,
-    gap: theme.spacing[2],
-  },
-  heatmapRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-  },
-  heatmapDate: {
-    width: 42,
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    fontVariant: ["tabular-nums"],
-  },
-  heatmapSlots: {
-    flex: 1,
-    flexDirection: "row",
-    gap: 2,
-  },
-  heatCell: {
-    flex: 1,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-  },
-  heatLegend: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[1],
-    marginTop: theme.spacing[2],
-  },
-  heatLegendCell: {
-    width: 16,
-    height: 10,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-  },
-}));
+const styles = StyleSheet.create((theme) => {
+  const accent = teamAccentColor(theme);
+  return {
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.surface0,
+    },
+    scroll: {
+      flex: 1,
+      minHeight: 0,
+    },
+    scrollContent: {
+      paddingHorizontal: { xs: theme.spacing[3], md: theme.spacing[6] },
+      paddingTop: theme.spacing[4],
+      paddingBottom: theme.spacing[8],
+    },
+    content: {
+      width: "100%",
+      maxWidth: 1320,
+      alignSelf: "center",
+      gap: theme.spacing[4],
+    },
+    headingRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: theme.spacing[4],
+    },
+    headingRowCompact: {
+      flexDirection: "column",
+      gap: theme.spacing[3],
+    },
+    headingCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: theme.spacing[1],
+    },
+    headingActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      flexWrap: "wrap",
+      gap: theme.spacing[2],
+    },
+    headingActionsCompact: {
+      width: "100%",
+      justifyContent: "flex-start",
+    },
+    dateRangeButton: {
+      maxWidth: "100%",
+    },
+    dateRangeText: {
+      fontSize: theme.fontSize.sm,
+      fontVariant: ["tabular-nums"],
+    },
+    eyebrow: {
+      color: accent,
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
+      letterSpacing: 0.8,
+      textTransform: "uppercase",
+    },
+    title: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize["2xl"],
+      fontWeight: theme.fontWeight.semibold,
+    },
+    description: {
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.base,
+      lineHeight: 22,
+    },
+    spinner: {
+      color: theme.colors.foregroundMuted,
+    },
+    centered: {
+      minHeight: 320,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: theme.spacing[3],
+    },
+    emptyState: {
+      minHeight: 260,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: theme.spacing[3],
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.xl,
+      padding: theme.spacing[6],
+    },
+    emptyTitle: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.base,
+      fontWeight: theme.fontWeight.medium,
+    },
+    muted: {
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+    },
+    inlineError: {
+      color: theme.colors.destructive,
+      fontSize: theme.fontSize.sm,
+    },
+    memberTabs: {
+      flexDirection: "row",
+      gap: theme.spacing[2],
+      paddingBottom: theme.spacing[1],
+    },
+    memberTab: {
+      minWidth: 138,
+      paddingVertical: theme.spacing[3],
+      paddingHorizontal: theme.spacing[3],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.surface1,
+      gap: theme.spacing[1],
+    },
+    memberTabActive: {
+      borderColor: accent,
+      backgroundColor: theme.colors.surface2,
+    },
+    memberTabHighlight: {
+      backgroundColor: theme.colors.surface2,
+    },
+    memberName: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
+    },
+    memberNameActive: {
+      color: accent,
+    },
+    memberMeta: {
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+    },
+    statGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing[3],
+    },
+    statCard: {
+      flexGrow: 1,
+      flexBasis: 148,
+      minWidth: 140,
+      padding: theme.spacing[4],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.surface1,
+      gap: theme.spacing[2],
+    },
+    statLabel: {
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+    },
+    statValue: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.xl,
+      fontWeight: theme.fontWeight.semibold,
+      fontVariant: ["tabular-nums"],
+    },
+    chartGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing[4],
+    },
+    chartPanel: {
+      flexGrow: 1,
+      flexBasis: 260,
+      minWidth: 240,
+    },
+    heatmapPanel: {
+      flex: 0.95,
+    },
+    panel: {
+      width: "100%",
+      minWidth: 0,
+      padding: theme.spacing[4],
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.xl,
+      backgroundColor: theme.colors.surface1,
+      gap: theme.spacing[4],
+    },
+    panelHeading: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: theme.spacing[3],
+    },
+    panelTitle: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.base,
+      fontWeight: theme.fontWeight.semibold,
+    },
+    allocationGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing[4],
+    },
+    allocation: {
+      flexGrow: 1,
+      flexBasis: 230,
+      minWidth: 0,
+      gap: theme.spacing[2],
+    },
+    allocationTitle: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
+    },
+    allocationList: {
+      gap: theme.spacing[2],
+    },
+    allocationRow: {
+      gap: theme.spacing[1],
+    },
+    allocationLabels: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: theme.spacing[2],
+    },
+    allocationLabel: {
+      flex: 1,
+      minWidth: 0,
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+    },
+    allocationShare: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.sm,
+      fontVariant: ["tabular-nums"],
+    },
+    allocationTrack: {
+      height: 5,
+      overflow: "hidden",
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.surface3,
+    },
+    allocationFill: {
+      height: "100%",
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: accent,
+    },
+    tokenRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: theme.spacing[3],
+    },
+    tokenValue: {
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.sm,
+      fontVariant: ["tabular-nums"],
+    },
+    heatmapDays: {
+      minWidth: 760,
+      gap: theme.spacing[2],
+    },
+    heatmapRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[2],
+    },
+    heatmapDate: {
+      width: 42,
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+      fontVariant: ["tabular-nums"],
+    },
+    heatmapSlots: {
+      flex: 1,
+      flexDirection: "row",
+      gap: 2,
+    },
+    heatCell: {
+      flex: 1,
+      height: 12,
+      borderRadius: 2,
+      backgroundColor: accent,
+    },
+    heatLegend: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[1],
+      marginTop: theme.spacing[2],
+    },
+    heatLegendCell: {
+      width: 16,
+      height: 10,
+      borderRadius: 2,
+      backgroundColor: accent,
+    },
+  };
+});

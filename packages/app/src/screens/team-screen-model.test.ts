@@ -154,6 +154,28 @@ describe("team screen model", () => {
     expect(merged?.members[0]?.sessionDistribution.map((row) => row.seconds)).toEqual([300, 180]);
   });
 
+  it("preserves the role order returned by the admin team API", () => {
+    const secondMember = {
+      ...member,
+      id: "member-b",
+      name: "村长",
+    };
+    const merged = mergeTeamInsightsForHosts([
+      {
+        serverId: "srv_a",
+        label: "办公室",
+        team: { ...team, members: [member, secondMember] },
+      },
+      {
+        serverId: "srv_b",
+        label: "家里",
+        team: { ...team, members: [secondMember, member] },
+      },
+    ]);
+
+    expect(merged?.members.map((entry) => entry.name)).toEqual(["书记", "村长"]);
+  });
+
   it("formats the same values and heat levels as the admin page", () => {
     expect(formatTeamDuration(540)).toBe("9 分钟");
     expect(formatTeamDuration(5400)).toBe("1 小时 30 分钟");
