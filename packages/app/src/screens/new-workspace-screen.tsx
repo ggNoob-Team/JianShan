@@ -86,7 +86,7 @@ import {
   getWorkspaceNamingAttachments,
   remapDraftCwdToWorkspace,
 } from "./new-workspace-fork-context";
-import { resolveNewWorkspaceIsolation } from "./new-workspace/isolation";
+import { resolveNewWorkspaceIsolation, type WorkspaceIsolation } from "./new-workspace/isolation";
 import {
   buildPickerOptionData,
   defaultBasePickerItem,
@@ -186,8 +186,24 @@ const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = ["workspace.project.pi
 function useWorkspaceIsolation(input: {
   supportsMultiplicity: boolean;
   worktreeSupport: "supported" | "unsupported" | "unknown";
-}): ReturnType<typeof resolveNewWorkspaceIsolation> {
-  return resolveNewWorkspaceIsolation(input);
+  selectionKey: string;
+}): ReturnType<typeof resolveNewWorkspaceIsolation> & {
+  setIsolation: (isolation: WorkspaceIsolation) => void;
+} {
+  const { selectionKey, ...capabilities } = input;
+  const [selection, setSelection] = useState<{
+    key: string;
+    isolation: WorkspaceIsolation;
+  } | null>(null);
+  const selectedIsolation = selection?.key === selectionKey ? selection.isolation : null;
+  const state = resolveNewWorkspaceIsolation({ ...capabilities, selectedIsolation });
+  const setIsolation = useCallback(
+    (isolation: WorkspaceIsolation) => {
+      setSelection({ key: selectionKey, isolation });
+    },
+    [selectionKey],
+  );
+  return { ...state, setIsolation };
 }
 
 function normalizeBranchDetails(
@@ -1006,12 +1022,14 @@ export function NewWorkspaceScreen({
   const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
   const {
     isolation: effectiveIsolation,
+    setIsolation,
     availableIsolations,
     showIsolationField,
     showRefPicker,
   } = useWorkspaceIsolation({
     supportsMultiplicity: supportsWorkspaceMultiplicity,
     worktreeSupport,
+    selectionKey: `${selectedServerId}:${selectedProjectOptionId}`,
   });
 
   const branchSuggestionsQuery = useQuery({
@@ -1463,6 +1481,7 @@ export function NewWorkspaceScreen({
       effectiveIsolation,
       availableIsolations,
       showIsolationField,
+      onSelect: setIsolation,
     },
     base: {
       anchorRef: pickerAnchorRef,

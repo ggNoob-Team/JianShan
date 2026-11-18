@@ -56,6 +56,7 @@ export interface NewWorkspaceFormProps {
     effectiveIsolation: WorkspaceIsolation;
     availableIsolations: readonly WorkspaceIsolation[];
     showIsolationField: boolean;
+    onSelect: (isolation: WorkspaceIsolation) => void;
   };
   base: PickerControl & {
     selectedSourceDirectory: string | null;
@@ -128,7 +129,7 @@ function useIsolationPicker(
   isPending: boolean,
 ): { options: ComboboxOption[]; onSelect: (id: string) => void; renderOption: RenderOption } {
   const { t } = useTranslation();
-  const { availableIsolations, onOpenChange } = isolation;
+  const { availableIsolations, onOpenChange, onSelect } = isolation;
   const options = useMemo<ComboboxOption[]>(() => {
     return availableIsolations.map((value) => ({
       id: value,
@@ -139,10 +140,11 @@ function useIsolationPicker(
     }));
   }, [availableIsolations, t]);
   const handleSelect = useCallback(
-    (_id: string) => {
+    (id: string) => {
+      if (id === "worktree" || id === "local") onSelect(id);
       onOpenChange(false);
     },
-    [onOpenChange],
+    [onOpenChange, onSelect],
   );
   const renderOption = useCallback<RenderOption>(
     (row) => <IsolationOption {...row} disabled={isPending} />,

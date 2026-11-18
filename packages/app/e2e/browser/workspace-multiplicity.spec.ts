@@ -34,8 +34,8 @@ async function createWorkspaceViaUi(
   page: Page,
   input: {
     project: { projectKey: string; projectDisplayName: string };
-    // null when the project has no git checkout: there is no Isolation control to
-    // touch, the isolation is implicitly local.
+    // null when no explicit Isolation choice is needed; non-git projects expose
+    // Local as their only mode.
     isolation: "local" | "worktree" | null;
     previousWorkspaceId: string;
     client: Awaited<ReturnType<typeof connectNewWorkspaceDaemonClient>>;
@@ -195,7 +195,7 @@ test.describe("Workspace multiplicity creation flow", () => {
 
       const second = await createWorkspaceViaUi(page, {
         project,
-        // Non-git project: no Isolation control, isolation is implicitly local.
+        // Non-git project: Local is the only available Isolation mode.
         isolation: null,
         previousWorkspaceId: seeded.workspaceId,
         client,

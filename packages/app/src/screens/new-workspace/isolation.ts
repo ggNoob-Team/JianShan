@@ -1,6 +1,7 @@
 export type WorkspaceIsolation = "local" | "worktree";
 
 const WORKTREE_ONLY: readonly WorkspaceIsolation[] = ["worktree"];
+const WORKTREE_AND_LOCAL: readonly WorkspaceIsolation[] = ["worktree", "local"];
 const LOCAL_ONLY: readonly WorkspaceIsolation[] = ["local"];
 
 interface NewWorkspaceIsolationState {
@@ -13,13 +14,23 @@ interface NewWorkspaceIsolationState {
 export function resolveNewWorkspaceIsolation(input: {
   supportsMultiplicity: boolean;
   worktreeSupport: "supported" | "unsupported" | "unknown";
+  selectedIsolation?: WorkspaceIsolation | null;
 }): NewWorkspaceIsolationState {
-  const isolation: WorkspaceIsolation =
-    !input.supportsMultiplicity || input.worktreeSupport !== "unsupported" ? "worktree" : "local";
+  let availableIsolations = WORKTREE_ONLY;
+  if (input.supportsMultiplicity) {
+    availableIsolations = input.worktreeSupport === "unsupported" ? LOCAL_ONLY : WORKTREE_AND_LOCAL;
+  }
+  const defaultIsolation: WorkspaceIsolation = availableIsolations.includes("worktree")
+    ? "worktree"
+    : "local";
+  const isolation =
+    input.selectedIsolation && availableIsolations.includes(input.selectedIsolation)
+      ? input.selectedIsolation
+      : defaultIsolation;
 
   return {
     isolation,
-    availableIsolations: isolation === "worktree" ? WORKTREE_ONLY : LOCAL_ONLY,
+    availableIsolations,
     showIsolationField: true,
     showRefPicker: !input.supportsMultiplicity || isolation === "worktree",
   };

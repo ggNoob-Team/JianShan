@@ -16,12 +16,7 @@ import { createTempGitRepo } from "../support/helpers/workspace";
 import { getServerId } from "../support/helpers/server-id";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
-// Regression for "the local / worktree selection in the new workspace is not
-// remembered." The isolation choice persists in the create-form preferences
-// (FormPreferences.isolation), so it must survive the create→reopen remount:
-// creating a worktree workspace navigates away from /new and unmounts it, and
-// reopening New Workspace has to still show "New worktree".
-test.describe("New workspace isolation memory", () => {
+test.describe("New workspace isolation selection", () => {
   let client: Awaited<ReturnType<typeof connectNewWorkspaceDaemonClient>>;
   const localWorkspaceIds = new Set<string>();
   const createdWorktreeDirectories = new Set<string>();
@@ -46,7 +41,7 @@ test.describe("New workspace isolation memory", () => {
     await client?.close().catch(() => undefined);
   });
 
-  test("remembers the worktree isolation choice after creating a workspace", async ({ page }) => {
+  test("defaults Git projects to worktree and keeps local selectable", async ({ page }) => {
     const serverId = getServerId();
     const tempRepo = await createTempGitRepo("isolation-memory-", { branches: ["main", "dev"] });
 
@@ -57,16 +52,21 @@ test.describe("New workspace isolation memory", () => {
       await gotoAppShell(page);
       await waitForSidebarHydration(page);
 
-      // First visit: the screen opens on Local, switch it to New worktree and create.
       await openNewWorkspaceComposer(page, {
         projectKey: openedProject.projectKey,
         projectDisplayName: openedProject.projectDisplayName,
       });
-      await expectWorkspaceIsolationSelected(page, "local");
+      await expectWorkspaceIsolationSelected(page, "worktree");
       await page.getByTestId("workspace-create-isolation-trigger").click();
       const isolationPopup = page.getByTestId("combobox-desktop-container").last();
       await expect(isolationPopup).toBeVisible({ timeout: 30_000 });
       await expectNoTruncation(isolationPopup);
+      await expect(page.getByTestId("workspace-create-isolation-local")).toBeVisible();
+      await expect(page.getByTestId("workspace-create-isolation-worktree")).toBeVisible();
+      await page.getByTestId("workspace-create-isolation-local").click();
+      await expectWorkspaceIsolationSelected(page, "local");
+
+      await page.getByTestId("workspace-create-isolation-trigger").click();
       await page.getByTestId("workspace-create-isolation-worktree").click();
       await expectWorkspaceIsolationSelected(page, "worktree");
 
@@ -87,7 +87,7 @@ test.describe("New workspace isolation memory", () => {
       });
       createdWorktreeDirectories.add(createdWorkspace.workspaceDirectory);
 
-      // Second visit (fresh mount of /new): the worktree choice must stick.
+      // A fresh mount defaults back to worktree for Git projects.
       await openNewWorkspaceComposer(page, {
         projectKey: openedProject.projectKey,
         projectDisplayName: openedProject.projectDisplayName,

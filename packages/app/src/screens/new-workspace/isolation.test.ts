@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveNewWorkspaceIsolation } from "./isolation";
 
 describe("resolveNewWorkspaceIsolation", () => {
-  it("defaults Git projects to worktree and omits local", () => {
+  it("defaults Git projects to worktree and keeps local selectable", () => {
     expect(
       resolveNewWorkspaceIsolation({
         supportsMultiplicity: true,
@@ -10,9 +10,24 @@ describe("resolveNewWorkspaceIsolation", () => {
       }),
     ).toEqual({
       isolation: "worktree",
-      availableIsolations: ["worktree"],
+      availableIsolations: ["worktree", "local"],
       showIsolationField: true,
       showRefPicker: true,
+    });
+  });
+
+  it("uses an explicitly selected local workspace for a Git project", () => {
+    expect(
+      resolveNewWorkspaceIsolation({
+        supportsMultiplicity: true,
+        worktreeSupport: "supported",
+        selectedIsolation: "local",
+      }),
+    ).toEqual({
+      isolation: "local",
+      availableIsolations: ["worktree", "local"],
+      showIsolationField: true,
+      showRefPicker: false,
     });
   });
 
@@ -38,7 +53,7 @@ describe("resolveNewWorkspaceIsolation", () => {
       }),
     ).toMatchObject({
       isolation: "worktree",
-      availableIsolations: ["worktree"],
+      availableIsolations: ["worktree", "local"],
     });
   });
 
