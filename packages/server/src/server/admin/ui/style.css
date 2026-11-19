@@ -7,16 +7,16 @@
   --text: #162033;
   --text-soft: #506079;
   --text-faint: #73819a;
-  --primary: #1e40af;
-  --primary-strong: #17358f;
-  --primary-soft: #dbe8ff;
-  --chart-1: #1e40af;
-  --chart-2: #3b82f6;
-  --chart-3: #0f766e;
-  --chart-4: #b45309;
-  --chart-5: #7c3aed;
-  --chart-6: #0891b2;
-  --chart-7: #64748b;
+  --primary: #3459a6;
+  --primary-strong: #274a8c;
+  --primary-soft: #e5edff;
+  --chart-1: #3459a6;
+  --chart-2: #5f82ca;
+  --chart-3: #1d8451;
+  --chart-4: #b7791f;
+  --chart-5: #6d51b2;
+  --chart-6: #2f8f9d;
+  --chart-7: #94a3b8;
   --accent: #b45309;
   --accent-soft: #fff1dc;
   --success: #0f766e;
@@ -46,12 +46,12 @@
   --primary-strong: #a7c4ff;
   --primary-soft: #172d55;
   --chart-1: #7aa7ff;
-  --chart-2: #60a5fa;
-  --chart-3: #61d3c8;
-  --chart-4: #f5b45a;
-  --chart-5: #c4a7ff;
-  --chart-6: #67d4f2;
-  --chart-7: #94a3b8;
+  --chart-2: #a3bffa;
+  --chart-3: #5dba80;
+  --chart-4: #e0a952;
+  --chart-5: #b6a0f0;
+  --chart-6: #67c5d2;
+  --chart-7: #a7b4c8;
   --accent: #f5b45a;
   --accent-soft: #3b2a14;
   --success: #61d3c8;
@@ -185,7 +185,7 @@ svg {
   height: 38px;
   border-radius: 11px;
   color: #fff;
-  background: linear-gradient(145deg, #1e40af, #0f766e);
+  background: linear-gradient(145deg, var(--primary-strong), var(--chart-2));
 }
 
 .brand-mark svg {

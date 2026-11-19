@@ -5,7 +5,7 @@
   --line: #e2e7f0;
   --ink: #1c2333;
   --muted: #6b7688;
-  --accent: #1e40af;
+  --accent: #3459a6;
   --green: #1f8a52;
   --amber: #b7791f;
   --red: #c0392b;
@@ -1259,6 +1259,12 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .team-reference-page .team-member-tab strong {
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
   .team-reference-page .personal-heatmap-head {
     display: grid;
     gap: 4px;
@@ -1298,6 +1304,10 @@
 }
 
 @media (max-width: 520px) {
+  .team-reference-page .team-member-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .team-reference-page .personal-calendar-popover {
     position: fixed;
     right: 8px;
@@ -1343,6 +1353,10 @@
   .team-reference-page .personal-pie::after,
   .team-reference-page .personal-pie-center {
     inset: 18px;
+  }
+
+  .team-reference-page .personal-heat-hour-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
