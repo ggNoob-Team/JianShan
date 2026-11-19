@@ -38,7 +38,7 @@ export interface ArchifyGenerationServiceOptions {
   logger: GenerationLogger;
   /** Called on every task change; the daemon fans it out to subscribed clients. */
   onTaskUpdated?: (task: ArchifyGenerationTask) => void;
-  /** Archives a worker once its diagram is delivered, so the sidebar stays quiet. */
+  /** Archives workers from a superseded run, so internal agents do not accumulate. */
   archiveAgent?: (agentId: string) => Promise<void>;
   deps?: {
     scanEvidence?: typeof scanArchifyEvidence;
@@ -54,6 +54,42 @@ interface TaskRecord {
   input: ArchifyGenerationStartInput;
   /** One worker per requested diagram; the worker's own agent draws one diagram. */
   workerAgentIdByType: Map<ArchifyDiagramType, string>;
+  /** Resolves once every worker has either received its agent id or failed to start. */
+  workersStarted: WorkerStartBarrier;
+}
+
+interface WorkerStartBarrier {
+  promise: Promise<void>;
+  markStarted(type: ArchifyDiagramType): void;
+  settleAll(): void;
+}
+
+function createWorkerStartBarrier(types: readonly ArchifyDiagramType[]): WorkerStartBarrier {
+  const pending = new Set(types);
+  let settled = false;
+  let resolve!: () => void;
+  const promise = new Promise<void>((ready) => {
+    resolve = ready;
+  });
+  const finishIfReady = () => {
+    if (settled || pending.size > 0) return;
+    settled = true;
+    resolve();
+  };
+  if (pending.size === 0) finishIfReady();
+  return {
+    promise,
+    markStarted: (type) => {
+      pending.delete(type);
+      finishIfReady();
+    },
+    settleAll: () => {
+      if (settled) return;
+      settled = true;
+      pending.clear();
+      resolve();
+    },
+  };
 }
 
 /**
@@ -108,6 +144,12 @@ export class ArchifyGenerationService {
   }
 
   async start(input: ArchifyGenerationStartInput): Promise<ArchifyGenerationTask> {
+    const previousTaskId = this.latestTaskIdByWorkspaceId.get(input.workspaceId);
+    const previousTask = previousTaskId ? this.tasks.get(previousTaskId) : undefined;
+    if (previousTask) {
+      await this.archiveTaskWorkers(previousTask, "starting a new Archify run");
+    }
+
     const taskId = `archify_task_${randomUUID()}`;
     const artifactPrefix = `archify-${taskId.slice(-12)}`;
     const now = new Date().toISOString();
@@ -126,6 +168,7 @@ export class ArchifyGenerationService {
       diagrams: input.types.map((type) => ({
         type,
         artifactId: `${artifactPrefix}-${type}`,
+        generatorAgentId: null,
         status: "pending",
         startedAt: null,
         finishedAt: null,
@@ -137,6 +180,7 @@ export class ArchifyGenerationService {
       task,
       input: { ...input, types: [...input.types] },
       workerAgentIdByType: new Map(),
+      workersStarted: createWorkerStartBarrier(input.types),
     };
     this.tasks.set(taskId, record);
     this.latestTaskIdByWorkspaceId.set(input.workspaceId, taskId);
@@ -144,6 +188,9 @@ export class ArchifyGenerationService {
     void this.run(record).catch((error) => {
       this.options.logger.error({ err: error, taskId }, "Archify generation run failed");
     });
+    // Make the start snapshot self-sufficient for per-diagram trace actions;
+    // progress pushes continue after the worker turns begin.
+    await record.workersStarted.promise;
     return snapshot(task);
   }
 
@@ -197,7 +244,10 @@ export class ArchifyGenerationService {
         cwd: workspace.cwd,
         force: input.forceScan === true,
       });
-      if (task.status !== "running") return;
+      if (task.status !== "running") {
+        record.workersStarted.settleAll();
+        return;
+      }
       task.evidenceRevision = evidence.revision;
       task.evidenceCached = evidence.cached;
       task.stage = "draw";
@@ -223,6 +273,7 @@ export class ArchifyGenerationService {
         results.every((result) => result.canceled),
       );
     } catch (error) {
+      record.workersStarted.settleAll();
       if (task.status !== "running") return;
       this.fail(task, error instanceof Error ? error.message : String(error));
     }
@@ -230,8 +281,8 @@ export class ArchifyGenerationService {
 
   /**
    * One worker per diagram: they run in parallel, each owns a single artifact,
-   * and a worker that delivered is archived instead of lingering in the agent
-   * list. A worker that fails only fails its own diagram.
+   * and each stays addressable as an internal agent so its trace can be opened
+   * after the turn ends. A worker that fails only fails its own diagram.
    */
   private async runWorker(
     record: TaskRecord,
@@ -248,6 +299,12 @@ export class ArchifyGenerationService {
     diagram.status = "drawing";
     diagram.startedAt = startedAt;
     let agentId: string | null = null;
+    let startSettled = false;
+    const settleStart = () => {
+      if (startSettled) return;
+      startSettled = true;
+      record.workersStarted.markStarted(diagram.type);
+    };
 
     try {
       const created = await this.options.createAgent({
@@ -270,13 +327,18 @@ export class ArchifyGenerationService {
         },
         ...(record.input.modeId ? { mode: record.input.modeId } : {}),
         unattended: true,
+        // Internal workers stay out of agent discovery and persistence while the
+        // trace tab can still address them by id.
+        internal: true,
         promptFailure: "return-error",
         notifyOnFinish: false,
       });
       agentId = created.snapshot.id;
       record.workerAgentIdByType.set(diagram.type, agentId);
+      diagram.generatorAgentId = agentId;
       task.agentId = task.agentId ?? agentId;
       this.publish(task);
+      settleStart();
       if (task.status !== "running") {
         return { canceled: true };
       }
@@ -307,17 +369,24 @@ export class ArchifyGenerationService {
       diagram.finishedAt ??= new Date().toISOString();
       return { canceled: false };
     } finally {
-      // Workers never linger in the agent list, whether they delivered or not.
-      if (agentId) {
-        await this.archiveAgent(agentId).catch((error) => {
-          this.options.logger.warn(
-            { err: error, taskId: task.taskId, agentId },
-            "Failed to archive an Archify worker",
-          );
-        });
-      }
+      settleStart();
+      // Keep the internal worker addressable after its turn ends so the finished
+      // trace remains inspectable. The next run archives old workers.
       this.publish(task);
     }
+  }
+
+  private async archiveTaskWorkers(record: TaskRecord, reason: string): Promise<void> {
+    await Promise.all(
+      [...record.workerAgentIdByType.values()].map((agentId) =>
+        this.archiveAgent(agentId).catch((error) => {
+          this.options.logger.warn(
+            { err: error, taskId: record.task.taskId, agentId, reason },
+            "Failed to archive an Archify worker",
+          );
+        }),
+      ),
+    );
   }
 
   private handleDelivery(

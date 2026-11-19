@@ -47,6 +47,7 @@ describe("archify generation protocol", () => {
       {
         type: "architecture" as const,
         artifactId: "archify-1-architecture",
+        generatorAgentId: "agent_1",
         status: "delivered" as const,
         startedAt: "2026-10-09T00:00:01.000Z",
         finishedAt: "2026-10-09T00:00:09.000Z",
@@ -114,5 +115,20 @@ describe("archify generation protocol", () => {
     ]) {
       expect(SessionOutboundMessageSchema.parse(message)).toEqual(message);
     }
+  });
+
+  it("keeps old generation tasks without a generator worker id parseable", () => {
+    const { generatorAgentId: _generatorAgentId, ...legacyDiagram } = task.diagrams[0]!;
+    const legacyTask = { ...task, diagrams: [legacyDiagram] };
+
+    expect(
+      SessionOutboundMessageSchema.parse({
+        type: "archify.generation.updated",
+        payload: { task: legacyTask },
+      }),
+    ).toEqual({
+      type: "archify.generation.updated",
+      payload: { task: legacyTask },
+    });
   });
 });

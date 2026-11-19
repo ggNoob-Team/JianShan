@@ -1,4 +1,8 @@
-import type { ArchifyArtifactSummary, ArchifyDiagramType } from "@getpaseo/protocol/messages";
+import type {
+  ArchifyArtifactSummary,
+  ArchifyDiagramType,
+  ArchifyGenerationDiagram,
+} from "@getpaseo/protocol/messages";
 import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import { getUnattendedModeId } from "@getpaseo/protocol/provider-manifest";
 import type { FormPreferences } from "@/hooks/use-form-preferences";
@@ -29,6 +33,15 @@ export interface ArchifyAgentConfig {
   provider: string;
   model?: string;
   modeId?: string;
+}
+
+/** Older daemons do not report which internal worker produced a diagram. */
+export function resolveArchifyGeneratorAgentId(
+  diagram: Pick<ArchifyGenerationDiagram, "generatorAgentId" | "status">,
+  supported: boolean,
+): string | null {
+  if (!supported) return null;
+  return diagram.generatorAgentId?.trim() || null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

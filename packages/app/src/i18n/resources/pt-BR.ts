@@ -20,6 +20,7 @@ export const ptBR: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "Repetir o que faltou",
+      viewGenerationTrace: "Ver raciocínio",
     },
     anchors: {
       title: "Confirme o que os diagramas devem cobrir",

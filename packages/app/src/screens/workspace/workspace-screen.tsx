@@ -3010,6 +3010,17 @@ function WorkspaceScreenContent({
             navigateToTabId(tabId);
           }
         },
+        onOpenAgentTab: (agentId) => {
+          if (!persistenceKey) return;
+          const tabId = openTab({
+            workspaceKey: persistenceKey,
+            target: { kind: "agent", agentId },
+            intent: "reveal",
+            pin: true,
+            placement: paneLocalPlacement(input.focusPaneBeforeOpen ? input.paneId : null),
+          });
+          if (tabId) navigateToTabId(tabId);
+        },
         onOpenPreferredTarget: (target, source) => {
           if (!persistenceKey) return;
           const tabId = openPreferredWorkspacePreview({
@@ -3069,6 +3080,7 @@ function WorkspaceScreenContent({
       navigateToTabId,
       normalizedServerId,
       normalizedWorkspaceId,
+      openTab,
       canRenderDesktopPaneSplits,
       openImportSheet,
       openInSidePane,
