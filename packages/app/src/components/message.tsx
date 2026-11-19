@@ -28,7 +28,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { isRenderProfileEnabled } from "@/utils/render-profiler";
 import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
 import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-default-environment";
-import { formatDuration, formatMessageTimestamp } from "@/utils/time";
+import { formatDuration, formatMessageTimestamp, formatMessageTimestamp24Hour } from "@/utils/time";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
 import { useTargetAgentTitle } from "@/tool-calls/use-target-agent-title";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -318,12 +318,20 @@ const userMessageStylesheet = StyleSheet.create((theme) => ({
   },
   bubble: {
     backgroundColor: theme.colors.surface3,
+    borderColor: theme.colors.surface4,
     borderRadius: theme.borderRadius["2xl"],
     borderTopRightRadius: theme.borderRadius.sm,
+    borderWidth: theme.borderWidth[1],
     paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[4],
     minWidth: 0,
     flexShrink: 1,
+    ...theme.shadow.sm,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+    elevation: 4,
   },
   text: {
     color: theme.colors.foreground,
@@ -490,7 +498,7 @@ export const UserMessage = memo(function UserMessage({
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
       >
-        <View style={userMessageStylesheet.bubble}>
+        <View style={userMessageStylesheet.bubble} testID="user-message-bubble">
           {hasImages ? (
             <View style={imagePreviewContainerStyle}>
               {images.map((image) => (
@@ -574,7 +582,7 @@ interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
   durationMs?: number | null;
-  showTiming?: boolean;
+  showDuration?: boolean;
   onFork?: (target: AssistantForkTarget) => Promise<void> | void;
 }
 
@@ -591,80 +599,49 @@ const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
     marginTop: 0,
     marginLeft: -theme.spacing[1],
   },
-  labelWrapper: {
-    position: "relative",
+  metadata: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing[1],
+    minWidth: 0,
   },
-  labelSizer: {
+  metadataText: {
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
-    opacity: 0,
+    fontVariant: ["tabular-nums"],
   },
-  labelOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
+  metadataSeparator: {
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
   },
 }));
 
-const TIMESTAMP_REVEAL_MS = 3000;
-
 /**
  * Footer rendered next to the copy button at the end of an assistant turn.
- * Shows the turn duration and swaps to the end timestamp when both are known.
- * A turn without a visible start shows its end timestamp directly.
+ * Shows the turn duration when it is not already visible in turn activity, and
+ * always shows the end timestamp once the turn has completed.
  */
 export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   getContent,
   completedAt,
   durationMs,
-  showTiming = true,
+  showDuration = true,
   onFork,
 }: AssistantTurnFooterProps) {
   const { t } = useTranslation();
-  const [hovered, setHovered] = useState(false);
-  const [pressedReveal, setPressedReveal] = useState(false);
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (revealTimerRef.current) {
-        clearTimeout(revealTimerRef.current);
-        revealTimerRef.current = null;
-      }
-    };
-  }, []);
 
   const durationLabel = useMemo(
     () =>
-      showTiming && durationMs !== undefined && durationMs !== null
+      showDuration && durationMs !== undefined && durationMs !== null
         ? getTurnDurationLabel(durationMs, t)
         : "",
-    [durationMs, showTiming, t],
+    [durationMs, showDuration, t],
   );
   const timestampLabel = useMemo(
-    () => (showTiming && completedAt ? formatMessageTimestamp(completedAt) : ""),
-    [completedAt, showTiming],
+    () => (completedAt ? formatMessageTimestamp24Hour(completedAt) : ""),
+    [completedAt],
   );
-
-  const primaryLabel = durationLabel || timestampLabel;
-  const canSwap = Boolean(durationLabel && timestampLabel);
-  const showTimestamp = canSwap && (isWeb ? hovered : pressedReveal);
-
-  const handleHoverIn = useCallback(() => setHovered(true), []);
-  const handleHoverOut = useCallback(() => setHovered(false), []);
-  const handlePress = useCallback(() => {
-    if (isWeb || !canSwap) return;
-    if (revealTimerRef.current) {
-      clearTimeout(revealTimerRef.current);
-    }
-    setPressedReveal((prev) => !prev);
-    revealTimerRef.current = setTimeout(() => {
-      setPressedReveal(false);
-      revealTimerRef.current = null;
-    }, TIMESTAMP_REVEAL_MS);
-  }, [canSwap]);
+  const hasMetadata = Boolean(durationLabel || timestampLabel);
   const handleFork = useCallback(
     (target: AssistantForkTarget) => {
       return onFork?.(target);
@@ -684,25 +661,25 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
         containerStyle={assistantTurnFooterStylesheet.copyButton}
       />
       {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
-      {primaryLabel ? (
-        <Pressable
-          onPress={handlePress}
-          onHoverIn={handleHoverIn}
-          onHoverOut={handleHoverOut}
-          accessibilityRole={canSwap ? "button" : undefined}
-          accessibilityLabel={canSwap ? `${durationLabel}, ended ${timestampLabel}` : primaryLabel}
-        >
-          <View style={assistantTurnFooterStylesheet.labelWrapper}>
-            {/* Sizer reserves space for whichever label is longer so the
-                container width is stable across hover transitions. */}
-            <Text style={assistantTurnFooterStylesheet.labelSizer} aria-hidden>
-              {primaryLabel.length >= timestampLabel.length ? primaryLabel : timestampLabel}
+      {hasMetadata ? (
+        <View style={assistantTurnFooterStylesheet.metadata}>
+          {durationLabel ? (
+            <Text style={assistantTurnFooterStylesheet.metadataText}>{durationLabel}</Text>
+          ) : null}
+          {durationLabel && timestampLabel ? (
+            <Text style={assistantTurnFooterStylesheet.metadataSeparator} aria-hidden>
+              ·
             </Text>
-            <Text style={assistantTurnFooterStylesheet.labelOverlay}>
-              {showTimestamp ? timestampLabel : primaryLabel}
+          ) : null}
+          {timestampLabel ? (
+            <Text
+              style={assistantTurnFooterStylesheet.metadataText}
+              testID="turn-completed-timestamp"
+            >
+              {timestampLabel}
             </Text>
-          </View>
-        </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );

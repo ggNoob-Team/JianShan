@@ -6,6 +6,7 @@ import {
   formatCompactTimeAgoAsProse,
   formatDuration,
   formatMessageTimestamp,
+  formatMessageTimestamp24Hour,
   formatTimeAgo,
 } from "./time";
 
@@ -151,5 +152,21 @@ describe("formatMessageTimestamp", () => {
     const formatted = formatMessageTimestamp(date, now);
     expect(formatted).toMatch(/Apr|April/);
     expect(formatted).toMatch(/2026/);
+  });
+});
+
+describe("formatMessageTimestamp24Hour", () => {
+  it("uses a 24-hour clock for same-day timestamps", () => {
+    const now = new Date(2026, 4, 14, 18, 0);
+    const date = new Date(2026, 4, 14, 17, 26);
+
+    expect(formatMessageTimestamp24Hour(date, now)).toBe("17:26");
+  });
+
+  it("keeps the date context while forcing a 24-hour clock", () => {
+    const now = new Date(2026, 4, 14, 17, 30);
+    const date = new Date(2026, 4, 11, 22, 12);
+
+    expect(formatMessageTimestamp24Hour(date, now)).toBe("Monday 22:12");
   });
 });
