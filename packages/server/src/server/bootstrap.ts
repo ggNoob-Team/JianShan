@@ -495,6 +495,7 @@ export interface PaseoDaemonDependencies {
   serverFeatureOverrides?: {
     daemonStatusRpc?: boolean;
     relayConfig?: boolean;
+    teamInsights?: boolean;
   };
 }
 
@@ -1752,6 +1753,7 @@ export async function createPaseoDaemon(
                 getHostnames: () => configuredHostnames,
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
+                teamInsights: dependencies.serverFeatureOverrides?.teamInsights,
                 startPaused: true,
               },
               workspaceAutoName,

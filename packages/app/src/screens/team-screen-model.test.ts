@@ -4,7 +4,10 @@ import type { TeamInsights, TeamMemberInsights } from "@getpaseo/protocol/team-i
 import {
   buildTeamInsightsRequest,
   buildTeamInsightsRequestForRange,
+  classifyTeamHosts,
   createTeamDateRange,
+  describeUnavailableTeamHosts,
+  formatTeamHostLoadFailure,
   formatTeamDuration,
   formatTeamDateRange,
   formatTeamNumber,
@@ -62,6 +65,66 @@ const team: TeamInsights = {
 };
 
 describe("team screen model", () => {
+  it("separates ready, unsupported, pending, and offline team hosts", () => {
+    const hosts = [
+      { serverId: "ready", label: "Ready" },
+      { serverId: "old", label: "Old" },
+      { serverId: "pending", label: "Pending" },
+      { serverId: "offline", label: "Offline" },
+    ];
+    const classified = classifyTeamHosts({
+      hosts,
+      connectionStatuses: new Map([
+        ["ready", "online"],
+        ["old", "online"],
+        ["pending", "connecting"],
+        ["offline", "offline"],
+      ]),
+      featureAvailability: new Map([
+        ["ready", true],
+        ["old", false],
+        ["pending", null],
+        ["offline", true],
+      ]),
+    });
+
+    expect(classified).toEqual({
+      ready: [hosts[0]],
+      unsupported: [hosts[1]],
+      pending: [hosts[2]],
+      offline: [hosts[3]],
+    });
+  });
+
+  it("explains an unsupported online host instead of claiming none is connected", () => {
+    expect(
+      describeUnavailableTeamHosts({
+        unsupported: [{ serverId: "old", label: "办公室" }],
+        pending: [],
+        offline: [{ serverId: "offline", label: "家里" }],
+      }),
+    ).toBe("办公室 的 Host 版本过旧，请更新 Host 后重试。");
+  });
+
+  it("reports no connected host only when every host is offline", () => {
+    expect(
+      describeUnavailableTeamHosts({
+        unsupported: [],
+        pending: [],
+        offline: [{ serverId: "offline", label: "家里" }],
+      }),
+    ).toBe("没有已连接的 Host");
+  });
+
+  it("surfaces the host request failure instead of dropping it", () => {
+    expect(
+      formatTeamHostLoadFailure([
+        { label: "办公室", error: new Error("Request timeout") },
+        { label: "家里", error: "connection closed" },
+      ]),
+    ).toBe("团队数据加载失败：办公室：Request timeout；家里：connection closed");
+  });
+
   it("builds the same seven-day request used by the admin team page", () => {
     expect(
       buildTeamInsightsRequest({

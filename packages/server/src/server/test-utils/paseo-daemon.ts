@@ -32,6 +32,7 @@ interface TestPaseoDaemonOptions {
   relayPublicUseTls?: boolean;
   daemonStatusRpcCapability?: boolean;
   relayConfigCapability?: boolean;
+  teamInsightsCapability?: boolean;
   agentClients?: Partial<Record<AgentProvider, AgentClient>>;
   providerOverrides?: PaseoDaemonConfig["providerOverrides"];
   paseoHomeRoot?: string;
@@ -108,6 +109,7 @@ export async function createTestPaseoDaemon(
       serverFeatureOverrides: {
         daemonStatusRpc: options.daemonStatusRpcCapability,
         relayConfig: options.relayConfigCapability,
+        teamInsights: options.teamInsightsCapability,
       },
     });
     try {

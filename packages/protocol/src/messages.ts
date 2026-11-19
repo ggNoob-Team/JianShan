@@ -4234,6 +4234,8 @@ export const ServerInfoStatusPayloadSchema = z
         providersSnapshot: z.boolean().optional(),
         connectedHosts: z.boolean().optional(),
         hostMultiplexing: z.boolean().optional(),
+        // COMPAT(teamInsights): added in v0.13.10, remove after 2027-11-19 once daemon floor >= v0.13.10.
+        teamInsights: z.boolean().optional(),
         localJobs: z.boolean().optional(),
         usageSources: z.boolean().optional(),
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.

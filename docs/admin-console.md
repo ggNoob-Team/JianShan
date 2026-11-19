@@ -117,6 +117,9 @@ the same team aggregation from `daemon.team.get.request`; it does not open the
 admin console in a browser. The admin console still exposes its standalone
 `/team` page and `/api/team/public` without the admin key. Do not expose the
 admin console beyond a trusted network unless that public team view is intended.
+The client gates the embedded view on `server_info.features.teamInsights`; an
+online host that predates the team RPC shows an update message instead of the
+generic "no connected host" error.
 
 Transferring an owner updates `createdBy` and appends an event to
 `$PASEO_HOME/admin/ownership-audit.jsonl`. Historical question attribution does

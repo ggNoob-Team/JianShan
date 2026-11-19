@@ -31,6 +31,7 @@ import {
   useHostRuntimeConnectionStatuses,
   useHosts,
 } from "@/runtime/host-runtime";
+import { useHostFeatureAvailabilityMap } from "@/runtime/host-features";
 import { StyleSheet } from "react-native-unistyles";
 
 import { TeamDateRangeSheet } from "./team-date-range-sheet";
@@ -38,9 +39,12 @@ import { teamAccentColor } from "./team-accent";
 import { TeamPieChart } from "./team-pie-chart";
 import {
   buildTeamInsightsRequestForRange,
+  classifyTeamHosts,
   createTeamDateRange,
+  describeUnavailableTeamHosts,
   formatTeamDuration,
   formatTeamDateRange,
+  formatTeamHostLoadFailure,
   heatLevel,
   listTeamMembers,
   mergeTeamInsightsForHosts,
@@ -63,6 +67,7 @@ export function TeamScreen({ serverId: _serverId }: { serverId: string }): React
   const hosts = useHosts();
   const hostIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const connectionStatuses = useHostRuntimeConnectionStatuses(hostIds);
+  const teamInsightsAvailability = useHostFeatureAvailabilityMap(hostIds, "teamInsights");
   const { width } = useWindowDimensions();
   const isWide = width >= 1100;
   const [range, setRange] = useState<TeamDateRange>(() => createTeamDateRange(7));
@@ -78,11 +83,16 @@ export function TeamScreen({ serverId: _serverId }: { serverId: string }): React
     const request = buildTeamInsightsRequestForRange({ range });
     try {
       const store = getHostRuntimeStore();
-      const connectedHosts = hosts.filter(
-        (host) => connectionStatuses.get(host.serverId) === "online",
-      );
+      const classifiedHosts = classifyTeamHosts({
+        hosts,
+        connectionStatuses,
+        featureAvailability: teamInsightsAvailability,
+      });
+      if (classifiedHosts.ready.length === 0) {
+        throw new Error(describeUnavailableTeamHosts(classifiedHosts));
+      }
       const results = await Promise.allSettled(
-        connectedHosts.map(async (host) => {
+        classifiedHosts.ready.map(async (host) => {
           const hostClient = store.getClient(host.serverId);
           if (!hostClient) throw new Error(`${host.label} 尚未连接`);
           const payload = await hostClient.getDaemonTeamInsights({
@@ -92,19 +102,49 @@ export function TeamScreen({ serverId: _serverId }: { serverId: string }): React
           return { serverId: host.serverId, label: host.label, team: payload.team };
         }),
       );
+      const failures = results.flatMap((result, index) =>
+        result.status === "rejected"
+          ? [{ label: classifiedHosts.ready[index]?.label ?? "Host", error: result.reason }]
+          : [],
+      );
       const connectedTeams = results.flatMap((result) =>
         result.status === "fulfilled" ? [result.value] : [],
       );
       const merged = mergeTeamInsightsForHosts(connectedTeams);
-      if (!merged) throw new Error("没有已连接的 Host");
+      if (!merged) {
+        throw new Error(
+          failures.length > 0 ? formatTeamHostLoadFailure(failures) : "团队数据加载失败",
+        );
+      }
+      const warnings: string[] = [];
+      if (classifiedHosts.unsupported.length > 0) {
+        warnings.push(
+          describeUnavailableTeamHosts({
+            unsupported: classifiedHosts.unsupported,
+            pending: [],
+            offline: [],
+          }),
+        );
+      }
+      if (classifiedHosts.pending.length > 0) {
+        warnings.push(
+          describeUnavailableTeamHosts({
+            unsupported: [],
+            pending: classifiedHosts.pending,
+            offline: [],
+          }),
+        );
+      }
+      if (failures.length > 0) warnings.push(formatTeamHostLoadFailure(failures));
       setTeam(merged);
       setActiveMemberId((current) => selectTeamMember(merged, current)?.id ?? null);
+      setError(warnings.length > 0 ? warnings.join(" ") : null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "团队数据加载失败");
     } finally {
       setIsLoading(false);
     }
-  }, [connectionStatuses, hosts, range]);
+  }, [connectionStatuses, hosts, range, teamInsightsAvailability]);
 
   useEffect(() => {
     void loadTeam();
