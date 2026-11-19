@@ -2,6 +2,7 @@ import type {
   FormPreferences,
   ProviderPreferences,
 } from "../../../src/create-agent-preferences/preferences";
+import type { PairingRole } from "@getpaseo/protocol/agent-actor";
 
 export const TEST_HOST_LABEL = "localhost";
 
@@ -27,6 +28,7 @@ export function buildSeededHost(input: {
   endpoint: string;
   label?: string;
   clientName?: string;
+  role?: PairingRole;
   nowIso: string;
 }) {
   const connection = buildDirectTcpConnection(input.endpoint);
@@ -34,6 +36,7 @@ export function buildSeededHost(input: {
     serverId: input.serverId,
     label: input.label ?? TEST_HOST_LABEL,
     clientName: input.clientName ?? "测试角色",
+    ...(input.role ? { role: input.role } : {}),
     connections: [connection],
     preferredConnectionId: connection.id,
     createdAt: input.nowIso,

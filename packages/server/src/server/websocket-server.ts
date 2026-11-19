@@ -178,6 +178,7 @@ interface WebSocketServerConfig {
   getHostnames?: () => HostnamesConfig | undefined;
   daemonStatusRpc?: boolean;
   relayConfig?: boolean;
+  teamInsights?: boolean;
   startPaused?: boolean;
 }
 
@@ -637,6 +638,7 @@ export class VoiceAssistantWebSocketServer {
   private connectionLifecycle: "starting" | "accepting" | "stopping" = "accepting";
   private readonly advertiseDaemonStatusRpc: boolean;
   private readonly advertiseRelayConfig: boolean;
+  private readonly advertiseTeamInsights: boolean;
   private readonly directorySync = new DirectorySyncService();
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
@@ -713,6 +715,7 @@ export class VoiceAssistantWebSocketServer {
     this.workspaceSetupRuntime = workspaceSetupRuntime;
     this.advertiseDaemonStatusRpc = wsConfig.daemonStatusRpc !== false;
     this.advertiseRelayConfig = wsConfig.relayConfig !== false;
+    this.advertiseTeamInsights = wsConfig.teamInsights !== false;
     this.connectionLifecycle = wsConfig.startPaused === true ? "starting" : "accepting";
     this.serverId = serverId;
     this.daemonVersion = requireDaemonVersion(daemonVersion);
@@ -1995,6 +1998,7 @@ export class VoiceAssistantWebSocketServer {
       features: {
         connectedHosts: true,
         hostMultiplexing: true,
+        ...(this.advertiseTeamInsights ? { teamInsights: true } : {}),
         localJobs: this.localJobService !== null,
         usageSources: true,
         ownedSubscriptions: true,

@@ -89,6 +89,73 @@ export interface TeamHostInsights {
   team: TeamInsights;
 }
 
+export interface TeamHostCandidate {
+  serverId: string;
+  label: string;
+}
+
+export interface TeamHostClassification<Host extends TeamHostCandidate> {
+  ready: Host[];
+  unsupported: Host[];
+  pending: Host[];
+  offline: Host[];
+}
+
+export function classifyTeamHosts<Host extends TeamHostCandidate>(input: {
+  hosts: readonly Host[];
+  connectionStatuses: ReadonlyMap<string, string | undefined>;
+  featureAvailability: ReadonlyMap<string, boolean | null | undefined>;
+}): TeamHostClassification<Host> {
+  const classified: TeamHostClassification<Host> = {
+    ready: [],
+    unsupported: [],
+    pending: [],
+    offline: [],
+  };
+  for (const host of input.hosts) {
+    const connectionStatus = input.connectionStatuses.get(host.serverId);
+    if (connectionStatus === "connecting" || connectionStatus === "idle" || !connectionStatus) {
+      classified.pending.push(host);
+      continue;
+    }
+    if (connectionStatus !== "online") {
+      classified.offline.push(host);
+      continue;
+    }
+    const supported = input.featureAvailability.get(host.serverId);
+    if (supported === true) classified.ready.push(host);
+    else if (supported === false) classified.unsupported.push(host);
+    else classified.pending.push(host);
+  }
+  return classified;
+}
+
+export function describeUnavailableTeamHosts(
+  classification: Pick<
+    TeamHostClassification<TeamHostCandidate>,
+    "unsupported" | "pending" | "offline"
+  >,
+): string {
+  if (classification.unsupported.length > 0) {
+    const names = classification.unsupported.map((host) => host.label).join("、");
+    return `${names} 的 Host 版本过旧，请更新 Host 后重试。`;
+  }
+  if (classification.pending.length > 0) {
+    return "正在等待 Host 版本信息，请稍后重试。";
+  }
+  return "没有已连接的 Host";
+}
+
+export function formatTeamHostLoadFailure(
+  failures: readonly { label: string; error: unknown }[],
+): string {
+  const details = failures.map(({ label, error }) => {
+    const message = error instanceof Error ? error.message : String(error);
+    return `${label}：${message}`;
+  });
+  return `团队数据加载失败：${details.join("；")}`;
+}
+
 interface MemberAccumulator {
   id: string;
   name: string;
