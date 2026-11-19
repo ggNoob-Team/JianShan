@@ -92,6 +92,19 @@ export interface FileExplorerFileStream {
   chunks: AsyncIterable<Uint8Array>;
 }
 
+/** Random-access workspace file source for outbound streaming without buffering the whole file. */
+export interface ExplorerFileReadSource {
+  path: string;
+  absolutePath: string;
+  fileName: string;
+  size: number;
+  modifiedAt: string;
+  revision: string;
+  mimeType: string;
+  readChunk(offset: number, length: number): Promise<Uint8Array>;
+  close(): Promise<void>;
+}
+
 const TEXT_MIME_TYPES: Record<string, string> = {
   ".json": "application/json",
 };
@@ -298,6 +311,71 @@ export async function readExplorerFileBytes({
     };
   } finally {
     await handle.close();
+  }
+}
+
+/** Opens a workspace file for an upload stream and rejects paths outside the workspace. */
+export async function openExplorerFileReadSource({
+  root,
+  relativePath,
+}: ReadFileParams): Promise<ExplorerFileReadSource> {
+  const filePath = await resolveScopedPath({ root, relativePath });
+  const handle = await openFileForRead(filePath.resolvedPath);
+
+  try {
+    const stats = await handle.stat({ bigint: true });
+    if (!stats.isFile()) {
+      throw new Error("Requested path is not a file");
+    }
+
+    const advertisedSize = Number(stats.size);
+    const advertisedRevision = fileRevision(stats);
+    const type = await sniffFileType(handle, path.extname(filePath.resolvedPath).toLowerCase());
+    let closed = false;
+
+    return {
+      path: normalizeRelativePath({ root, targetPath: filePath.requestedPath }),
+      absolutePath: filePath.resolvedPath,
+      fileName: path.basename(filePath.resolvedPath),
+      size: advertisedSize,
+      modifiedAt: stats.mtime.toISOString(),
+      revision: advertisedRevision,
+      mimeType: type.mimeType,
+      async readChunk(offset, length) {
+        if (!Number.isSafeInteger(offset) || offset < 0) {
+          throw new Error("File read offset is invalid");
+        }
+        if (!Number.isSafeInteger(length) || length < 0) {
+          throw new Error("File read length is invalid");
+        }
+        if (offset + length > advertisedSize) {
+          throw new Error("File read exceeds the advertised size");
+        }
+        if (length === 0) return new Uint8Array();
+
+        const chunk = Buffer.allocUnsafe(length);
+        const { bytesRead } = await handle.read(chunk, 0, length, offset);
+        if (bytesRead !== length) {
+          throw new Error("File changed during transfer");
+        }
+        return chunk;
+      },
+      async close() {
+        if (closed) return;
+        closed = true;
+        try {
+          const finalStats = await handle.stat({ bigint: true });
+          if (fileRevision(finalStats) !== advertisedRevision) {
+            throw new Error("File changed during transfer");
+          }
+        } finally {
+          await handle.close();
+        }
+      },
+    };
+  } catch (error) {
+    await handle.close();
+    throw error;
   }
 }
 

@@ -120,6 +120,7 @@ describe("OpenCodeBridge", () => {
         })
         .parse(await response.json());
       const definitions = new Map(manifest.tools.map((tool) => [tool.name, tool]));
+      expect(definitions.has("send_file_to_agent")).toBe(true);
       const createDefinition = definitions.get("create_agent")!;
       const sendDefinition = definitions.get("send_agent_prompt")!;
       const topLevelCatalog = createPaseoToolCatalog(dependencies);
