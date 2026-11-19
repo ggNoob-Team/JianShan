@@ -29,6 +29,7 @@ export interface BuildWorkspacePaneContentModelInput {
   host: PaneHost;
   fileNavigationRevision?: number;
   onOpenTab: (target: WorkspaceTabDescriptor["target"]) => void;
+  onOpenAgentTab?: (agentId: string) => void;
   onOpenPreferredTarget: (
     target: WorkspaceTabDescriptor["target"],
     source: OpenInSidePaneSource,
@@ -48,6 +49,7 @@ export function buildWorkspacePaneContentModel({
   host,
   fileNavigationRevision,
   onOpenTab,
+  onOpenAgentTab,
   onOpenPreferredTarget,
   onOpenTargetToSide,
   onCloseCurrentTab,
@@ -71,6 +73,7 @@ export function buildWorkspacePaneContentModel({
       state: tab.state,
       fileNavigationRevision,
       openTab: onOpenTab,
+      openAgentTab: onOpenAgentTab,
       openPreferredTarget: onOpenPreferredTarget,
       openTargetToSide: onOpenTargetToSide,
       closeCurrentTab: onCloseCurrentTab,
@@ -97,6 +100,7 @@ export function WorkspacePaneContent({
 }: WorkspacePaneContentProps) {
   const { Component, key, paneContextValue } = content;
   const openTab = useStableEvent(paneContextValue.openTab);
+  const openAgentTab = useStableEvent(paneContextValue.openAgentTab ?? (() => undefined));
   const openPreferredTarget = useStableEvent(paneContextValue.openPreferredTarget);
   const openTargetToSide = useStableEvent(paneContextValue.openTargetToSide ?? (() => undefined));
   const closeCurrentTab = useStableEvent(paneContextValue.closeCurrentTab);
@@ -114,6 +118,7 @@ export function WorkspacePaneContent({
       state: paneContextValue.state,
       fileNavigationRevision: paneContextValue.fileNavigationRevision,
       openTab,
+      openAgentTab: paneContextValue.openAgentTab ? openAgentTab : undefined,
       openPreferredTarget,
       openTargetToSide: paneContextValue.openTargetToSide ? openTargetToSide : undefined,
       closeCurrentTab,
@@ -127,6 +132,7 @@ export function WorkspacePaneContent({
       openFileInWorkspace,
       openImportSheet,
       openTab,
+      openAgentTab,
       openPreferredTarget,
       openTargetToSide,
       paneContextValue.serverId,
@@ -136,6 +142,7 @@ export function WorkspacePaneContent({
       paneContextValue.state,
       paneContextValue.workspaceId,
       paneContextValue.host,
+      paneContextValue.openAgentTab,
       paneContextValue.openTargetToSide,
       retargetCurrentTab,
       setCurrentTabState,

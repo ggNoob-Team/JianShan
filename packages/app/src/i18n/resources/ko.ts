@@ -20,6 +20,7 @@ export const ko: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "미완료 다시 실행",
+      viewGenerationTrace: "사고 과정 보기",
     },
     anchors: {
       title: "다이어그램이 다룰 범위를 확인하세요",

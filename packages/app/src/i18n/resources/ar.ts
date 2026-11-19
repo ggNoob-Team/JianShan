@@ -20,6 +20,7 @@ export const ar: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "إعادة تشغيل غير المكتمل",
+      viewGenerationTrace: "عرض التفكير",
     },
     anchors: {
       title: "أكّد ما يجب أن تغطيه المخططات",

@@ -14,7 +14,7 @@ function artifactFor(task: ArchifyGenerationTask, index: number): ArchifyArtifac
     updatedAt: new Date().toISOString(),
     specBytes: 10,
     artifactBytes: 20,
-    generatorAgentId: task.agentId,
+    generatorAgentId: diagram.generatorAgentId ?? task.agentId,
     request: null,
     scope: null,
   };
@@ -33,6 +33,7 @@ function createService(options?: {
   const stopGenerator = options?.stopGenerator ?? vi.fn(async () => undefined);
   const archiveAgent = vi.fn(async () => undefined);
   const createdAgentIds: string[] = [];
+  const createdAgentInputs: Array<{ internal?: boolean }> = [];
   const service = new ArchifyGenerationService({
     paseoHome: "/tmp/paseo-archify-generation",
     workspaceRegistry: {
@@ -41,6 +42,7 @@ function createService(options?: {
     createAgent: (async (input: { labels?: Record<string, string> }) => {
       const agentId = workerAgentId(input.labels?.["paseo.archify-type"] ?? "unknown");
       createdAgentIds.push(agentId);
+      createdAgentInputs.push(input);
       return { snapshot: { id: agentId } };
     }) as never,
     agentManager: {} as never,
@@ -54,7 +56,7 @@ function createService(options?: {
       archiveAgent,
     },
   });
-  return { service, updates, stopGenerator, archiveAgent, createdAgentIds };
+  return { service, updates, stopGenerator, archiveAgent, createdAgentIds, createdAgentInputs };
 }
 
 /** A generator whose workers only finish when the test releases them. */
@@ -95,11 +97,22 @@ function deliver(workspaceId: string, task: ArchifyGenerationTask, index: number
 describe("ArchifyGenerationService", () => {
   test("runs one worker per diagram in parallel and reports each delivery", async () => {
     const { releases, runGenerator } = gatedGenerator();
-    const { service, archiveAgent, createdAgentIds } = createService({ runGenerator });
+    const { service, archiveAgent, createdAgentIds, createdAgentInputs } = createService({
+      runGenerator,
+    });
 
-    await startedTask(service);
+    const started = await startedTask(service);
+    expect(started.diagrams.map((diagram) => diagram.generatorAgentId)).toEqual([
+      "agent_architecture",
+      "agent_sequence",
+    ]);
     expect(createdAgentIds).toEqual(["agent_architecture", "agent_sequence"]);
+    expect(createdAgentInputs.map((input) => input.internal)).toEqual([true, true]);
     expect(releases).toHaveLength(2);
+    expect(service.get("ws_1")?.diagrams.map((diagram) => diagram.generatorAgentId)).toEqual([
+      "agent_architecture",
+      "agent_sequence",
+    ]);
 
     const running = service.get("ws_1")!;
     deliver("ws_1", running, 0);
@@ -116,12 +129,13 @@ describe("ArchifyGenerationService", () => {
     const task = service.get("ws_1")!;
     expect(task.stage).toBe("done");
     expect(task.diagrams.map((diagram) => diagram.status)).toEqual(["delivered", "delivered"]);
-    expect(task.finishedAt).not.toBeNull();
-    // Finished workers do not linger in the agent list.
-    expect(archiveAgent.mock.calls.map(([agentId]) => agentId).sort()).toEqual([
+    expect(task.diagrams.map((diagram) => diagram.generatorAgentId)).toEqual([
       "agent_architecture",
       "agent_sequence",
     ]);
+    expect(task.finishedAt).not.toBeNull();
+    // Internal workers stay addressable so the completed trace can be opened later.
+    expect(archiveAgent).not.toHaveBeenCalled();
   });
 
   test("a worker that delivers survives another worker failing", async () => {
@@ -163,7 +177,7 @@ describe("ArchifyGenerationService", () => {
     expect(delivered.artifact?.id).toBe("sequence-renamed-by-the-model");
   });
 
-  test("a worker whose run throws is archived and only fails its own diagram", async () => {
+  test("a worker whose run throws stays inspectable and only fails its own diagram", async () => {
     const { service, archiveAgent } = createService({
       runGenerator: async (agentId) => {
         if (agentId === workerAgentId("sequence")) throw new Error("provider exploded");
@@ -183,10 +197,11 @@ describe("ArchifyGenerationService", () => {
     const task = service.get("ws_1")!;
     expect(task.diagrams[1]?.status).toBe("failed");
     expect(task.diagrams[1]?.error).toBe("provider exploded");
-    expect(archiveAgent.mock.calls.map(([agentId]) => agentId).sort()).toEqual([
+    expect(task.diagrams.map((diagram) => diagram.generatorAgentId)).toEqual([
       "agent_architecture",
       "agent_sequence",
     ]);
+    expect(archiveAgent).not.toHaveBeenCalled();
   });
 
   test("cancel keeps delivered diagrams and stops every worker", async () => {
@@ -244,7 +259,24 @@ describe("ArchifyGenerationService", () => {
     const task = service.get("ws_1")!;
     expect(task.error).toBe("scan exploded");
     expect(task.agentId).toBeNull();
+    expect(task.diagrams[0]?.generatorAgentId).toBeNull();
     expect(task.diagrams[0]?.status).toBe("failed");
     expect(createdAgentIds).toEqual([]);
+  });
+
+  test("archives workers from the previous run only after the next run starts", async () => {
+    const { service, archiveAgent } = createService({
+      runGenerator: async () => ({ canceled: false }),
+    });
+
+    await service.start({ workspaceId: "ws_1", types: ["architecture"], provider: "codex" });
+    await vi.waitFor(() => {
+      expect(service.get("ws_1")?.status).toBe("failed");
+    });
+    expect(archiveAgent).not.toHaveBeenCalled();
+
+    await service.start({ workspaceId: "ws_1", types: ["sequence"], provider: "codex" });
+
+    expect(archiveAgent.mock.calls.map(([agentId]) => agentId)).toEqual(["agent_architecture"]);
   });
 });

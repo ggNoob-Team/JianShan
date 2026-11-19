@@ -4,6 +4,7 @@ import {
   buildArchifySearchEntries,
   filterArchifySearchEntries,
   resolveArchifyAgentConfig,
+  resolveArchifyGeneratorAgentId,
   resolveArchifyArtifactTabLabel,
 } from "./model";
 
@@ -107,6 +108,42 @@ describe("archify model", () => {
       "api",
       "db",
     ]);
+  });
+
+  it("resolves a worker id on a capable host and keeps it after completion", () => {
+    expect(
+      resolveArchifyGeneratorAgentId(
+        { status: "drawing", generatorAgentId: " agent_worker " },
+        true,
+      ),
+    ).toBe("agent_worker");
+    expect(
+      resolveArchifyGeneratorAgentId(
+        { status: "delivered", generatorAgentId: "agent_worker" },
+        true,
+      ),
+    ).toBe("agent_worker");
+    expect(
+      resolveArchifyGeneratorAgentId({ status: "failed", generatorAgentId: "agent_worker" }, true),
+    ).toBe("agent_worker");
+    expect(
+      resolveArchifyGeneratorAgentId(
+        { status: "canceled", generatorAgentId: "agent_worker" },
+        true,
+      ),
+    ).toBe("agent_worker");
+    expect(
+      resolveArchifyGeneratorAgentId(
+        { status: "drawing", generatorAgentId: "agent_worker" },
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      resolveArchifyGeneratorAgentId({ status: "delivered", generatorAgentId: null }, true),
+    ).toBeNull();
+    expect(
+      resolveArchifyGeneratorAgentId({ status: "drawing", generatorAgentId: "   " }, true),
+    ).toBeNull();
   });
 
   it("focuses every endpoint for a relationship result", () => {

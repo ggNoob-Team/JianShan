@@ -20,6 +20,7 @@ export const ja: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "未完了を再実行",
+      viewGenerationTrace: "思考を表示",
     },
     anchors: {
       title: "図が扱う対象を確認",

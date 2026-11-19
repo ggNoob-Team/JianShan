@@ -1764,6 +1764,9 @@ export const ArchifyGenerationDiagramStatusSchema = z.enum([
 export const ArchifyGenerationDiagramSchema = z.object({
   type: ArchifyDiagramTypeSchema,
   artifactId: z.string(),
+  // COMPAT(archifyAgentTrace): added in v0.13.10, remove after 2027-11-19 once the daemon floor
+  // reports the internal worker that generated a diagram.
+  generatorAgentId: z.string().nullable().optional(),
   status: ArchifyGenerationDiagramStatusSchema,
   startedAt: z.string().nullable(),
   finishedAt: z.string().nullable(),
@@ -4309,6 +4312,9 @@ export const ServerInfoStatusPayloadSchema = z
         archifyGeneration: z.boolean().optional(),
         // COMPAT(archifyArtifactDelete): added in v0.11.2, remove gate after 2027-10-09.
         archifyArtifactDelete: z.boolean().optional(),
+        // COMPAT(archifyAgentTrace): added in v0.13.10, remove gate after 2027-11-19 once the
+        // daemon floor reports the live worker behind an in-progress diagram.
+        archifyAgentTrace: z.boolean().optional(),
         // COMPAT(terminalRestoreModes): added in v0.1.81, remove gate after 2026-11-23.
         "terminal-restore-modes": z.boolean().optional(),
         // COMPAT(terminalInputModeReplay): added in v0.2.6, remove gate after 2027-02-02.

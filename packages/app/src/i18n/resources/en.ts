@@ -17,6 +17,7 @@ export const en = {
     },
     actions: {
       rerunUnfinished: "Rerun unfinished",
+      viewGenerationTrace: "View thinking",
     },
     anchors: {
       title: "Confirm what the diagrams must cover",

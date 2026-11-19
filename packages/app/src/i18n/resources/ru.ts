@@ -20,6 +20,7 @@ export const ru: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "Повторить незавершённое",
+      viewGenerationTrace: "Показать рассуждение",
     },
     anchors: {
       title: "Подтвердите, что должны охватывать диаграммы",

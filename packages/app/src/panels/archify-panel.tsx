@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import {
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronUp,
@@ -26,6 +27,7 @@ import {
   latestArchifyArtifactByType,
   resolveArchifyAgentConfig,
   resolveArchifyArtifactTabLabel,
+  resolveArchifyGeneratorAgentId,
   type ArchifySearchEntry,
 } from "@/archify/model";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import { confirmDialog } from "@/utils/confirm-dialog";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 import type {
   ArchifyArtifactSummary,
   ArchifyDiagramType,
@@ -361,15 +364,24 @@ function archifyDiagramStatusStyle(status: ArchifyGenerationDiagramStatus) {
 
 function ArchifyGenerationDiagramRow({
   diagram,
+  generatorAgentId,
+  openTraceLabel,
   typeLabel,
   statusLabel,
+  onOpenTrace,
 }: {
   diagram: ArchifyGenerationDiagram;
+  generatorAgentId: string | null;
+  openTraceLabel: string;
   typeLabel: string;
   statusLabel: string;
+  onOpenTrace: (agentId: string) => void;
 }): ReactElement {
   const elapsedMs = useArchifyElapsedMs(diagram.startedAt, diagram.finishedAt);
   const duration = diagram.startedAt ? formatArchifyDuration(elapsedMs) : null;
+  const handleOpenTrace = useCallback(() => {
+    if (generatorAgentId) onOpenTrace(generatorAgentId);
+  }, [generatorAgentId, onOpenTrace]);
   return (
     <View style={styles.diagramBlock}>
       <View style={styles.diagramRow}>
@@ -377,6 +389,18 @@ function ArchifyGenerationDiagramRow({
         <Text style={styles.diagramType} numberOfLines={1}>
           {typeLabel}
         </Text>
+        {generatorAgentId ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            leftIcon={BrainCircuit}
+            onPress={handleOpenTrace}
+            style={styles.diagramTraceButton}
+            testID={`archify-agent-trace-${diagram.artifactId}`}
+          >
+            {openTraceLabel}
+          </Button>
+        ) : null}
         <Text style={[styles.diagramStatus, archifyDiagramStatusStyle(diagram.status)]}>
           {statusLabel}
         </Text>
@@ -463,7 +487,7 @@ function ArchifyAnchorRow({
 // eslint-disable-next-line complexity
 function ArchifyPanel(): ReactElement {
   const { t } = useTranslation();
-  const { serverId, workspaceId, target } = usePaneContext();
+  const { serverId, workspaceId, target, openAgentTab } = usePaneContext();
   invariant(target.kind === "archify", "ArchifyPanel requires archify target");
   const client = useHostRuntimeClient(serverId);
   const archifyHost = useHostFeature(serverId, "archify");
@@ -472,6 +496,7 @@ function ArchifyPanel(): ReactElement {
   const archifyGenerationHost = useHostFeature(serverId, "archifyGeneration");
   const supported = archifyHost && archifyGenerationHost;
   const canDeleteArtifacts = useHostFeature(serverId, "archifyArtifactDelete");
+  const canOpenGenerationTrace = useHostFeature(serverId, "archifyAgentTrace");
   const skillManagement = useHostFeature(serverId, "skillManagement");
   const workspaceDirectory = useWorkspaceFields(
     serverId,
@@ -512,6 +537,7 @@ function ArchifyPanel(): ReactElement {
   const deliveredArtifactIdsRef = useRef<Set<string>>(new Set());
   const userSelectedArtifactRef = useRef(false);
   const generationTaskIdRef = useRef<string | null>(null);
+  const generationSubscriptionReadyRef = useRef<Promise<void> | null>(null);
 
   const generationRunning = generationTask?.status === "running";
   const generationTaskError = generationTask?.status === "failed" ? generationTask.error : null;
@@ -604,6 +630,11 @@ function ArchifyPanel(): ReactElement {
       setIsStarting(true);
       setGenerationError(null);
       try {
+        const subscriptionReady = generationSubscriptionReadyRef.current;
+        if (!subscriptionReady) {
+          throw new Error("Archify progress subscription is unavailable");
+        }
+        await subscriptionReady;
         if (!skillReadyRef.current) {
           await ensureArchifySkill({ client, skillManagement });
           skillReadyRef.current = true;
@@ -640,6 +671,9 @@ function ArchifyPanel(): ReactElement {
   useEffect(() => {
     if (!client || !supported || !workspaceId) return;
     const subscription = client.observeArchifyGeneration();
+    const subscriptionReady = subscription.ready.then(() => undefined);
+    void subscriptionReady.catch(() => undefined);
+    generationSubscriptionReadyRef.current = subscriptionReady;
     const unsubscribe = subscription.subscribe({
       snapshot: () => {},
       update: (message) => {
@@ -649,6 +683,7 @@ function ArchifyPanel(): ReactElement {
       },
     });
     return () => {
+      generationSubscriptionReadyRef.current = null;
       unsubscribe();
       void subscription.release().catch(() => undefined);
     };
@@ -729,6 +764,17 @@ function ArchifyPanel(): ReactElement {
     void workspaceQuery.refetch();
     void artifactQuery.refetch();
   }, [artifactQuery, workspaceQuery]);
+
+  const handleOpenGenerationTrace = useCallback(
+    (agentId: string) => {
+      if (openAgentTab) {
+        openAgentTab(agentId);
+        return;
+      }
+      navigateToAgent({ serverId, agentId, workspaceId, pin: true });
+    },
+    [openAgentTab, serverId, workspaceId],
+  );
 
   const handleSelectArtifact = useCallback((artifactId: string) => {
     userSelectedArtifactRef.current = true;
@@ -994,8 +1040,11 @@ function ArchifyPanel(): ReactElement {
                 <ArchifyGenerationDiagramRow
                   key={`${diagram.type}:${diagram.artifactId}`}
                   diagram={diagram}
+                  generatorAgentId={resolveArchifyGeneratorAgentId(diagram, canOpenGenerationTrace)}
+                  openTraceLabel={t("archify.actions.viewGenerationTrace")}
                   typeLabel={t(`archify.types.${diagram.type}`)}
                   statusLabel={t(`archify.generation.status.${diagram.status}`)}
+                  onOpenTrace={handleOpenGenerationTrace}
                 />
               ))}
             </View>
@@ -1270,6 +1319,9 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     textAlign: "right",
+  },
+  diagramTraceButton: {
+    flexShrink: 0,
   },
   diagramError: {
     marginLeft: 22,

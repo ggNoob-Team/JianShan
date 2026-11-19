@@ -26,8 +26,10 @@ The daemon then creates one background worker agent per requested diagram, each 
 artifact, and use the provider's unattended mode when the provider advertises one, so repository
 inspection and renderer calls do not stop for permission prompts. A worker reads the evidence
 sheet, uses the `paseo-archify` skill to author a schema-valid specification, then calls the
-`archify_render` Paseo tool for its artifact. Workers are archived when they finish, delivered or
-not, so a run leaves nothing behind in the sidebar; a worker that fails only fails its own diagram.
+`archify_render` Paseo tool for its artifact. Workers are internal agents, so they stay out of the
+agent directory and project history while remaining addressable by the live task. A worker that
+fails only fails its own diagram. The panel can open each diagram's worker tab while the agent runs
+and after the turn ends; starting the next run archives the previous run's workers.
 
 `archify_render` resolves the caller agent's workspace, writes the specification to
 `$PASEO_HOME/archify/<workspaceId>/<artifactId>/spec.json`, runs the vendored
@@ -37,7 +39,11 @@ only after delivery succeeds. A failed candidate leaves any previous successful 
 Every task change is broadcast as `archify.generation.updated` with the stage, the per-diagram
 status and timing, the current action line, and the failure reason, so the panel does not poll.
 Diagrams land progressively: the first delivery becomes the visible tab until the user picks one,
-and the run can be canceled or, once stopped, have its unfinished diagrams rerun.
+and the run can be canceled or, once stopped, have its unfinished diagrams rerun. A host that
+advertises `archifyAgentTrace` reports each diagram's internal worker in the task payload. The
+diagram row uses that id to open the normal Agent pane, streamed and inspectable like any other
+conversation. The start response is sent after each requested worker has an id or has failed to
+start, so a missed initial progress push cannot remove the trace entry.
 
 The first open of a workspace writes `.initialized` and returns `autoGenerate: true`. The panel uses
 that one-shot signal to start a single architecture overview; method-call, data-flow, workflow, and

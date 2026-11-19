@@ -20,6 +20,7 @@ export const es: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "Reintentar lo pendiente",
+      viewGenerationTrace: "Ver razonamiento",
     },
     anchors: {
       title: "Confirma qué deben cubrir los diagramas",

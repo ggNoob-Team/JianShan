@@ -20,6 +20,7 @@ export const zhCN: TranslationResources = {
     },
     actions: {
       rerunUnfinished: "重跑未完成",
+      viewGenerationTrace: "查看思考",
     },
     anchors: {
       title: "确认图表要覆盖的范围",
