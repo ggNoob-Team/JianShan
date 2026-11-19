@@ -125,14 +125,18 @@ function getTimeFormatter(): Intl.DateTimeFormat {
   return cachedTimeFormatter;
 }
 
-/**
- * Format a chat-message timestamp for hover-revealed UI.
- * - Same day: "10:11 PM" or "22:11" depending on user preference
- * - The previous 6 calendar days: "Wednesday 10:11 PM"
- * - Older, including today's weekday last week: "14 May 2026, 10:11 PM"
- */
-export function formatMessageTimestamp(date: Date, now: Date = new Date()): string {
-  const time = getTimeFormatter().format(date);
+let cached24HourTimeFormatter: Intl.DateTimeFormat | null = null;
+function get24HourTimeFormatter(): Intl.DateTimeFormat {
+  if (cached24HourTimeFormatter) return cached24HourTimeFormatter;
+  cached24HourTimeFormatter = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return cached24HourTimeFormatter;
+}
+
+function formatMessageTimestampWithTime(date: Date, now: Date, time: string): string {
   const daysAgo = localCalendarDaysBetween(date, now);
 
   if (daysAgo === 0) {
@@ -150,6 +154,23 @@ export function formatMessageTimestamp(date: Date, now: Date = new Date()): stri
     year: "numeric",
   });
   return `${dateLabel}, ${time}`;
+}
+
+/**
+ * Format a chat-message timestamp for hover-revealed UI.
+ * - Same day: "10:11 PM" or "22:11" depending on user preference
+ * - The previous 6 calendar days: "Wednesday 10:11 PM"
+ * - Older, including today's weekday last week: "14 May 2026, 10:11 PM"
+ */
+export function formatMessageTimestamp(date: Date, now: Date = new Date()): string {
+  return formatMessageTimestampWithTime(date, now, getTimeFormatter().format(date));
+}
+
+/**
+ * Same day context as formatMessageTimestamp, but the clock is always 24-hour.
+ */
+export function formatMessageTimestamp24Hour(date: Date, now: Date = new Date()): string {
+  return formatMessageTimestampWithTime(date, now, get24HourTimeFormatter().format(date));
 }
 
 /**

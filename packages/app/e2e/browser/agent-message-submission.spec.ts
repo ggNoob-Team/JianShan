@@ -890,6 +890,10 @@ async function readClipboardText(page: Page): Promise<string> {
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
+function readBoxShadow(locator: Locator): Promise<string> {
+  return locator.evaluate((element) => getComputedStyle(element).boxShadow);
+}
+
 test.describe("user message actions with a mouse", () => {
   test.use({ viewport: { width: 900, height: 960 } });
 
@@ -931,6 +935,45 @@ test.describe("user message actions with a mouse", () => {
       await page.mouse.move(0, 0);
       await expect(trailingRow).toHaveCSS("opacity", "0");
       await expect(trailingRow).toHaveCSS("pointer-events", "none");
+    } finally {
+      await agent.cleanup();
+    }
+  });
+});
+
+test.describe("completed turn presentation", () => {
+  test("keeps the bubble shadow and completion time on desktop and mobile layouts", async ({
+    page,
+  }, testInfo) => {
+    const prompt = "Keep my message visually separated from the conversation.";
+    const agent = await seedMockAgentWorkspace({
+      repoPrefix: "message-shadow-",
+      title: "Message shadow",
+      initialPrompt: prompt,
+    });
+    try {
+      await agent.client.waitForFinish(agent.agentId, 30_000);
+      await openAgentRoute(page, agent);
+      await expectComposerVisible(page);
+      const userMessage = page.getByTestId("user-message").filter({ hasText: prompt });
+
+      for (const width of [900, 390]) {
+        await page.setViewportSize({ width, height: 960 });
+        await expect(userMessage).toBeVisible();
+        const bubble = userMessage.getByTestId("user-message-bubble");
+        await expect(bubble).toBeVisible();
+        await expect.poll(() => readBoxShadow(bubble)).toContain("0.24");
+        await expect(bubble).toHaveCSS("border-top-width", "1px");
+        const completedTime = page.getByTestId("turn-completed-timestamp");
+        await expect(completedTime).toBeVisible();
+        await expect(completedTime).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+        const screenshotPath = testInfo.outputPath(`message-shadow-${width}.png`);
+        await page.screenshot({ path: screenshotPath });
+        await testInfo.attach(`message-shadow-${width}`, {
+          path: screenshotPath,
+          contentType: "image/png",
+        });
+      }
     } finally {
       await agent.cleanup();
     }

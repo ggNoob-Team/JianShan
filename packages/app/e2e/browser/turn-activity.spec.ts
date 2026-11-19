@@ -2,7 +2,7 @@ import { test, expect } from "../support/fixtures";
 import { expectComposerVisible } from "../support/helpers/composer";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
-test("collapses a completed turn and expands its process in order", async ({ page }) => {
+test("collapses a completed turn and expands its process in order", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const agent = await seedMockAgentWorkspace({
     repoPrefix: "turn-activity-",
@@ -25,6 +25,15 @@ test("collapses a completed turn and expands its process in order", async ({ pag
     await expect(activity).toBeVisible();
     const toggle = activity.getByTestId("turn-activity-toggle");
     await expect(toggle).toContainText(/Worked for/);
+    const completedTime = page.getByTestId("turn-completed-timestamp");
+    await expect(completedTime).toBeVisible();
+    await expect(completedTime).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+    const screenshotPath = testInfo.outputPath("completed-turn-timestamp.png");
+    await page.screenshot({ path: screenshotPath });
+    await testInfo.attach("completed-turn-timestamp", {
+      path: screenshotPath,
+      contentType: "image/png",
+    });
 
     // The process is hidden by default: no reasoning rows and no command rows.
     await expect(page.getByText("Thinking", { exact: true })).toHaveCount(0);
