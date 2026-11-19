@@ -25,6 +25,7 @@ import { BackHeader } from "@/components/headers/back-header";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { PressHighlight } from "@/components/ui/press-highlight";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   getHostRuntimeStore,
   useHostRuntimeConnectionStatuses,
@@ -264,6 +265,23 @@ function MemberTabs({
   activeMemberId: string;
   onSelect: (memberId: string) => void;
 }): ReactElement {
+  const compact = useIsCompactFormFactor();
+  const tabs = members.map((member) => (
+    <MemberTab
+      key={member.id}
+      member={member}
+      active={member.id === activeMemberId}
+      compact={compact}
+      onSelect={onSelect}
+    />
+  ));
+  if (compact) {
+    return (
+      <View style={[styles.memberTabs, styles.memberTabsWrap]} testID="team-member-tabs">
+        {tabs}
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
@@ -271,14 +289,7 @@ function MemberTabs({
       contentContainerStyle={styles.memberTabs}
       testID="team-member-tabs"
     >
-      {members.map((member) => (
-        <MemberTab
-          key={member.id}
-          member={member}
-          active={member.id === activeMemberId}
-          onSelect={onSelect}
-        />
-      ))}
+      {tabs}
     </ScrollView>
   );
 }
@@ -286,15 +297,20 @@ function MemberTabs({
 function MemberTab({
   member,
   active,
+  compact,
   onSelect,
 }: {
   member: TeamMemberInsights;
   active: boolean;
+  compact: boolean;
   onSelect: (memberId: string) => void;
 }): ReactElement {
   const handlePress = useCallback(() => onSelect(member.id), [member.id, onSelect]);
   const accessibilityState = useMemo(() => ({ selected: active }), [active]);
-  const style = useMemo(() => [styles.memberTab, active && styles.memberTabActive], [active]);
+  const style = useMemo(
+    () => [styles.memberTab, compact && styles.memberTabCompact, active && styles.memberTabActive],
+    [active, compact],
+  );
 
   return (
     <PressHighlight
@@ -411,12 +427,100 @@ function PanelHeading({ title, note }: { title: string; note: string }): ReactEl
   );
 }
 
+function HeatmapCell({
+  date,
+  slot,
+  seconds,
+  compact = false,
+}: {
+  date: string;
+  slot: number;
+  seconds: number;
+  compact?: boolean;
+}): ReactElement {
+  const time = `${String(Math.floor(slot / 4)).padStart(2, "0")}:${String((slot % 4) * 15).padStart(2, "0")}`;
+  return (
+    <View
+      accessibilityLabel={`${date} ${time} ${formatTeamDuration(seconds)}`}
+      style={[
+        styles.heatCell,
+        compact && styles.heatCellCompact,
+        { opacity: 0.16 + heatLevel(seconds) * 0.19 },
+      ]}
+    />
+  );
+}
+
+function HeatmapLegend(): ReactElement {
+  return (
+    <View style={styles.heatLegend}>
+      <Text style={styles.muted}>空缺</Text>
+      {[0, 1, 2, 3, 4].map((level) => (
+        <View key={level} style={[styles.heatLegendCell, { opacity: 0.16 + level * 0.19 }]} />
+      ))}
+      <Text style={styles.muted}>满 15 分钟</Text>
+    </View>
+  );
+}
+
+function CompactHeatmapDay({ day }: { day: TeamHeatmapDay }): ReactElement {
+  const totalSeconds = day.slots.reduce((sum, seconds) => sum + seconds, 0);
+  return (
+    <View style={styles.heatmapCompactDay}>
+      <View style={styles.heatmapCompactMeta}>
+        <Text style={styles.heatmapDate}>{day.date.slice(5)}</Text>
+        <Text style={styles.muted}>{formatTeamDuration(totalSeconds)}</Text>
+      </View>
+      {[0, 1].map((half) => (
+        <View key={half} style={styles.heatmapCompactHalfRow}>
+          <Text style={styles.heatmapHalfLabel}>{half === 0 ? "00–12" : "12–24"}</Text>
+          <View style={styles.heatmapCompactHourGrid}>
+            {Array.from({ length: 12 }, (_, offset) => {
+              const hour = half * 12 + offset;
+              return (
+                <View key={hour} style={styles.heatmapCompactHour}>
+                  <Text style={styles.heatmapHourLabel}>{String(hour).padStart(2, "0")}</Text>
+                  <View style={styles.heatmapCompactCells}>
+                    {day.slots.slice(hour * 4, hour * 4 + 4).map((seconds, quarter) => {
+                      const slot = hour * 4 + quarter;
+                      return (
+                        <HeatmapCell
+                          key={slot}
+                          date={day.date}
+                          slot={slot}
+                          seconds={seconds}
+                          compact
+                        />
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function Heatmap({ days }: { days: TeamHeatmapDay[] }): ReactElement {
+  const compact = useIsCompactFormFactor();
   const activeDays = [...days]
     .filter((day) => day.slots.some((seconds) => seconds > 0))
     .sort((left, right) => right.date.localeCompare(left.date));
   if (activeDays.length === 0) {
     return <Text style={styles.muted}>当前范围没有可用的时间数据。</Text>;
+  }
+  if (compact) {
+    return (
+      <View style={styles.heatmapCompactDays} testID="team-heatmap">
+        {activeDays.map((day) => (
+          <CompactHeatmapDay key={day.date} day={day} />
+        ))}
+        <HeatmapLegend />
+      </View>
+    );
   }
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="team-heatmap">
@@ -426,25 +530,19 @@ function Heatmap({ days }: { days: TeamHeatmapDay[] }): ReactElement {
             <Text style={styles.heatmapDate}>{day.date.slice(5)}</Text>
             <View style={styles.heatmapSlots}>
               {Array.from(day.slots.entries()).map(([slot, seconds]) => {
-                const time = `${String(Math.floor(slot / 4)).padStart(2, "0")}:${String((slot % 4) * 15).padStart(2, "0")}`;
                 return (
-                  <View
-                    key={`${day.date}-${time}`}
-                    accessibilityLabel={`${day.date} ${time} ${formatTeamDuration(seconds)}`}
-                    style={[styles.heatCell, { opacity: 0.16 + heatLevel(seconds) * 0.19 }]}
+                  <HeatmapCell
+                    key={`${day.date}-${slot}`}
+                    date={day.date}
+                    slot={slot}
+                    seconds={seconds}
                   />
                 );
               })}
             </View>
           </View>
         ))}
-        <View style={styles.heatLegend}>
-          <Text style={styles.muted}>空缺</Text>
-          {[0, 1, 2, 3, 4].map((level) => (
-            <View key={level} style={[styles.heatLegendCell, { opacity: 0.16 + level * 0.19 }]} />
-          ))}
-          <Text style={styles.muted}>满 15 分钟</Text>
-        </View>
+        <HeatmapLegend />
       </View>
     </ScrollView>
   );
@@ -560,6 +658,9 @@ const styles = StyleSheet.create((theme) => {
       gap: theme.spacing[2],
       paddingBottom: theme.spacing[1],
     },
+    memberTabsWrap: {
+      flexWrap: "wrap",
+    },
     memberTab: {
       minWidth: 138,
       paddingVertical: theme.spacing[3],
@@ -569,6 +670,11 @@ const styles = StyleSheet.create((theme) => {
       borderRadius: theme.borderRadius.lg,
       backgroundColor: theme.colors.surface1,
       gap: theme.spacing[1],
+    },
+    memberTabCompact: {
+      flexBasis: "44%",
+      flexGrow: 1,
+      minWidth: 0,
     },
     memberTabActive: {
       borderColor: accent,
@@ -581,6 +687,7 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foreground,
       fontSize: theme.fontSize.sm,
       fontWeight: theme.fontWeight.medium,
+      minWidth: 0,
     },
     memberNameActive: {
       color: accent,
@@ -713,6 +820,57 @@ const styles = StyleSheet.create((theme) => {
       minWidth: 760,
       gap: theme.spacing[2],
     },
+    heatmapCompactDays: {
+      gap: theme.spacing[3],
+    },
+    heatmapCompactDay: {
+      gap: theme.spacing[1],
+      paddingTop: theme.spacing[2],
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    heatmapCompactMeta: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: theme.spacing[2],
+    },
+    heatmapCompactHalfRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: theme.spacing[1],
+    },
+    heatmapHalfLabel: {
+      width: 34,
+      color: theme.colors.foregroundMuted,
+      fontSize: theme.fontSize.sm,
+      lineHeight: 12,
+      textAlign: "right",
+    },
+    heatmapCompactHourGrid: {
+      flex: 1,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing[1],
+      minWidth: 0,
+    },
+    heatmapCompactHour: {
+      flexBasis: "14%",
+      flexGrow: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    heatmapHourLabel: {
+      color: theme.colors.foregroundMuted,
+      fontSize: 7,
+      lineHeight: 8,
+      textAlign: "center",
+    },
+    heatmapCompactCells: {
+      flexDirection: "row",
+      gap: 1,
+      height: 10,
+    },
     heatmapRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -734,6 +892,9 @@ const styles = StyleSheet.create((theme) => {
       height: 12,
       borderRadius: 2,
       backgroundColor: accent,
+    },
+    heatCellCompact: {
+      height: 10,
     },
     heatLegend: {
       flexDirection: "row",

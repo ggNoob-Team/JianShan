@@ -86,6 +86,19 @@ describe("admin server", () => {
     expect(roleScriptText).toContain("badge virtual");
     expect(roleScriptText).toContain("data-owner-agent");
 
+    const teamCss = await fetch(new URL("/team-reference.css", handle.url));
+    expect(teamCss.status).toBe(200);
+    const teamCssText = await teamCss.text();
+    expect(teamCssText).toContain("--accent: #3459a6");
+    expect(teamCssText).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(teamCssText).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
+
+    const adminCss = await fetch(new URL("/style.css", handle.url));
+    expect(adminCss.status).toBe(200);
+    const adminCssText = await adminCss.text();
+    expect(adminCssText).toContain("--primary: #3459a6");
+    expect(adminCssText).toContain("--chart-2: #5f82ca");
+
     const unauthorized = await fetch(new URL("/api/roles", handle.url));
     expect(unauthorized.status).toBe(401);
 
