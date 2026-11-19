@@ -37,11 +37,22 @@ Trusted server plugins retain the authority of their runtime; they are not sandb
 ## Delegating agents
 
 Agent MCP discovers destination IDs with `list_hosts`. `create_workspace`, `list_workspaces`,
-`create_agent`, `send_agent_prompt`, `get_agent_status`, `get_agent_activity`, and `list_agents`
-accept `serverId`; omission selects the calling daemon. Remote creation requires a
-destination workspace and explicit provider/model. Caller filesystem defaults apply only on the
-calling daemon. Prompting a remote child acknowledges acceptance and uses the existing idle wait for
-finish notifications. Remote agent lists have no caller-directory default; pass `cwd` to filter them.
+`create_agent`, `send_agent_prompt`, `send_file_to_agent`, `get_agent_status`,
+`get_agent_activity`, and `list_agents` accept `serverId`; omission selects the calling daemon.
+Remote creation requires a destination workspace and explicit provider/model. Caller filesystem
+defaults apply only on the calling daemon. Prompting a remote child acknowledges acceptance and uses
+the existing idle wait for finish notifications. Remote agent lists have no caller-directory default;
+pass `cwd` to filter them.
+
+`send_file_to_agent` streams a file from the caller's workspace to the destination daemon's upload
+store, then sends the target agent a prompt with an `uploaded_file` attachment. The attachment gives
+the target agent the destination path, name, MIME type, and size, so it can copy the file to a
+desktop, server root, or another requested location with its own tools. Files are capped by the
+existing 100 MiB upload limit. A same-host handoff sends the source path directly without uploading.
+The caller receives the existing idle-wait notification when the target finishes; unlike a remote
+prompt limited to a child, the file handoff can notify for any reachable target agent. The transfer
+does not grant reverse host access; the destination still needs its own saved registration for a
+later reverse transfer.
 
 The parent’s Subagents track shows qualified children across connected hosts. Opening a child uses
 the ordinary conversation on the destination's session. The runtime selects among that host's

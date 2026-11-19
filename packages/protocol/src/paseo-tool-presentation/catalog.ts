@@ -155,6 +155,15 @@ export const PASEO_TOOL_CATALOG = {
       outputFields: ["status", "lastMessage", "permission"],
     },
   },
+  send_file_to_agent: {
+    label: "Send file",
+    context: field("fileName", "sourcePath"),
+    detail: {
+      promptField: "prompt",
+      inputOrder: ["serverId", "agentId", "sourcePath", "fileName", "prompt", "notifyOnFinish"],
+      outputFields: ["agentId", "deliveryStatus", "status", "transfer"],
+    },
+  },
   get_agent_status: {
     label: "Check agent",
     context: targetAgent(),
