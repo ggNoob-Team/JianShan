@@ -535,6 +535,31 @@ export const fr: TranslationResources = {
       archive: "Archiver",
     },
   },
+  screenshot: {
+    capture: "Capture",
+    editorTitle: "Modifier la capture",
+    send: "Envoyer",
+    loading: "Chargement de l’image...",
+    cropHint: "Faites glisser les coins pour recadrer",
+    applyCrop: "Appliquer le recadrage",
+    textPlaceholder: "Saisir du texte",
+    tools: {
+      crop: "Recadrer",
+      pen: "Stylo",
+      rectangle: "Rectangle",
+      arrow: "Flèche",
+      text: "Texte",
+      undo: "Annuler",
+      reset: "Réinitialiser",
+      color: "Couleur",
+    },
+    errors: {
+      capture: "Impossible de capturer l’écran. Réessayez.",
+      load: "Impossible de charger la capture.",
+      crop: "Impossible de recadrer l’image.",
+      save: "Impossible d’enregistrer l’image.",
+    },
+  },
   message: {
     diagram: {
       diagram: "Diagramme",

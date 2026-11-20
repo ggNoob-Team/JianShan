@@ -13,6 +13,7 @@ import {
   readRawFile,
 } from "../web/rawfile-assets";
 import { PhotoPickerBridge } from "../web/photo-picker-bridge";
+import { ScreenCaptureBridge } from "../web/screen-capture-bridge";
 
 const LOG_DOMAIN: number = 0x0000;
 const LOG_TAG: string = "PaseoHarmony";
@@ -94,6 +95,7 @@ struct Index {
   private controller: web_webview.WebviewController = new web_webview.WebviewController();
   private screenKeepAwake = new ScreenKeepAwakeBridge();
   private photoPicker = new PhotoPickerBridge();
+  private screenCapture = new ScreenCaptureBridge(this.controller);
   private resources: resourceManager.ResourceManager | null = null;
   /**
    * A unique document URL per launch. The bundle and its document are served from
@@ -104,6 +106,7 @@ struct Index {
   private entryUrl: string = `${ENTRY_URL}?launch=${Date.now()}`;
 
   aboutToAppear(): void {
+    web_webview.WebviewController.enableWholeWebPageDrawing();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     this.resources = context.resourceManager;
     this.screenKeepAwake.setContext(context);
@@ -230,6 +233,13 @@ struct Index {
           name: "paseoPhotoPicker",
           methodList: [],
           asyncMethodList: ["pickImages", "readImages"],
+          controller: this.controller,
+        })
+        .javaScriptProxy({
+          object: this.screenCapture,
+          name: "paseoScreenCapture",
+          methodList: [],
+          asyncMethodList: ["capturePage"],
           controller: this.controller,
         })
         // IndexedDB backs the replica row store on web (row-store.web.ts).

@@ -529,6 +529,31 @@ export const ru: TranslationResources = {
       archive: "Архивировать",
     },
   },
+  screenshot: {
+    capture: "Снимок экрана",
+    editorTitle: "Редактировать снимок",
+    send: "Отправить",
+    loading: "Загрузка изображения...",
+    cropHint: "Перетащите углы для обрезки",
+    applyCrop: "Применить обрезку",
+    textPlaceholder: "Введите текст",
+    tools: {
+      crop: "Обрезать",
+      pen: "Перо",
+      rectangle: "Прямоугольник",
+      arrow: "Стрелка",
+      text: "Текст",
+      undo: "Отменить",
+      reset: "Сбросить",
+      color: "Цвет",
+    },
+    errors: {
+      capture: "Не удалось захватить экран. Повторите попытку.",
+      load: "Не удалось загрузить снимок.",
+      crop: "Не удалось обрезать изображение.",
+      save: "Не удалось сохранить изображение.",
+    },
+  },
   message: {
     diagram: {
       diagram: "Диаграмма",

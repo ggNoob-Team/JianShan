@@ -4,16 +4,28 @@ import { useTranslation } from "react-i18next";
 import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { ArrowRight, List, MessageSquare, Plus, Search, TriangleAlert } from "lucide-react-native";
+import {
+  ArrowRight,
+  Camera,
+  List,
+  MessageSquare,
+  Plus,
+  Search,
+  TriangleAlert,
+} from "lucide-react-native";
 import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 import { AgentStatusDot } from "@/components/agent-status-dot";
 import { BackHeader } from "@/components/headers/back-header";
 import { Button } from "@/components/ui/button";
+import { AttachmentPill, AttachmentThumbnail } from "@/components/attachment-pill";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { EditingTextInput, type EditingTextInputHandle } from "@/components/ui/text-input";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { queueComposerMessage } from "@/composer/actions";
+import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
+import type { UserComposerAttachment } from "@/attachments/types";
+import { encodeAttachmentsForSend } from "@/attachments/service";
 import { useTimeAgo } from "@/hooks/use-time-ago";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useAgentFormState, type FormInitialValues } from "@/hooks/use-agent-form-state";
@@ -51,6 +63,8 @@ import { useDraftStore } from "@/stores/draft-store";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { buildHostRootRoute, buildOpenProjectRoute, buildSessionsRoute } from "@/utils/host-routes";
+import { useScreenshotCapture } from "@/screenshot/provider";
+import { consumePendingScreenshot } from "@/screenshot/pending-capture";
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-jsx-as-prop -- list rows own per-session handlers and rerender with each result set */
 
@@ -72,6 +86,7 @@ const mutedIconMapping = (theme: { colors: { foregroundMuted: string } }) => ({
   color: theme.colors.foregroundMuted,
 });
 type QuickInputError = "sendFailed" | "hostOffline" | "sessionGone";
+type QuickInputImageAttachment = Extract<UserComposerAttachment, { kind: "image" }>;
 
 // eslint-disable-next-line complexity
 export function QuickInputScreen() {
@@ -84,16 +99,19 @@ export function QuickInputScreen() {
   const { sessions, isLoading } = useQuickInputSessions();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState("");
+  const [attachments, setAttachments] = useState<QuickInputImageAttachment[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<QuickInputError | null>(null);
   const [slowRouteElapsedSeconds, setSlowRouteElapsedSeconds] = useState(0);
+  const screenshotCapture = useScreenshotCapture();
   const inputRef = useRef<EditingTextInputHandle>(null);
   const sendingRef = useRef(false);
   const sendAttemptRef = useRef<QuickInputSendAttempt | null>(null);
   const trimmedQuery = query.trim();
   const isSearching = trimmedQuery.length > 0;
+  const hasAttachments = attachments.length > 0;
   const recentPrompts = useQuickInputRecentPrompts(sessions, true);
   const localRanking = useMemo(
     () =>
@@ -265,6 +283,17 @@ export function QuickInputScreen() {
     }
   }, [activeIndex, ranking.results.length]);
 
+  useEffect(() => {
+    sendAttemptRef.current = null;
+  }, [attachments]);
+
+  useEffect(() => {
+    const pending = consumePendingScreenshot();
+    if (pending) {
+      setAttachments([{ kind: "image", metadata: pending }]);
+    }
+  }, []);
+
   const skip = useCallback(() => {
     router.replace(buildHostRootRoute(serverId ?? ""));
   }, [serverId]);
@@ -284,15 +313,22 @@ export function QuickInputScreen() {
     [setProviderAndModelFromUser],
   );
 
+  const handleScreenshot = useCallback(() => {
+    screenshotCapture?.openScreenshotEditor((attachment) => {
+      setAttachments((current) => [...current, { kind: "image", metadata: attachment }]);
+    });
+  }, [screenshotCapture]);
+
   const openSessionWithDraft = useCallback(
     (session: QuickInputSession) => {
       const text = query.trim();
-      if (text) {
-        const draftKey = buildDraftStoreKey({
-          serverId: session.serverId,
-          agentId: session.agentId,
-        });
-        const existing = useDraftStore.getState().getDraftInput(draftKey);
+      const draftKey = buildDraftStoreKey({
+        serverId: session.serverId,
+        agentId: session.agentId,
+      });
+      const existing = useDraftStore.getState().getDraftInput(draftKey);
+      const nextAttachments = [...(existing?.attachments ?? []), ...attachments];
+      if (text || nextAttachments.length > 0) {
         const existingText = existing?.text ?? "";
         const trimmedExistingText = existingText.trim();
         let draftText = text;
@@ -303,7 +339,7 @@ export function QuickInputScreen() {
           draftKey,
           draft: {
             text: draftText,
-            attachments: existing?.attachments ?? [],
+            attachments: nextAttachments,
           },
         });
       }
@@ -313,13 +349,24 @@ export function QuickInputScreen() {
         workspaceId: session.workspaceId,
       });
     },
-    [query],
+    [attachments, query],
+  );
+
+  const handleSessionPress = useCallback(
+    (session: QuickInputSession) => {
+      if (trimmedQuery || hasAttachments) {
+        openSessionWithDraft(session);
+      } else {
+        openSession(session);
+      }
+    },
+    [hasAttachments, openSession, openSessionWithDraft, trimmedQuery],
   );
 
   const sendToSession = useCallback(
     async (session: QuickInputSession) => {
       const text = query.trim();
-      if (!text || sendingRef.current) {
+      if ((!text && attachments.length === 0) || sendingRef.current) {
         return;
       }
       const liveSession = useSessionStore.getState().sessions[session.serverId];
@@ -345,7 +392,7 @@ export function QuickInputScreen() {
         queueComposerMessage({
           agentId: session.agentId,
           text,
-          attachments: [],
+          attachments,
           queue: {
             read: (agentId) =>
               useSessionStore.getState().sessions[session.serverId]?.queuedMessages?.get(agentId) ??
@@ -356,6 +403,7 @@ export function QuickInputScreen() {
         });
         sendAttemptRef.current = null;
         setQuery("");
+        setAttachments([]);
         navigateToAgent({
           serverId: session.serverId,
           agentId: session.agentId,
@@ -371,12 +419,17 @@ export function QuickInputScreen() {
       setSending(true);
       setSendError(null);
       try {
+        const wirePayload = splitComposerAttachmentsForSubmit(attachments);
+        const images = await encodeAttachmentsForSend(wirePayload.images);
         await client.sendAgentMessage(session.agentId, text, {
           messageId: attempt.messageId,
           activeTurnBehavior: decision.activeTurnBehavior,
+          images: images ?? [],
+          attachments: wirePayload.attachments,
         });
         sendAttemptRef.current = null;
         setQuery("");
+        setAttachments([]);
         navigateToAgent({
           serverId: session.serverId,
           agentId: session.agentId,
@@ -389,7 +442,7 @@ export function QuickInputScreen() {
         setSending(false);
       }
     },
-    [query, settings.sendBehavior],
+    [attachments, query, settings.sendBehavior],
   );
 
   const openNewSession = useCallback(() => {
@@ -399,14 +452,14 @@ export function QuickInputScreen() {
     }
     const draftId = generateDraftId();
     const text = query.trim();
-    if (text) {
+    if (text || attachments.length > 0) {
       useDraftStore.getState().saveDraftInput({
         draftKey: buildDraftStoreKey({
           serverId: newSessionTarget.serverId,
           agentId: draftId,
           draftId,
         }),
-        draft: { text, attachments: [] },
+        draft: { text, attachments },
       });
     }
     navigateToWorkspace({
@@ -414,18 +467,26 @@ export function QuickInputScreen() {
       workspaceId: newSessionTarget.workspaceId,
       target: { kind: "draft", draftId },
     });
-  }, [newSessionTarget, query]);
+  }, [attachments, newSessionTarget, query]);
 
   const browseAll = useCallback(() => {
     router.push(buildSessionsRoute());
   }, []);
 
   const handleEnter = useCallback(() => {
-    if (!trimmedQuery || !activeResult || awaitingSlowRoute) {
+    const target = activeResult?.session ?? fallbackSession;
+    if ((!trimmedQuery && !hasAttachments) || !target || awaitingSlowRoute) {
       return;
     }
-    openSessionWithDraft(activeResult.session);
-  }, [activeResult, awaitingSlowRoute, openSessionWithDraft, trimmedQuery]);
+    openSessionWithDraft(target);
+  }, [
+    activeResult,
+    awaitingSlowRoute,
+    fallbackSession,
+    hasAttachments,
+    openSessionWithDraft,
+    trimmedQuery,
+  ]);
 
   const handleKeyPress = useCallback(
     (event: { nativeEvent: { key: string }; preventDefault?: () => void }) => {
@@ -452,10 +513,10 @@ export function QuickInputScreen() {
 
   const handleResultPress = useCallback(
     (result: QuickInputResult) => {
-      if (trimmedQuery) openSessionWithDraft(result.session);
+      if (trimmedQuery || hasAttachments) openSessionWithDraft(result.session);
       else openSession(result.session);
     },
-    [openSession, openSessionWithDraft, trimmedQuery],
+    [hasAttachments, openSession, openSessionWithDraft, trimmedQuery],
   );
 
   const showEmptyFallback = isSearching && ranking.results.length === 0 && !awaitingSlowRoute;
@@ -483,9 +544,23 @@ export function QuickInputScreen() {
         title={t("quickInput.title")}
         onBack={skip}
         rightContent={
-          <Button variant="ghost" size="sm" onPress={skip} disabled={sending}>
-            {t("quickInput.actions.skip")}
-          </Button>
+          <View style={styles.headerActions}>
+            {screenshotCapture?.supported ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={handleScreenshot}
+                disabled={sending}
+                leftIcon={(color: string) => <Camera size={14} color={color} />}
+                testID="quick-input-screenshot-button"
+              >
+                {t("screenshot.capture")}
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="sm" onPress={skip} disabled={sending}>
+              {t("quickInput.actions.skip")}
+            </Button>
+          </View>
         }
       />
       <ScrollView
@@ -525,7 +600,7 @@ export function QuickInputScreen() {
                       recentMessage={recentPrompts[quickInputSessionKey(session)]?.at(-1) ?? null}
                       showHost={showHost}
                       layout={useTwoColumns ? "half" : "full"}
-                      onPress={() => openSession(session)}
+                      onPress={() => handleSessionPress(session)}
                     />
                   ))}
                 </View>
@@ -610,6 +685,27 @@ export function QuickInputScreen() {
               <Text style={styles.errorText}>{t(`quickInput.errors.${sendError}`)}</Text>
             </View>
           ) : null}
+          {attachments.length > 0 ? (
+            <View style={styles.attachmentTray} testID="quick-input-attachment-tray">
+              {attachments.map((attachment, index) => (
+                <AttachmentPill
+                  key={attachment.metadata.id}
+                  onOpen={() => undefined}
+                  onRemove={() => {
+                    setAttachments((current) =>
+                      current.filter((_, currentIndex) => currentIndex !== index),
+                    );
+                  }}
+                  openAccessibilityLabel={t("composer.attachments.openImage")}
+                  removeAccessibilityLabel={t("composer.attachments.removeImage")}
+                  disabled={sending}
+                  testID="quick-input-image-attachment-pill"
+                >
+                  <AttachmentThumbnail metadata={attachment.metadata} />
+                </AttachmentPill>
+              ))}
+            </View>
+          ) : null}
           <Text style={styles.hint}>
             {isSearching ? t("quickInput.searchHint") : t("quickInput.idleHint")}
           </Text>
@@ -655,7 +751,11 @@ export function QuickInputScreen() {
             <Button
               size="xs"
               variant="default"
-              disabled={!isSearching || !activeResult || awaitingSlowRoute}
+              disabled={
+                (!isSearching && !hasAttachments) ||
+                !(activeResult?.session ?? fallbackSession) ||
+                awaitingSlowRoute
+              }
               onPress={handleEnter}
               accessibilityLabel={t("quickInput.actions.open")}
               testID="quick-input-submit"
@@ -946,6 +1046,11 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     backgroundColor: theme.colors.surface0,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
   scroll: {
     flex: 1,
   },
@@ -974,6 +1079,13 @@ const styles = StyleSheet.create((theme) => ({
     maxWidth: 1200,
     alignSelf: "center",
     gap: theme.spacing[2],
+  },
+  attachmentTray: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: theme.spacing[2],
+    paddingHorizontal: theme.spacing[1],
   },
   inputShell: {
     minHeight: 52,

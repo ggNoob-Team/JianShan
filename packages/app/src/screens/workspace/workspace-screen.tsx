@@ -16,6 +16,7 @@ import {
 } from "@/composer/editing-session";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SheetHostScope } from "@/components/ui/isolated-bottom-sheet-modal";
+import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import type { JsonValue } from "@getpaseo/protocol/agent-types";
 import { getOpenAgentTabLabel } from "@getpaseo/protocol/agent-labels";
 import {
@@ -39,6 +40,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
 import invariant from "tiny-invariant";
+import { Camera } from "lucide-react-native";
 import { SidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
 import { ScreenHeader } from "@/components/headers/screen-header";
 import { NotesHeaderButton } from "@/notes/notes-header-button";
@@ -208,6 +210,7 @@ import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/l
 import { getIsElectron, isNative, isWeb } from "@/constants/platform";
 import {
   buildHostRootRoute,
+  buildHostQuickInputRoute,
   buildHostWorkspaceRoute,
   buildSettingsHostRoute,
 } from "@/utils/host-routes";
@@ -228,6 +231,8 @@ import {
 import { RenderProfile } from "@/utils/render-profiler";
 import { useWorkspaceCheckoutStatus } from "@/screens/workspace/use-workspace-checkout-status";
 import { useWorkspacePullRequestDiscovery } from "@/panels/pull-request";
+import { setPendingScreenshot } from "@/screenshot/pending-capture";
+import { useScreenshotCapture } from "@/screenshot/provider";
 
 const NO_SHEETS: readonly SheetTab[] = [];
 const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
@@ -274,6 +279,7 @@ function buildWorkspaceFileLocation(
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const ThemedCamera = withUnistyles(Camera);
 
 interface WorkspaceScreenProps {
   serverId: string;
@@ -284,6 +290,19 @@ interface WorkspaceScreenProps {
 type WorkspaceScreenContentProps = WorkspaceScreenProps & {
   isRouteFocused: boolean;
 };
+
+function useWorkspaceScreenshotNavigation(serverId: string, router: ReturnType<typeof useRouter>) {
+  const screenshotCapture = useScreenshotCapture();
+  const supported = Boolean(screenshotCapture?.supported);
+  const openScreenshot = useCallback(() => {
+    if (!supported || !serverId) return;
+    screenshotCapture?.openScreenshotEditor((attachment) => {
+      setPendingScreenshot(attachment);
+      router.push(buildHostQuickInputRoute(serverId));
+    });
+  }, [router, screenshotCapture, serverId, supported]);
+  return useMemo(() => ({ supported, openScreenshot }), [openScreenshot, supported]);
+}
 
 function trimNonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -1041,6 +1060,7 @@ function WorkspaceScreenContent({
     () => resolveWorkspaceRouteId({ routeWorkspaceId: workspaceId }) ?? "",
     [workspaceId],
   );
+  const screenshotNavigation = useWorkspaceScreenshotNavigation(normalizedServerId, router);
   const archifySupported = useHostFeature(normalizedServerId, "archify");
   const workspaceDescriptor = useWorkspace(normalizedServerId, normalizedWorkspaceId);
   useEffect(() => {
@@ -3257,6 +3277,15 @@ function WorkspaceScreenContent({
   const headerRight = useMemo(
     () => (
       <View style={styles.headerRight}>
+        {screenshotNavigation.supported ? (
+          <ToolbarButton
+            onPress={screenshotNavigation.openScreenshot}
+            label={t("screenshot.capture")}
+            testID="workspace-header-screenshot-button"
+          >
+            <ThemedCamera size={16} uniProps={mutedColorMapping} />
+          </ToolbarButton>
+        ) : null}
         {workspaceDescriptor ? (
           <NotesHeaderButton
             serverId={normalizedServerId}
@@ -3315,6 +3344,7 @@ function WorkspaceScreenContent({
       explorerSidebarToggleLabel,
       explorerSidebarToggleAccessibilityState,
       explorerToggleOwner,
+      screenshotNavigation,
       t,
     ],
   );
@@ -3471,6 +3501,15 @@ function WorkspaceScreenContent({
               projectName={workspaceDescriptor.projectDisplayName}
             />
           ) : null}
+          {screenshotNavigation.supported ? (
+            <ToolbarButton
+              onPress={screenshotNavigation.openScreenshot}
+              label={t("screenshot.capture")}
+              testID="workspace-header-screenshot-button"
+            >
+              <ThemedCamera size={16} uniProps={mutedColorMapping} />
+            </ToolbarButton>
+          ) : null}
           <MobileWorkspaceTabSwitcher
             tabs={tabs}
             activeTabKey={activeTabKey}
@@ -3537,6 +3576,7 @@ function WorkspaceScreenContent({
       handleSelectSwitcherTab,
       handleToggleExplorerSidebar,
       isMobile,
+      screenshotNavigation,
       isWorkspaceHeaderLoading,
       isWorkspaceHeaderSubtitleDistinct,
       normalizedServerId,
@@ -3544,6 +3584,7 @@ function WorkspaceScreenContent({
       openImportSheet,
       showCreateBrowserTab,
       showWorkspaceSetup,
+      t,
       tabs,
       workspaceDescriptor,
       workspaceDirectory,

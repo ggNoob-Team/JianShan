@@ -533,6 +533,31 @@ export const ptBR: TranslationResources = {
       archive: "Arquivar",
     },
   },
+  screenshot: {
+    capture: "Captura",
+    editorTitle: "Editar captura",
+    send: "Enviar",
+    loading: "Carregando imagem...",
+    cropHint: "Arraste os cantos para recortar",
+    applyCrop: "Aplicar recorte",
+    textPlaceholder: "Digite o texto",
+    tools: {
+      crop: "Recortar",
+      pen: "Caneta",
+      rectangle: "Retângulo",
+      arrow: "Seta",
+      text: "Texto",
+      undo: "Desfazer",
+      reset: "Redefinir",
+      color: "Cor",
+    },
+    errors: {
+      capture: "Não foi possível capturar a tela. Tente novamente.",
+      load: "Não foi possível carregar a captura.",
+      crop: "Não foi possível recortar a imagem.",
+      save: "Não foi possível salvar a imagem.",
+    },
+  },
   message: {
     diagram: {
       diagram: "Diagrama",

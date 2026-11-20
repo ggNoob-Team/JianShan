@@ -33,6 +33,7 @@ import { AddProjectFlowHost } from "@/components/add-project-flow-host";
 import { WorktreeSetupCalloutSource } from "@/components/worktree-setup-callout-source";
 import { DownloadToast } from "@/components/download-toast";
 import { QuittingOverlay } from "@/components/quitting-overlay";
+import { ScreenshotCaptureProvider } from "@/screenshot/provider";
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 import { ChangelogHost } from "@/changelog";
 import { AppDiagnosticHost } from "@/components/app-diagnostic-host";
@@ -868,7 +869,9 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
     <HostRuntimeBootstrapProvider>
       <NotificationOpenBridge />
       <SidebarCalloutProvider>
-        <ProvidersWrapper>{children}</ProvidersWrapper>
+        <ScreenshotCaptureProvider>
+          <ProvidersWrapper>{children}</ProvidersWrapper>
+        </ScreenshotCaptureProvider>
       </SidebarCalloutProvider>
     </HostRuntimeBootstrapProvider>
   );

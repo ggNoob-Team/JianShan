@@ -520,6 +520,31 @@ export const ar: TranslationResources = {
       archive: "أرشيف",
     },
   },
+  screenshot: {
+    capture: "لقطة الشاشة",
+    editorTitle: "تحرير اللقطة",
+    send: "إرسال",
+    loading: "جارٍ تحميل الصورة...",
+    cropHint: "اسحب الزوايا لقص الصورة",
+    applyCrop: "تطبيق القص",
+    textPlaceholder: "أدخل النص",
+    tools: {
+      crop: "قص",
+      pen: "قلم",
+      rectangle: "مستطيل",
+      arrow: "سهم",
+      text: "نص",
+      undo: "تراجع",
+      reset: "إعادة تعيين",
+      color: "اللون",
+    },
+    errors: {
+      capture: "تعذر التقاط الشاشة. حاول مرة أخرى.",
+      load: "تعذر تحميل اللقطة.",
+      crop: "تعذر قص الصورة.",
+      save: "تعذر حفظ الصورة.",
+    },
+  },
   message: {
     diagram: {
       diagram: "مخطط",

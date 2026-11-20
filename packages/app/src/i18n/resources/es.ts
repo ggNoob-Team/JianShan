@@ -536,6 +536,31 @@ export const es: TranslationResources = {
       archive: "Archivo",
     },
   },
+  screenshot: {
+    capture: "Captura",
+    editorTitle: "Editar captura",
+    send: "Enviar",
+    loading: "Cargando imagen...",
+    cropHint: "Arrastra las esquinas para recortar",
+    applyCrop: "Aplicar recorte",
+    textPlaceholder: "Introduce texto",
+    tools: {
+      crop: "Recortar",
+      pen: "Lápiz",
+      rectangle: "Rectángulo",
+      arrow: "Flecha",
+      text: "Texto",
+      undo: "Deshacer",
+      reset: "Restablecer",
+      color: "Color",
+    },
+    errors: {
+      capture: "No se pudo capturar la pantalla. Inténtalo de nuevo.",
+      load: "No se pudo cargar la captura.",
+      crop: "No se pudo recortar la imagen.",
+      save: "No se pudo guardar la imagen.",
+    },
+  },
   message: {
     diagram: {
       diagram: "Diagrama",

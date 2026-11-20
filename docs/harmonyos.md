@@ -110,6 +110,19 @@ in a second bridge call. **Add image** remains available in the attachment menu.
 `utils/harmony-shell.ts` still marks the shell as a touch device so controls such
 as attachment removal do not depend on hover.
 
+## Screenshot editor
+
+The mobile composer and Quick Input expose a Screenshot button when the current
+platform can capture the app surface. On HarmonyOS the shell injects
+`window.paseoScreenCapture`, backed by `WebviewController.webPageSnapshot()`.
+It returns a PNG data URL to the web editor; the editor and attachment/send
+pipeline are shared with the browser build.
+
+The Harmony screenshot is the current app page, not a system-wide capture. The
+ArkWeb snapshot API only guarantees static images and text; video is replaced by
+its placeholder, so terminal, canvas and WebView-heavy views need device checks
+after changing the shell. The feature needs no media-library permission.
+
 ## Version stamping
 
 `versionCode` and `versionName` come from `packages/app/native-release-version.js`

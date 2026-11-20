@@ -524,6 +524,31 @@ export const ko: TranslationResources = {
       archive: "보관",
     },
   },
+  screenshot: {
+    capture: "스크린샷",
+    editorTitle: "스크린샷 편집",
+    send: "보내기",
+    loading: "이미지 불러오는 중...",
+    cropHint: "모서리를 드래그하여 자르기",
+    applyCrop: "자르기 적용",
+    textPlaceholder: "텍스트 입력",
+    tools: {
+      crop: "자르기",
+      pen: "펜",
+      rectangle: "사각형",
+      arrow: "화살표",
+      text: "텍스트",
+      undo: "실행 취소",
+      reset: "초기화",
+      color: "색상",
+    },
+    errors: {
+      capture: "화면을 캡처하지 못했습니다. 다시 시도해 주세요.",
+      load: "스크린샷을 불러오지 못했습니다.",
+      crop: "이미지를 자르지 못했습니다.",
+      save: "이미지를 저장하지 못했습니다.",
+    },
+  },
   message: {
     diagram: {
       diagram: "다이어그램",

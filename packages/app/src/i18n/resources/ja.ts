@@ -528,6 +528,31 @@ export const ja: TranslationResources = {
       archive: "アーカイブ",
     },
   },
+  screenshot: {
+    capture: "スクリーンショット",
+    editorTitle: "スクリーンショットを編集",
+    send: "送信",
+    loading: "画像を読み込み中...",
+    cropHint: "四隅をドラッグして切り抜きます",
+    applyCrop: "切り抜きを適用",
+    textPlaceholder: "テキストを入力",
+    tools: {
+      crop: "切り抜き",
+      pen: "ペン",
+      rectangle: "四角形",
+      arrow: "矢印",
+      text: "テキスト",
+      undo: "元に戻す",
+      reset: "リセット",
+      color: "色",
+    },
+    errors: {
+      capture: "画面をキャプチャできませんでした。再試行してください。",
+      load: "スクリーンショットを読み込めませんでした。",
+      crop: "画像を切り抜けませんでした。",
+      save: "画像を保存できませんでした。",
+    },
+  },
   message: {
     diagram: {
       diagram: "図",

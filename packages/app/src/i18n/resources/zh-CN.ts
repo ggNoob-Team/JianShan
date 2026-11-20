@@ -516,6 +516,31 @@ export const zhCN: TranslationResources = {
       archive: "归档",
     },
   },
+  screenshot: {
+    capture: "截屏",
+    editorTitle: "编辑截图",
+    send: "发送",
+    loading: "正在加载图片...",
+    cropHint: "拖动四角调整裁剪范围",
+    applyCrop: "应用裁剪",
+    textPlaceholder: "输入文字",
+    tools: {
+      crop: "裁剪",
+      pen: "画笔",
+      rectangle: "矩形",
+      arrow: "箭头",
+      text: "文字",
+      undo: "撤销",
+      reset: "重置",
+      color: "颜色",
+    },
+    errors: {
+      capture: "无法截取当前画面，请重试。",
+      load: "无法加载截图。",
+      crop: "无法裁剪图片。",
+      save: "无法保存图片。",
+    },
+  },
   message: {
     diagram: {
       diagram: "图表",

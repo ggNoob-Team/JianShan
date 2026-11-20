@@ -519,6 +519,31 @@ export const en = {
       archive: "Archive",
     },
   },
+  screenshot: {
+    capture: "Screenshot",
+    editorTitle: "Edit screenshot",
+    send: "Send",
+    loading: "Loading image...",
+    cropHint: "Drag the corners to crop",
+    applyCrop: "Apply crop",
+    textPlaceholder: "Enter text",
+    tools: {
+      crop: "Crop",
+      pen: "Pen",
+      rectangle: "Rectangle",
+      arrow: "Arrow",
+      text: "Text",
+      undo: "Undo",
+      reset: "Reset",
+      color: "Color",
+    },
+    errors: {
+      capture: "Could not capture the screen. Try again.",
+      load: "Could not load the screenshot.",
+      crop: "Could not crop the image.",
+      save: "Could not save the image.",
+    },
+  },
   message: {
     diagram: {
       diagram: "Diagram",

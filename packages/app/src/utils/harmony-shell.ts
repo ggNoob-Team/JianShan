@@ -10,10 +10,12 @@ export function isHarmonyShell(): boolean {
   const shell = window as unknown as {
     paseoClipboard?: { writeText?: unknown };
     paseoPhotoPicker?: { pickImages?: unknown };
+    paseoScreenCapture?: { capturePage?: unknown };
   };
   return (
     typeof shell.paseoPhotoPicker?.pickImages === "function" ||
-    typeof shell.paseoClipboard?.writeText === "function"
+    typeof shell.paseoClipboard?.writeText === "function" ||
+    typeof shell.paseoScreenCapture?.capturePage === "function"
   );
 }
 
