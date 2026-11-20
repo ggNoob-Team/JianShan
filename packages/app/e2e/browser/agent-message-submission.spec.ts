@@ -967,6 +967,10 @@ test.describe("completed turn presentation", () => {
         const completedTime = page.getByTestId("turn-completed-timestamp");
         await expect(completedTime).toBeVisible();
         await expect(completedTime).toHaveText(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+        await expect(page.getByText(/^Worked for/)).toHaveCount(0);
+        await expect(
+          page.getByTestId("turn-completed-footer").getByTestId("add-to-notes"),
+        ).toBeVisible();
         const screenshotPath = testInfo.outputPath(`message-shadow-${width}.png`);
         await page.screenshot({ path: screenshotPath });
         await testInfo.attach(`message-shadow-${width}`, {

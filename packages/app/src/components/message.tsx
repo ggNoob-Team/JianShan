@@ -85,7 +85,6 @@ import Animated, {
 import Svg, { Defs, Rect, Stop, LinearGradient as SvgLinearGradient } from "react-native-svg";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { capAssistantMessageForRender, getUtf8ByteLength } from "./assistant-message-render-limit";
-import { getTurnDurationLabel } from "./assistant-turn-footer-label";
 import { getCompactionMarkerLabel } from "./message-compaction-label";
 import { PlanCard } from "./plan-card";
 import { ToolCallDetailsContent } from "./tool-call-details";
@@ -581,8 +580,6 @@ export const UserMessage = memo(function UserMessage({
 interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
-  durationMs?: number | null;
-  showDuration?: boolean;
   onFork?: (target: AssistantForkTarget) => Promise<void> | void;
 }
 
@@ -599,49 +596,27 @@ const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
     marginTop: 0,
     marginLeft: -theme.spacing[1],
   },
-  metadata: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: theme.spacing[1],
-    minWidth: 0,
-  },
   metadataText: {
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
     fontVariant: ["tabular-nums"],
   },
-  metadataSeparator: {
-    color: theme.colors.foregroundMuted,
-    fontSize: STREAM_METADATA_FONT_SIZE,
-  },
 }));
 
 /**
  * Footer rendered next to the copy button at the end of an assistant turn.
- * Shows the turn duration when it is not already visible in turn activity, and
- * always shows the end timestamp once the turn has completed.
+ * Shows the end timestamp once the turn has completed. Turn duration belongs
+ * to the activity header, where it can open the process details.
  */
 export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   getContent,
   completedAt,
-  durationMs,
-  showDuration = true,
   onFork,
 }: AssistantTurnFooterProps) {
-  const { t } = useTranslation();
-
-  const durationLabel = useMemo(
-    () =>
-      showDuration && durationMs !== undefined && durationMs !== null
-        ? getTurnDurationLabel(durationMs, t)
-        : "",
-    [durationMs, showDuration, t],
-  );
   const timestampLabel = useMemo(
     () => (completedAt ? formatMessageTimestamp24Hour(completedAt) : ""),
     [completedAt],
   );
-  const hasMetadata = Boolean(durationLabel || timestampLabel);
   const handleFork = useCallback(
     (target: AssistantForkTarget) => {
       return onFork?.(target);
@@ -651,7 +626,7 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
   const canFork = Boolean(onFork);
 
   return (
-    <View style={assistantTurnFooterStylesheet.container}>
+    <View style={assistantTurnFooterStylesheet.container} testID="turn-completed-footer">
       <TurnCopyButton
         getContent={getContent}
         containerStyle={assistantTurnFooterStylesheet.copyButton}
@@ -661,25 +636,10 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
         containerStyle={assistantTurnFooterStylesheet.copyButton}
       />
       {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
-      {hasMetadata ? (
-        <View style={assistantTurnFooterStylesheet.metadata}>
-          {durationLabel ? (
-            <Text style={assistantTurnFooterStylesheet.metadataText}>{durationLabel}</Text>
-          ) : null}
-          {durationLabel && timestampLabel ? (
-            <Text style={assistantTurnFooterStylesheet.metadataSeparator} aria-hidden>
-              ·
-            </Text>
-          ) : null}
-          {timestampLabel ? (
-            <Text
-              style={assistantTurnFooterStylesheet.metadataText}
-              testID="turn-completed-timestamp"
-            >
-              {timestampLabel}
-            </Text>
-          ) : null}
-        </View>
+      {timestampLabel ? (
+        <Text style={assistantTurnFooterStylesheet.metadataText} testID="turn-completed-timestamp">
+          {timestampLabel}
+        </Text>
       ) : null}
     </View>
   );
