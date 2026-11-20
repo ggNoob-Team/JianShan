@@ -102,11 +102,11 @@ The composer's recent-photo strip is native-only. HarmonyOS lists
 level: a normal app needs an ACL-enabled profile, and the documented ACL editing
 path is for debugging rather than store builds.
 
-Instead, the shell injects `window.paseoPhotoPicker`, backed by
-`PhotoViewPicker`, and the composer adds a Gallery button after `+`. The picker
-opens the system gallery directly and needs no media-library permission; it
-grants temporary read access to the selected URIs, which `readImages` consumes in
-a second bridge call. **Add image** remains available in the attachment menu.
+Every chat composer shows a Gallery button after `+`; it opens the platform
+image picker directly. On HarmonyOS the shell injects `window.paseoPhotoPicker`,
+backed by `PhotoViewPicker`, so the picker needs no media-library permission and
+grants temporary read access to the selected URIs, which `readImages` consumes
+in a second bridge call. **Add image** remains available in the attachment menu.
 `utils/harmony-shell.ts` still marks the shell as a touch device so controls such
 as attachment removal do not depend on hover.
 

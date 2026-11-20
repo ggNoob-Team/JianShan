@@ -94,6 +94,29 @@ test.describe("Composer attachments", () => {
     await expectAttachmentSheetRowsOnTitleRail(page);
   });
 
+  test("gallery shortcut sits beside the attachment button", async ({ page, withWorkspace }) => {
+    const workspace = await withWorkspace({ prefix: "attach-gallery-shortcut-" });
+    await workspace.navigateTo();
+    await clickNewChat(page);
+    await expectComposerVisible(page);
+
+    const attach = page.getByTestId("message-input-attach-button");
+    const gallery = page.getByTestId("message-input-gallery-button");
+    await expect(attach).toBeVisible();
+    await expect(gallery).toBeVisible();
+    const attachBox = await attach.boundingBox();
+    const galleryBox = await gallery.boundingBox();
+    expect(attachBox).not.toBeNull();
+    expect(galleryBox).not.toBeNull();
+    expect(galleryBox!.x).toBeGreaterThan(attachBox!.x);
+
+    const chooserPromise = page.waitForEvent("filechooser", { timeout: 10_000 });
+    await gallery.click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles([TEST_IMAGE]);
+    await expectAttachmentPill(page, "composer-image-attachment-pill");
+  });
+
   test("GitHub combobox does not render until the picker is opened", async ({
     page,
     withWorkspace,

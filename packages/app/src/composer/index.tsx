@@ -160,7 +160,6 @@ import { RecentPhotosRow } from "./recent-photos/row";
 import type { RecentPhoto } from "./recent-photos/model";
 import { resolveRecentPhotoSource } from "./recent-photos/source";
 import { normalizePickedImageAssets } from "@/hooks/image-attachment-picker";
-import { hasHarmonyGalleryPicker } from "@/hooks/harmony-gallery-picker";
 import { PluginResourceAttachmentPill, usePluginAttachmentPicker } from "@/plugins";
 import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-slash-commands";
 import {
@@ -2224,7 +2223,7 @@ function ComposerContentImpl({
     () => (isNative ? <RecentPhotosRow onSelect={handleAddRecentPhoto} /> : null),
     [handleAddRecentPhoto],
   );
-  const showGalleryButton = useMemo(() => hasHarmonyGalleryPicker(), []);
+  const showGalleryButton = mode.showAttachments;
 
   const handleToggleGithubItem = useCallback(
     (item: ForgeSearchItem) => {
