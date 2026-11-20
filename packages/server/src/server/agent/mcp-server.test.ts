@@ -15,6 +15,8 @@ import { z } from "zod";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { createAgentMcpServer as createAgentMcpServerWithDependencies } from "./mcp-server.js";
+import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { ToolHosts } from "../host-operations/index.js";
 import { AgentManager, type ManagedAgent } from "./agent-manager.js";
 import { AgentStorage, type StoredAgentRecord } from "./agent-storage.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
@@ -1001,6 +1003,246 @@ describe("local job MCP tools", () => {
       terminalManager.killAll();
       await server.close();
       await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("send_file_to_agent MCP tool", () => {
+  const logger = createTestLogger();
+
+  it("delivers a workspace file to another agent and notifies the caller", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "mcp-send-file-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const parentClient = new HeldTurnAgentClient("claude", false);
+    const targetClient = new HeldTurnAgentClient("codex", true);
+    const agentManager = new AgentManager({
+      clients: { claude: parentClient, codex: targetClient },
+      registry: storage,
+      logger,
+    });
+
+    try {
+      const parent = await agentManager.createAgent(
+        { provider: "claude", cwd: workdir },
+        undefined,
+        { workspaceId: "wks_transfer" },
+      );
+      const target = await agentManager.createAgent(
+        { provider: "codex", cwd: workdir },
+        undefined,
+        { workspaceId: "wks_transfer" },
+      );
+      const content = "server-side report\n";
+      const sourcePath = join(workdir, "report.txt");
+      await writeFile(sourcePath, content, "utf8");
+      const server = await createAgentMcpServer({
+        agentManager,
+        agentStorage: storage,
+        callerAgentId: parent.id,
+        providerSnapshotManager: createOpenCodeManager().manager,
+        logger,
+      });
+
+      const response = await invokeToolWithParsedInput(
+        registeredTool(server, "send_file_to_agent"),
+        {
+          agentId: target.id,
+          sourcePath: "report.txt",
+          prompt: "Copy this file to the desktop.",
+        },
+      );
+
+      expect(response.structuredContent).toMatchObject({
+        success: true,
+        agentId: target.id,
+        deliveryStatus: "queued",
+        transfer: {
+          sourcePath: "report.txt",
+          destinationPath: sourcePath,
+          fileName: "report.txt",
+          size: Buffer.byteLength(content),
+          delivery: "local_path",
+        },
+      });
+      expect(targetClient.sessions[0]?.prompts).toHaveLength(1);
+      expect(targetClient.sessions[0]?.prompts[0]).toContain(`Path: ${sourcePath}`);
+      expect(targetClient.sessions[0]?.prompts[0]).toContain("Copy this file to the desktop.");
+
+      targetClient.sessions[0]!.finishTurn();
+      await vi.waitFor(() => {
+        const parentPrompts = parentClient.sessions[0]?.prompts ?? [];
+        expect(parentPrompts).toHaveLength(1);
+        expect(parentPrompts[0]).toContain(target.id);
+        expect(parentPrompts[0]).toContain("finished");
+      });
+    } finally {
+      await removeAgentStateDir(agentManager, storage, workdir);
+    }
+  });
+  it("streams a file to a remote agent as an uploaded-file attachment", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "mcp-send-file-remote-"));
+    const storage = new AgentStorage(join(workdir, "agents"), logger);
+    const parentClient = new HeldTurnAgentClient("claude", false);
+    const agentManager = new AgentManager({
+      clients: { claude: parentClient },
+      registry: storage,
+      logger,
+    });
+    const remoteAgentId = "remote-agent-1";
+    const remoteFilePath = "/srv/paseo/uploads/upload-1/renamed.txt";
+    const uploadedChunks: Uint8Array[] = [];
+    const sentMessages: Array<{
+      agentId: string;
+      text: string;
+      options: Record<string, unknown>;
+    }> = [];
+    let waitAttempts = 0;
+    const notifications: Array<Parameters<AgentMessageDelivery["enqueue"]>[0]> = [];
+    const notificationDelivery: AgentMessageDelivery = {
+      enqueue(message) {
+        notifications.push(message);
+        return {
+          status: "queued",
+          messageId: "notification-1",
+          dispatched: Promise.resolve("turn_started"),
+        };
+      },
+      async close() {},
+      async waitForDispatch() {},
+    };
+
+    try {
+      const parent = await agentManager.createAgent(
+        { provider: "claude", cwd: workdir },
+        undefined,
+        { workspaceId: "wks_transfer" },
+      );
+      const content = Buffer.alloc(600 * 1024, 0x61);
+      await writeFile(join(workdir, "report.txt"), content);
+      const uploadedFile = {
+        type: "uploaded_file" as const,
+        id: "upload-1",
+        fileName: "renamed.txt",
+        mimeType: "text/plain",
+        size: content.byteLength,
+        path: remoteFilePath,
+      };
+      const remoteClient = {
+        async uploadFile(input: {
+          fileName: string;
+          mimeType: string;
+          source: { size: number; readChunk(offset: number, length: number): Promise<Uint8Array> };
+        }) {
+          expect(input.fileName).toBe("renamed.txt");
+          expect(input.mimeType).toBe("text/plain");
+          for (let offset = 0; offset < input.source.size; offset += 128 * 1024) {
+            uploadedChunks.push(
+              await input.source.readChunk(
+                offset,
+                Math.min(128 * 1024, input.source.size - offset),
+              ),
+            );
+          }
+          return { requestId: "upload-request", file: uploadedFile, error: null };
+        },
+        async fetchAgent(agentId: string) {
+          return {
+            agent: { id: agentId, status: "idle", lifecycle: "idle" },
+            project: null,
+          };
+        },
+        async sendMessage(agentId: string, text: string, options: Record<string, unknown>) {
+          sentMessages.push({ agentId, text, options });
+          return { deliveryStatus: "queued" as const };
+        },
+        async waitForFinish() {
+          waitAttempts += 1;
+          return {
+            status: "idle" as const,
+            final: {
+              id: remoteAgentId,
+              title: "Local agent",
+              pendingPermissions: [],
+            },
+            error: null,
+            lastMessage: "Copied the file to the desktop.",
+          };
+        },
+      } as unknown as DaemonClient;
+      const hostTools: ToolHosts = {
+        directory: async () => ({
+          self: { serverId: "server-a", label: "Server A" },
+          hosts: [],
+        }),
+        async use<T>(_serverId: string, action: (client: DaemonClient) => Promise<T>) {
+          return await action(remoteClient);
+        },
+      };
+      const server = await createAgentMcpServer({
+        agentManager,
+        agentStorage: storage,
+        callerAgentId: parent.id,
+        serverId: "server-a",
+        hosts: () => hostTools,
+        agentMessages: () => notificationDelivery,
+        providerSnapshotManager: createOpenCodeManager().manager,
+        logger,
+      });
+
+      const response = await invokeToolWithParsedInput(
+        registeredTool(server, "send_file_to_agent"),
+        {
+          serverId: "server-b",
+          agentId: remoteAgentId,
+          sourcePath: "report.txt",
+          fileName: "renamed.txt",
+          prompt: "Copy this file to the desktop.",
+        },
+      );
+
+      expect(response.structuredContent).toMatchObject({
+        success: true,
+        agentId: remoteAgentId,
+        deliveryStatus: "queued",
+        transfer: {
+          sourcePath: "report.txt",
+          destinationPath: remoteFilePath,
+          fileName: "renamed.txt",
+          mimeType: "text/plain",
+          size: content.byteLength,
+          delivery: "uploaded_attachment",
+          serverId: "server-b",
+        },
+      });
+      expect(Buffer.concat(uploadedChunks)).toEqual(content);
+      expect(sentMessages).toHaveLength(1);
+      expect(sentMessages[0]).toMatchObject({
+        agentId: remoteAgentId,
+        options: {
+          sourceAgentId: parent.id,
+          sourceAgentServerId: "server-a",
+          activeTurnBehavior: "steer",
+          attachments: [uploadedFile],
+        },
+      });
+      expect(sentMessages[0]?.text).toContain(`Path: ${remoteFilePath}`);
+      expect(sentMessages[0]?.text).toContain("Copy this file to the desktop.");
+      await vi.waitFor(() => expect(waitAttempts).toBe(1), { timeout: 2_000 });
+
+      await vi.waitFor(() => expect(notifications).toHaveLength(1));
+      expect(notifications[0]).toMatchObject({
+        recipientId: parent.id,
+        source: {
+          kind: "agent-notification",
+          agentId: remoteAgentId,
+          serverId: "server-b",
+          event: "finished",
+        },
+      });
+      expect(notifications[0]?.prompt).toContain(remoteAgentId);
+      expect(notifications[0]?.prompt).toContain("finished");
+    } finally {
+      await removeAgentStateDir(agentManager, storage, workdir);
     }
   });
 });

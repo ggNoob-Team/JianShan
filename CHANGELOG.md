@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.0 - 2026-11-19
+
+Cross-host file handoff, clearer team host states, role-aware workspaces, and local Git workspace choice.
+
+### Added
+
+- Added cross-host file handoff, so an agent can send files to another connected host.
+- Added role ordering and virtual ownership views to the admin console.
+- Kept the local workspace choice for Git projects.
+
+### Improved
+
+- Team analytics now distinguishes offline and unsupported hosts and matches the admin styling.
+- Note details stay inside the workspace dialog.
+
+### Fixed
+
+- Enforced role ownership for agent-created workspaces.
+
 ## 0.13.9 - 2026-11-17
 
 Worktree-first Git workspaces, per-client host registrations, prefetched workspace notes, and a team analytics refresh.

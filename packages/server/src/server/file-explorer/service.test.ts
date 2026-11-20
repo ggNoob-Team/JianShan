@@ -20,6 +20,7 @@ import {
   duplicateExplorerEntry,
   getExplorerFileVersion,
   getDownloadableFileInfo,
+  openExplorerFileReadSource,
   readExplorerFileBytes,
   readExplorerFile,
   renameExplorerEntry,
@@ -275,6 +276,31 @@ describe("file explorer service", () => {
         expect(Buffer.concat(chunks)).toEqual(bytes);
       });
       expect(await getDownloadableFileInfo(target)).toMatchObject({ mimeType: "application/pdf" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("opens a workspace file as a seekable upload source", async () => {
+    const root = await createTempDir("paseo-file-upload-source-");
+    const content = Buffer.from("0123456789abcdefghijklmnopqrstuvwxyz");
+    try {
+      await writeFile(path.join(root, "notes.txt"), content);
+      const source = await openExplorerFileReadSource({
+        root,
+        relativePath: "notes.txt",
+      });
+      try {
+        expect(source).toMatchObject({
+          path: "notes.txt",
+          fileName: "notes.txt",
+          size: content.byteLength,
+          mimeType: "text/plain",
+        });
+        expect(Buffer.from(await source.readChunk(10, 8))).toEqual(content.subarray(10, 18));
+      } finally {
+        await source.close();
+      }
     } finally {
       await rm(root, { recursive: true, force: true });
     }

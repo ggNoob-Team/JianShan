@@ -24,6 +24,12 @@ describe("Paseo tool display", () => {
       "Send message",
       "Fix the failing test",
     ],
+    [
+      "send_file_to_agent",
+      { agentId: "agt_1", sourcePath: "out/report.txt", fileName: "report.txt", prompt: "Copy it" },
+      "Send file",
+      "report.txt",
+    ],
     ["create_agent", { title: "Reviewer", initialPrompt: "Review it" }, "Create agent", "Reviewer"],
     ["create_agent", { initialPrompt: "Review it" }, "Create agent", "Review it"],
     ["get_agent_status", { agentId: "agt_1" }, "Check agent", "agt_1"],

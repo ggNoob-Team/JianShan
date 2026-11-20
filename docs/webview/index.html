@@ -8,7 +8,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link rel="icon" href="data:," />
-    <title>Paseo 二开 · 功能索引</title>
+    <title>见山 · 未完成需求索引</title>
     <style>
       :root {
         --bg: #070b14;
@@ -92,7 +92,7 @@
       }
       .overview {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
         margin: 22px 0 16px;
       }
@@ -612,8 +612,8 @@
   <body>
     <div class="wrap">
       <h1>
-        Paseo 二开 · 功能索引<small>PASEO FORK · FEATURES &amp; REQUIREMENTS</small
-        ><span class="build-stamp">线上版本 · 2026-11-12 17:55 CST</span>
+        见山 · 未完成需求<small>JIANSHAN · OPEN REQUIREMENTS</small
+        ><span class="build-stamp">线上版本 · 2026-11-18 17:49 CST</span>
       </h1>
 
       <div class="overview">
@@ -621,40 +621,32 @@
           <b>5</b><span>下一步 P0<br />形成可验证的闭环</span>
         </div>
         <div class="overview-item">
-          <b>22</b><span>计划中 / 未开发<br />P0 5 · P1 8 · P2 7 · 暂缓 2</span>
+          <b>21</b><span>计划中 / 未开发<br />P0 5 · P1 7 · P2 7 · 暂缓 2</span>
         </div>
         <div class="overview-item bug">
           <b>1</b><span>待复现 Bug<br />需要入口与复现证据</span>
         </div>
-        <div class="overview-item live">
-          <b>18</b><span>已实现<br />按主题归组</span>
-        </div>
       </div>
 
       <div class="meta">
-        <b style="color: var(--txt)">当前没有标记为“正在开发”的功能。</b>P0
-        是下一批开发队列，不是已经开工。状态口径：
-        <b style="color: var(--live)">已实现</b>=有入口且可运行；
+        门户只展示尚未完成的开放事项；已经完成的需求会从门户移除，并继续保留在
+        <code>DOC/需求原始文档.txt</code> 与发布记录中。状态口径：
         <b style="color: var(--wip)">计划中</b>=需求已成形、待排期；
         <b style="color: var(--plan)">探索</b>=产品方向，尚不足以直接开发；
-        <b style="color: var(--bug)">Bug</b>=需要修复或复现；<b style="color: var(--pain)">痛点</b
-        >=真实摩擦，尚未整理成确定需求。<br />
-        优先级只看 P0 → P1 → P2。P0 先解决品牌改名、服务端安装与本地 Web
-        管理台、笔记闭环、角色归属、个人首页；P1 做代码 /
-        需求可视化、会话收纳、个人知识库、本地意图目录、设备 / 环境感知以及消息 / 实时聊天；P2
-        才是任务闭环、分布式 Agent、通用办公、通用 Agent、AI 手套与新书。<br />
+        <b style="color: var(--bug)">Bug</b>=需要修复或复现。<br />
+        优先级只看 P0 → P1 → P2。P0 优先分布式 Agent，同时保留品牌改名、服务端安装包与 Share
+        页入口、笔记闭环和个人首页；P1 做代码 / 需求可视化、会话收纳、个人知识库、本地意图目录、设备
+        / 环境感知以及消息 / 实时聊天；P2 才是任务闭环、通用办公、通用 Agent、AI 手套与新书。<br />
         下载：<a href="#download" style="color: var(--todo)">「下载」Tab</a> · Android 固定直链
         <code>https://paseo.zxyz.app/apk/paseo-latest.apk</code> · 桌面端 Windows 与 macOS 已更新到
-        GitHub Release v0.13.9；Linux 最新为 v0.13.8 · 鸿蒙 AppGallery 邀请测试。
+        GitHub Release v0.14.0；Linux 最新为 v0.13.8 · 鸿蒙 AppGallery 邀请测试。
       </div>
 
       <div class="tabs" id="tabs">
         <button class="tab backlog on" data-tab="backlog">
-          计划中 / 未开发<span class="c">22</span>
+          计划中 / 未开发<span class="c">21</span>
         </button>
         <button class="tab bug" data-tab="bugs">Bug<span class="c">1</span></button>
-        <button class="tab pain" data-tab="pains">痛点想法<span class="c">1</span></button>
-        <button class="tab live" data-tab="done">已实现<span class="c">18</span></button>
         <button class="tab download" data-tab="download">
           下载<span class="c">WIN · MAC · APK · HMOS</span>
         </button>
@@ -674,43 +666,6 @@
         <button class="tagf" data-tagf="archify">可视化</button>
         <button class="tagf" data-tagf="release">构建发布</button>
         <button class="tagf" data-tagf="agent">Agent</button>
-      </div>
-
-      <div class="pane" id="pane-pains">
-        <section class="filter-section">
-          <h2>痛点想法 <span class="n">1 项 · 原始摩擦，暂未整理成排期需求</span></h2>
-          <div class="grid">
-            <div class="card req" data-tag="session">
-              <div class="t">
-                切换会话 / 回前台都要重连、等很久<span class="tag g-session">会话</span
-                ><span class="badge b-pain">痛点</span>
-              </div>
-              <div class="d">
-                切换会话会触发连接和刷新；手机从后台回前台也会重连，过程中没有明确进度，用户只能等。
-              </div>
-              <div class="rq">
-                <span class="k">现状</span>
-                <div class="v">
-                  3 秒存活探测、1.5s→30s 重连退避、15s
-                  建连超时；连上后还可能重拉服务器信息、会话列表和时间线。相关位置：<code>packages/client/src/daemon-client.ts</code>。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">期望</span>
-                <div class="v">
-                  缓存优先：先展示已有内容，再后台增量同步；重连有可见进度；避免每次全量重拉。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">下一步</span>
-                <div class="v">
-                  先定位耗时发生在建连、服务器信息、目录同步还是 timeline；确认后整理成 P0 / P1
-                  需求。
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
       </div>
 
       <div class="pane on" id="pane-backlog">
@@ -804,64 +759,23 @@
 
             <div class="card req" data-tag="release">
               <div class="t">
-                服务端安装与本地 Web 管理台<span class="tag g-release">服务端</span
-                ><span class="badge b-plan">计划中</span
+                服务端安装包与 Share 页入口<span class="tag g-release">服务端</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-live">持续迭代</span
                 ><span class="badge b-p0">P0 · 最高优先级</span>
               </div>
               <div class="d">
-                面向 Windows / Linux 提供服务端安装包；安装完成后在 Share / 完成页展示本机 Web
-                管理台地址。Web
-                管理台作为见山的统一管理入口，不依赖桌面客户端即可管理模型、二维码、团队和全部核心功能。本需求承接原「团队共用一台
-                daemon」。
+                服务端目前需要独立、可交付的原生安装包，不能只依赖 npm 或命令行启动。安装完成后应在
+                Share / 完成页直接给出本地 Web 管理入口。
               </div>
               <div class="rq">
-                <span class="k">安装与启动</span>
+                <span class="k">未完成范围</span>
                 <div class="v">
                   <ul>
-                    <li>
-                      提供 Windows、Linux 服务端安装包；安装完成后启动本地服务端与 Web 管理台。
-                    </li>
+                    <li>提供 Windows、Linux 服务端原生安装包，并支持卸载与升级。</li>
+                    <li>安装过程完成依赖检查、服务注册、登录启动配置和首次健康检查。</li>
                     <li>
                       Share / 安装完成页显示可点击的本地 Web
-                      管理链接；之后应能再次找到该地址，不需要重新安装才能查看。
-                    </li>
-                    <li>
-                      链接默认供本机访问；局域网或公网开放必须显式配置并经过身份鉴权，不能默认暴露管理能力。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">Web 管理台</span>
-                <div class="v">
-                  <ul>
-                    <li>统一管理见山功能、服务状态、工作区、Agent 与运行配置。</li>
-                    <li>
-                      配置模型：provider、模型、推理参数、接口地址与凭证；敏感凭证不能在页面明文回显。
-                    </li>
-                    <li>创建和管理二维码角色入口、邀请链接及其使用状态。</li>
-                    <li>不要求用户先安装桌面客户端；常用管理动作应能在浏览器内闭环完成。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">团队管理</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      首版按 <code>https://myagents.zxyz.app/team/</code>
-                      原样复刻页面结构、成员切换、信息层级与操作方式，再接入见山数据。
-                    </li>
-                    <li>
-                      已核对参考页包含：团队成员标签、所选成员的个人管理视图、估算投入、会话数、项目数、账户数、完成轮次、时间构成、项目
-                      / 账户 / 会话分布、时间热力图，以及“标题归属清单”入口。
-                    </li>
-                    <li>
-                      团队数据接入见山的角色、会话、账号、工作区和工作量统计，复用现有二维码角色归属。
-                    </li>
-                    <li>
-                      内部功能以需求方指定的 <code>/home/agent/myagent</code>
-                      对应团队管理实现为参考；当前执行环境无法读取该路径，开发前必须先取得可访问的源码或仓库。
+                      管理链接；后续能从开始菜单、桌面快捷方式或命令行重新找回。
                     </li>
                   </ul>
                 </div>
@@ -869,118 +783,38 @@
               <div class="rq">
                 <span class="k">验收</span>
                 <div class="v">
-                  在干净的 Windows / Linux 环境完成安装后，Share 页链接可直接打开 Web
-                  管理台；能配置模型、创建二维码角色入口、查看团队统计并完成参考页面的全部团队管理操作；服务重启后配置与团队数据保持。
+                  在干净的 Windows / Linux 环境安装后，无需手工执行 npm 命令即可启动服务端；Share
+                  页链接可直接打开本地 Web 管理台；重启系统后服务恢复，配置与会话数据保持。
                 </div>
               </div>
               <div class="rq">
                 <span class="k">关联</span>
-                <div class="v">
-                  角色二维码与会话工作量归属、团队任务与需求闭环、分布式
-                  Agent、团队运行与安装身份迁移。
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="collab">
-              <div class="t">
-                角色二维码与会话工作量归属<span class="tag g-collab">协作</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-p0">P0</span>
-              </div>
-              <div class="d">
-                最小用户体系只解决“谁在操作、会话属于谁、工作量算给谁”。管理员创建不同工作角色，每个角色有一个稳定二维码；扫码后进入现有
-                Paseo，不另做一套权限界面。
-              </div>
-              <div class="rq">
-                <span class="k">已确认</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      管理员创建不同角色二维码；二维码是无限会话入口，保留现有 Paseo 全部功能。
-                    </li>
-                    <li>
-                      同一角色在手机、电脑、网页看到并操作同一套内容；不同角色也看到同样的全局内容。
-                    </li>
-                    <li>二维码只区分“当前操作角色”，本阶段不承担会话隔离或权限隔离。</li>
-                    <li>
-                      一个自然人可以有多个工作角色，例如“书记一”“书记二”；系统不需要知道它们属于同一个人。
-                    </li>
-                    <li>
-                      一个会话同一时间只属于一个角色；新会话自动归当前角色，之后可从 A 转让给 B。
-                    </li>
-                    <li>工作量按操作发生时的角色分段统计：转让前算 A，转让后算 B。</li>
-                    <li>现有未归属角色的旧会话暂不处理。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">边界</span>
-                <div class="v">
-                  工作角色是二维码身份，与“产品 / 开发 /
-                  测试”职责标签不是同一个概念。二维码泄露后的撤销、设备管理和权限控制留到下一阶段。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">验收</span>
-                <div class="v">
-                  两个角色可在同一 daemon
-                  下创建会话、互相转让，并得到分段工作量；任一端用同一角色进入时内容一致。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">关联</span>
-                <div class="v">团队任务闭环、团队共用 daemon。</div>
+                <div class="v">品牌与安装身份迁移、团队运行、分布式 Agent。</div>
               </div>
             </div>
 
             <div class="card req" data-tag="notes">
               <div class="t">
-                笔记工作台闭环<span class="tag g-notes">笔记</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-p0">P0</span
-                ><span class="badge b-live">部分已做</span>
+                笔记工作台剩余闭环<span class="tag g-notes">笔记</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-p0">P0</span>
               </div>
-              <div class="d">
-                把“标签笔记 Bottom Sheet”和“笔记增强”合并为一条闭环：随手记 → 缓存立即打开 →
-                回到来源 → 处理完成。不再分别拆成两个需求。
-              </div>
+              <div class="d">门户只保留笔记尚未完成的三项闭环能力。</div>
               <div class="rq">
-                <span class="k">已做</span>
-                <div class="v">
-                  一条捕获一条笔记；标题 / 正文 /
-                  备注可编辑删除；会话消息块、选中文本、剪贴板可预填；来源 workspaceId / agentId
-                  已落库；笔记链接可点开和复制。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">P0 范围</span>
+                <span class="k">未完成范围</span>
                 <div class="v">
                   <ul>
+                    <li>笔记列表支持上下拖动排序，排序结果持久化。</li>
+                    <li>增加“待处理 / 已完成”，默认只显示未处理，处理后可勾掉。</li>
                     <li>
-                      顶部笔记按钮改为从下往上的 Bottom Sheet，先展示缓存，不因展开动作触发刷新。
+                      笔记来源升级为可回跳锚点：会话、消息、文件 + 行、图片或 PR，主操作是回到来源。
                     </li>
-                    <li>
-                      App
-                      启动后刷新一次；新增、编辑、删除后刷新一次；保留下拉刷新，不在每次展开时重拉。
-                    </li>
-                    <li>笔记列表支持上下拖动排序；排序结果持久化，刷新或重开 App 后保持。</li>
-                    <li>标题、正文和备注可编辑；编辑完成后列表与详情显示最新内容。</li>
-                    <li>
-                      笔记渲染来源锚点，能跳回会话、消息、文件 + 行、图片或 PR；主操作是“回去”。
-                    </li>
-                    <li>增加“待处理 / 已完成”，默认只看未处理；处理完成可直接勾掉。</li>
                   </ul>
                 </div>
               </div>
               <div class="rq">
                 <span class="k">验收</span>
                 <div class="v">
-                  重复展开抽屉不产生网络请求；新增一条后返回能看到且只刷新一次；笔记上下拖动后顺序保存并在重开后保持；标题、正文和备注编辑后正确保存；从笔记可准确回到来源；待处理可清空。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">后置</span>
-                <div class="v">
-                  个人笔记收件箱、跨项目全文检索与思维导图统一放到「个人知识库」。
+                  拖动后顺序在刷新与重开后保持；待处理可清空且不混入已完成；从笔记可准确回到原始上下文。
                 </div>
               </div>
             </div>
@@ -1015,217 +849,11 @@
                 <div class="v">会话收纳与气泡图、个人知识库、笔记工作台闭环。</div>
               </div>
             </div>
-          </div>
-        </section>
-        <section class="filter-section">
-          <h2>近期 · P1 <span class="n">8 项 · P0 落地后接续，包含分布式 Agent 核心架构</span></h2>
-          <div class="grid">
-            <div class="card req" data-tag="archify">
-              <div class="t">
-                代码与需求可视化工作台<span class="tag g-archify">可视化</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span
-                ><span class="badge b-live">部分基础</span>
-              </div>
-              <div class="d">
-                把“需求地图”和代码理解合并：既能画需求和范围，也能画代码架构、方法调用链、参数传导链。图放在工作区文件
-                / 内容 Tab 中，不飘在聊天里。
-              </div>
-              <div class="rq">
-                <span class="k">代码视图</span>
-                <div class="v">
-                  <ul>
-                    <li>架构图：前端、服务端、协议、存储、外部服务的边界和依赖。</li>
-                    <li>调用链：从一个入口追到关键方法；参数传导链显示数据如何变形。</li>
-                    <li>范围过滤：只看前端、只看某个模块、只看 K 线相关代码。</li>
-                    <li>点击节点回到文件与行号；代码变化后可刷新证据并标记过期节点。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">需求视图</span>
-                <div class="v">
-                  对话和文档可直接生成范围、关系、流程、状态、数据模型图；未知、待定、冲突显式标注，文字与图同源。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">复用</span>
-                <div class="v">
-                  Archify 的 spec、渲染器、面板、搜索和产物缓存；新增代码 /
-                  需求证据生成器，不重做可视化底座。
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="session">
-              <div class="t">
-                会话 / 工作区收纳与气泡图<span class="tag g-session">会话</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
-              </div>
-              <div class="d">
-                会话越堆越多：实测未归档会话 13 条、已归档 11 条，落在 6
-                个未归档工作区，其中一个塞了 7 条。需要减少侧栏行数，同时让常用会话更容易找到。
-              </div>
-              <div class="rq">
-                <span class="k">已弄清</span>
-                <div class="v">
-                  <ul>
-                    <li>侧栏一行 = 一个工作区，只显示未归档；会话挂在工作区里。</li>
-                    <li>归档会减少工作区行，History 仍在、可恢复；减的是工作区，不是单条会话。</li>
-                    <li>同一工作区可容纳多条会话；父 + 子会话能把多条收成一个侧栏入口。</li>
-                    <li>把两条已有会话合并成一条没有这个能力，只有 fork（复制历史）。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">气泡图</span>
-                <div class="v">
-                  <ul>
-                    <li>入口：会话列表界面往下滑，进入任务气泡图。</li>
-                    <li>
-                      默认只显示 10 个使用最频繁的气泡；一个气泡 =
-                      一个常用会话（任务与会话是多对多，见「任务 ↔ 会话多对多」）。
-                    </li>
-                    <li>点气泡进入对应会话；气泡只做展示，不承载其他操作。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">待定</span>
-                <div class="v">
-                  先做归档 + 气泡 / 置顶分组；任务系统（父 + 子）改变的是以后怎么开任务。
-                </div>
-              </div>
-            </div>
-            <div class="card req" data-tag="agent">
-              <div class="t">
-                快慢双通道 / 意图路由<span class="tag g-agent">Agent</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span
-                ><span class="badge b-live">部分已做</span>
-              </div>
-              <div class="d">
-                “我知道一行命令但记不住”的场景走快通道：本地规则 + 向量检索 +
-                小模型只做意图分类与填槽，直接执行确定性动作；接不住再交给云端大模型走慢通道。
-              </div>
-              <div class="rq">
-                <span class="k">已做</span>
-                <div class="v">
-                  <ul>
-                    <li>快速输入页已经采用“本地即时排序 → 低置信度云端结构化路由”的快慢双通道。</li>
-                    <li>
-                      终端 AI 操作员已经具备命令规划、危险动作确认、可见 PTY
-                      执行、输出捕获和结论总结。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">待做</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      建立本地小模型可选择的意图目录与确定性动作目录；模型只能选择目录项，不能自由生成任意
-                      shell。
-                    </li>
-                    <li>读操作可自动执行；写、删、部署、重启必须确认。</li>
-                    <li>没命中或置信度低时回退到现有 Agent 流程。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">开放问题</span>
-                <div class="v">
-                  <ul>
-                    <li>第一版意图目录先收哪些高频动作。</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="notes">
-              <div class="t">
-                个人知识库<span class="tag g-notes">笔记</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
-              </div>
-              <div class="d">
-                合并“个人笔记收件箱 + 跨项目全文检索 +
-                思维导图”：承接不属于某个项目的链接、图片、地址和想法，并能按列表或导图找回。
-              </div>
-              <div class="rq">
-                <span class="k">范围</span>
-                <div class="v">
-                  <ul>
-                    <li>个人收件箱独立于项目笔记，默认私有，可主动分享给团队。</li>
-                    <li>跨项目全文检索标题、正文、备注、链接和来源。</li>
-                    <li>
-                      同一批笔记可切换列表 / 思维导图；节点可指向会话、消息、文件、图片和网页。
-                    </li>
-                    <li>思维导图可手工编辑，也可由笔记生成，并能回到原文。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">开放问题</span>
-                <div class="v">
-                  个人笔记与项目笔记是一套数据两种视图，还是两个独立容器；“私有”只靠界面默认不展示，还是需要真正的读取隔离。
-                </div>
-              </div>
-            </div>
-
-            <div class="card req" data-tag="device">
-              <div class="t">
-                设备与环境感知（Device Context）<span class="tag g-device">设备</span
-                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
-              </div>
-              <div class="d">
-                服务器和 Agent
-                必须知道当前是谁、在哪台设备、在哪个界面发起操作，才能判断哪些动作可以在该设备完成。不能把手机、平板、Web、Mac、Windows
-                和 HarmonyOS 都当成同一个无差别客户端。
-              </div>
-              <div class="rq">
-                <span class="k">至少感知</span>
-                <div class="v">
-                  <ul>
-                    <li>设备类型、设备 ID、操作系统、客户端版本、在线状态和网络延迟。</li>
-                    <li>
-                      当前活动上下文：输入来自手机还是 Mac、当前在工作区 / 输入框 / 终端 / 浏览器 /
-                      设置页，以及当前项目与会话。
-                    </li>
-                    <li>输入方式：触屏、硬件键盘、语音、扫码、相机和文件选择器是否可用。</li>
-                    <li>
-                      执行能力：浏览器自动化、本地
-                      Codex、终端、文件系统、桌面应用、通知、相机和系统分享等。
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">用途</span>
-                <div class="v">
-                  Agent 根据设备和当前上下文选择动作：手机负责输入、确认、扫码和查看；Mac / Windows
-                  可以执行本地浏览器、Codex、终端和文件操作；服务器负责统一推理、编排和记录。设备切换时上下文要实时更新。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">边界</span>
-                <div class="v">
-                  默认只上报能力与活动元数据，不上报完整屏幕、剪贴板和文件内容；敏感能力需要单独授权。设备状态必须有时效，失联或切后台后不能继续被视为可执行节点。
-                </div>
-              </div>
-              <div class="rq">
-                <span class="k">与分布式 Agent 的关系</span>
-                <div class="v">
-                  这是分布式 Agent
-                  的前置能力：服务器需要先知道哪台设备在线、有什么能力、当前是否适合执行，才能把任务路由到本地
-                  Agent。
-                </div>
-              </div>
-            </div>
-
             <div class="card req" data-tag="agent">
               <div class="t">
                 分布式 Agent（服务器编排 + 本地执行）<span class="tag g-agent">Agent</span
                 ><span class="badge b-plan">计划中</span
-                ><span class="badge b-todo">P1 · 核心架构</span
+                ><span class="badge b-p0">P0 · 最高优先级</span
                 ><span class="badge b-live">部分基础</span>
               </div>
               <div class="d">
@@ -1412,8 +1040,16 @@
               <div class="rq">
                 <span class="k">MVP 验收</span>
                 <div class="v">
-                  服务器上的 Agent 能把一个明确任务委派给一台在线电脑，由本地 Codex
-                  执行，手机端实时看到执行状态并收到结果； 支持取消、超时、失联恢复和危险操作确认。
+                  <ul>
+                    <li>
+                      <b>首个硬验收：</b>AI 在服务器生成文件 <code>123</code>，随后由本地 Agent 把
+                      <code>123</code> 复制到本机电脑桌面；这条端到端链路跑通即视为基本通过。
+                    </li>
+                    <li>
+                      通用验收：服务器上的 Agent
+                      能把明确任务委派给在线电脑，手机端实时看到状态与结果，并支持取消、超时、失联恢复和危险操作确认。
+                    </li>
+                  </ul>
                 </div>
               </div>
               <div class="rq">
@@ -1422,6 +1058,211 @@
                   主会话最终存在服务器还是本地；本地执行者是 Paseo Agent、Codex
                   子进程还是两者组合；多台电脑如何选择；
                   离线任务是否排队；服务器与本地之间哪些内容需要端到端加密。
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="filter-section">
+          <h2>近期 · P1 <span class="n">7 项 · P0 落地后接续</span></h2>
+          <div class="grid">
+            <div class="card req" data-tag="archify">
+              <div class="t">
+                代码与需求可视化工作台<span class="tag g-archify">可视化</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span
+                ><span class="badge b-live">持续迭代</span>
+              </div>
+              <div class="d">
+                把“需求地图”和代码理解合并：既能画需求和范围，也能画代码架构、方法调用链、参数传导链。图放在工作区文件
+                / 内容 Tab 中，不飘在聊天里。
+              </div>
+              <div class="rq">
+                <span class="k">代码视图</span>
+                <div class="v">
+                  <ul>
+                    <li>架构图：前端、服务端、协议、存储、外部服务的边界和依赖。</li>
+                    <li>调用链：从一个入口追到关键方法；参数传导链显示数据如何变形。</li>
+                    <li>范围过滤：只看前端、只看某个模块、只看 K 线相关代码。</li>
+                    <li>点击节点回到文件与行号；代码变化后可刷新证据并标记过期节点。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">需求视图</span>
+                <div class="v">
+                  对话和文档可直接生成范围、关系、流程、状态、数据模型图；未知、待定、冲突显式标注，文字与图同源。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">复用</span>
+                <div class="v">
+                  Archify 的 spec、渲染器、面板、搜索和产物缓存；新增代码 /
+                  需求证据生成器，不重做可视化底座。
+                </div>
+              </div>
+            </div>
+
+            <div class="card req" data-tag="session">
+              <div class="t">
+                会话 / 工作区收纳与气泡图<span class="tag g-session">会话</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
+              </div>
+              <div class="d">
+                会话越堆越多：实测未归档会话 13 条、已归档 11 条，落在 6
+                个未归档工作区，其中一个塞了 7 条。需要减少侧栏行数，同时让常用会话更容易找到。
+              </div>
+              <div class="rq">
+                <span class="k">已弄清</span>
+                <div class="v">
+                  <ul>
+                    <li>侧栏一行 = 一个工作区，只显示未归档；会话挂在工作区里。</li>
+                    <li>归档会减少工作区行，History 仍在、可恢复；减的是工作区，不是单条会话。</li>
+                    <li>同一工作区可容纳多条会话；父 + 子会话能把多条收成一个侧栏入口。</li>
+                    <li>把两条已有会话合并成一条没有这个能力，只有 fork（复制历史）。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">气泡图</span>
+                <div class="v">
+                  <ul>
+                    <li>入口：会话列表界面往下滑，进入任务气泡图。</li>
+                    <li>
+                      默认只显示 10 个使用最频繁的气泡；一个气泡 =
+                      一个常用会话（任务与会话是多对多，见「任务 ↔ 会话多对多」）。
+                    </li>
+                    <li>点气泡进入对应会话；气泡只做展示，不承载其他操作。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">待定</span>
+                <div class="v">
+                  先做归档 + 气泡 / 置顶分组；任务系统（父 + 子）改变的是以后怎么开任务。
+                </div>
+              </div>
+            </div>
+            <div class="card req" data-tag="agent">
+              <div class="t">
+                快慢双通道 / 意图路由<span class="tag g-agent">Agent</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span
+                ><span class="badge b-live">持续迭代</span>
+              </div>
+              <div class="d">
+                “我知道一行命令但记不住”的场景走快通道：本地规则 + 向量检索 +
+                小模型只做意图分类与填槽，直接执行确定性动作；接不住再交给云端大模型走慢通道。
+              </div>
+              <div class="rq">
+                <span class="k">已做</span>
+                <div class="v">
+                  <ul>
+                    <li>快速输入页已经采用“本地即时排序 → 低置信度云端结构化路由”的快慢双通道。</li>
+                    <li>
+                      终端 AI 操作员已经具备命令规划、危险动作确认、可见 PTY
+                      执行、输出捕获和结论总结。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">待做</span>
+                <div class="v">
+                  <ul>
+                    <li>
+                      建立本地小模型可选择的意图目录与确定性动作目录；模型只能选择目录项，不能自由生成任意
+                      shell。
+                    </li>
+                    <li>读操作可自动执行；写、删、部署、重启必须确认。</li>
+                    <li>没命中或置信度低时回退到现有 Agent 流程。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">开放问题</span>
+                <div class="v">
+                  <ul>
+                    <li>第一版意图目录先收哪些高频动作。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="card req" data-tag="notes">
+              <div class="t">
+                个人知识库<span class="tag g-notes">笔记</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
+              </div>
+              <div class="d">
+                合并“个人笔记收件箱 + 跨项目全文检索 +
+                思维导图”：承接不属于某个项目的链接、图片、地址和想法，并能按列表或导图找回。
+              </div>
+              <div class="rq">
+                <span class="k">范围</span>
+                <div class="v">
+                  <ul>
+                    <li>个人收件箱独立于项目笔记，默认私有，可主动分享给团队。</li>
+                    <li>跨项目全文检索标题、正文、备注、链接和来源。</li>
+                    <li>
+                      同一批笔记可切换列表 / 思维导图；节点可指向会话、消息、文件、图片和网页。
+                    </li>
+                    <li>思维导图可手工编辑，也可由笔记生成，并能回到原文。</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">开放问题</span>
+                <div class="v">
+                  个人笔记与项目笔记是一套数据两种视图，还是两个独立容器；“私有”只靠界面默认不展示，还是需要真正的读取隔离。
+                </div>
+              </div>
+            </div>
+
+            <div class="card req" data-tag="device">
+              <div class="t">
+                设备与环境感知（Device Context）<span class="tag g-device">设备</span
+                ><span class="badge b-plan">计划中</span><span class="badge b-todo">P1</span>
+              </div>
+              <div class="d">
+                服务器和 Agent
+                必须知道当前是谁、在哪台设备、在哪个界面发起操作，才能判断哪些动作可以在该设备完成。不能把手机、平板、Web、Mac、Windows
+                和 HarmonyOS 都当成同一个无差别客户端。
+              </div>
+              <div class="rq">
+                <span class="k">至少感知</span>
+                <div class="v">
+                  <ul>
+                    <li>设备类型、设备 ID、操作系统、客户端版本、在线状态和网络延迟。</li>
+                    <li>
+                      当前活动上下文：输入来自手机还是 Mac、当前在工作区 / 输入框 / 终端 / 浏览器 /
+                      设置页，以及当前项目与会话。
+                    </li>
+                    <li>输入方式：触屏、硬件键盘、语音、扫码、相机和文件选择器是否可用。</li>
+                    <li>
+                      执行能力：浏览器自动化、本地
+                      Codex、终端、文件系统、桌面应用、通知、相机和系统分享等。
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">用途</span>
+                <div class="v">
+                  Agent 根据设备和当前上下文选择动作：手机负责输入、确认、扫码和查看；Mac / Windows
+                  可以执行本地浏览器、Codex、终端和文件操作；服务器负责统一推理、编排和记录。设备切换时上下文要实时更新。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">边界</span>
+                <div class="v">
+                  默认只上报能力与活动元数据，不上报完整屏幕、剪贴板和文件内容；敏感能力需要单独授权。设备状态必须有时效，失联或切后台后不能继续被视为可执行节点。
+                </div>
+              </div>
+              <div class="rq">
+                <span class="k">与分布式 Agent 的关系</span>
+                <div class="v">
+                  这是分布式 Agent
+                  的前置能力：服务器需要先知道哪台设备在线、有什么能力、当前是否适合执行，才能把任务路由到本地
+                  Agent。
                 </div>
               </div>
             </div>
@@ -1902,364 +1743,31 @@
             </div>
           </div>
         </section>
-        <section>
-          <h2>已核验关闭 <span class="n">不计入 Bug 数</span></h2>
-          <div class="card">
-            <div class="d">
-              消息复制按钮触屏不可用：当前触屏始终显示复制按钮，桌面才按 hover 显示。
-              会话列表时间覆盖三点菜单：时间已移入独立 meta row，触屏操作也保持可达。
-              笔记界面没有返回按钮：<code>c753abc0c</code> 为窄屏 / 非 Electron
-              推入页面补了返回和关闭。 鸿蒙图标白边：<code>d8259fe7f</code> 重做全平台图标源图。
-              链接打开后返回崩溃：HarmonyOS 已改为 <code>54d13f552</code> 交给系统浏览器，不再在单
-              WebView 内打开无头页面。
-            </div>
-          </div>
-        </section>
       </div>
 
-      <div class="pane" id="pane-done">
-        <section class="filter-section">
-          <h2>输入与 Agent <span class="n">4 项 · 已能使用</span></h2>
-          <div class="grid">
-            <div class="card" data-tag="session">
-              <div class="t">
-                智能快速输入 + 快慢双通道路由<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                冷启动可先进入快速输入页：未输入时按“正在继续 / 最近使用 /
-                其他”展示未归档会话；输入后本地即时按标题、项目、路径和最近输入排序，低置信度再走云端结构化路由。
-                可把文字直接投递到匹配会话，运行中的会话按现有发送策略排队；没有合适结果时提供新建会话、浏览全部和手动选择。
-                设置中可关闭这个冷启动入口。
-              </div>
-              <div class="rq">
-                <span class="k">边界</span>
-                <div class="v">
-                  这次落地的是“快速输入页与会话路由”，不是替代整个启动首屏的个人首页；个人首页仍在计划中。
-                </div>
-              </div>
-              <div class="src">
-                packages/app/src/screens/quick-input-screen.tsx · packages/app/src/quick-input ·
-                packages/server/src/server/agent/structured-generation-providers.ts · de4d7a632
-              </div>
-            </div>
-            <div class="card" data-tag="agent">
-              <div class="t">
-                终端 AI 操作员<span class="tag g-agent">Agent</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                终端底部增加自然语言输入栏，可选择模型；独立隐藏 Agent 负责规划命令，命令在当前可见
-                PTY 中执行，输出被捕获后继续下一轮并生成结论。危险命令会先确认，
-                遇到密码等交互式提示会交还终端控制，用户处理完后自动继续。宽屏使用右下浮动面板，窄屏使用底部抽屉，
-                操作员会话不混入普通会话列表。
-              </div>
-              <div class="src">
-                packages/app/src/terminal/agent-prompt ·
-                packages/app/src/components/terminal-pane.tsx · aeef058aa · e0ef87cbc
-              </div>
-            </div>
-            <div class="card" data-tag="session">
-              <div class="t">
-                完成轮次折叠 + 命令复制<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                Agent 完成一轮后，过程收成一条“Worked for”摘要；展开可按原顺序查看 commentary
-                与工具行，原始 reasoning 不渲染。连续 shell
-                调用合成一个命令组，展开后逐条查看；命令和代码块提供复制按钮，
-                桌面悬停显示，触屏保持可见。翻页恢复中途轮次时也会按最终答复正确折叠并保持滚动锚点。
-              </div>
-              <div class="src">
-                packages/app/src/agent-stream/turn-activity.tsx ·
-                packages/app/src/agent-stream/turn-activity-blocks.ts ·
-                packages/app/src/components/message.tsx · c460bf048 · 18d287248
-              </div>
-            </div>
-            <div class="card" data-tag="session">
-              <div class="t">
-                输入框加号默认展示最近 5 张图片<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                附件菜单顶部按时间倒序展示设备相册最近 5
-                张照片；点缩略图即加入待发送附件，菜单保持打开可连续多选，附件移除按钮在触屏上常显。
-                图片不足 5
-                张时按实际数量展示，加载时显示骨架，无图片或无相册权限时隐藏该区域；完整相册入口保留。
-                HarmonyOS 的“添加图片”直接打开系统相册。
-              </div>
-              <div class="src">
-                packages/app/src/composer/recent-photos · packages/app/src/composer/input/input.tsx
-                · packages/app/src/composer/index.tsx ·
-                packages/harmony/entry/src/main/ets/web/photo-library-bridge.ets · 2c872fa9c
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="filter-section">
-          <h2>笔记与内容 <span class="n">3 项 · 已能使用</span></h2>
-          <div class="grid">
-            <div class="card" data-tag="notes">
-              <div class="t">
-                项目笔记 + 最近工作区<span class="tag g-notes">笔记</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                一条捕获一条笔记：标题 / 正文 /
-                备注独立编辑、删除，按项目浏览，列表显示所属项目；消息块
-                多选与头部剪贴板两种捕获入口，笔记内链接可点开、长按或按钮复制；另含最近工作区入口。
-              </div>
-              <div class="src">
-                packages/app/src/notes · packages/server/src/server/notes · 9e20414f9 · f77844e67 ·
-                2f884242d · 965c796de · 618bda30b
-              </div>
-            </div>
-            <div class="card" data-tag="voice">
-              <div class="t">
-                口述实时转写 + 本地 STT<span class="tag g-voice">语音</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                输入框内实时显示口述转写；接入 SenseVoice 本地语音识别模型，覆盖中文、日文、韩文。
-              </div>
-              <div class="src">c83482f8b · 2615294a8</div>
-            </div>
-            <div class="card" data-tag="workspace">
-              <div class="t">
-                工作区文件上传<span class="tag g-workspace">工作区</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                资源管理器工具栏与目录右键菜单都能把本地文件上传到工作区目录；daemon
-                侧流式写入，单文件最大 2GB，上传列表显示进度，失败后可断点续传，重名先确认再替换。
-              </div>
-              <div class="src">
-                packages/app/src/hooks/use-file-upload.ts · packages/server/src/server/file-upload ·
-                packages/protocol/src/messages.ts · 983f93b65
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="filter-section">
-          <h2>可视化 <span class="n">2 项 · Archify 基础已可用</span></h2>
-          <div class="grid">
-            <div class="card" data-tag="archify">
-              <div class="t">
-                Archify 架构图集成<span class="tag g-archify">Archify</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                内置 <b>paseo-archify</b> skill（vendored 渲染运行时 + 五类图表 schema）、工作区
-                Archify 面板、<code>archify_render</code> MCP
-                工具与产物存储；面板含图表标签页、规格搜索与聚焦跳转。
-              </div>
-              <div class="src">
-                skills/paseo-archify · packages/server/src/server/archify/service.ts ·
-                packages/app/src/panels/archify-panel.tsx
-              </div>
-            </div>
-            <div class="card" data-tag="archify">
-              <div class="t">
-                Archify 生成体验重构<span class="tag g-archify">Archify</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                生成运行改由 daemon 托管：先做无模型的确定性预扫描，产出 ≤40KB
-                证据包并按仓库版本缓存；候选锚点确认后，每张图一个后台 worker
-                并行生成、交付即出。阶段、每张图状态与用时、实时动作行、失败原因主动推送，不再轮询；可取消、失败隔离、一个"重跑未完成"入口，worker
-                完成后自动归档。新工作区首次打开自动生成一张架构总览，单张图可删除。
-              </div>
-              <div class="src">
-                packages/server/src/server/archify/{evidence,generation}.ts ·
-                packages/app/src/panels/archify-panel.tsx · 0cabaceb2 · 0d7c34902 · fcab8422d ·
-                35e62255b · bf0101797 · 619094ff9 · 7697c0f38
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="filter-section">
-          <h2>客户端体验 <span class="n">4 项 · 已能使用</span></h2>
-          <div class="grid">
-            <div class="card" data-tag="session">
-              <div class="t">
-                侧栏 / 会话列表滚动位置恢复<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                打开抽屉重新显示工作区列表时，不再强制把当前 workspace
-                顶到列表顶部；读者离开时的滚动位置被保留，只有当前 workspace 不在视口内才滚动过去。
-              </div>
-              <div class="src">
-                packages/app/src/components/sidebar/use-sidebar-scroll-restore.ts · 249b1b9b2
-              </div>
-            </div>
-            <div class="card" data-tag="session">
-              <div class="t">
-                平板宽度显示 prompt rail<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">聊天右侧的 prompt 导航栏在平板 / 中等宽度窗格也显示，窄屏才收起。</div>
-              <div class="src">
-                packages/app/src/agent-stream/chat-outline/rail.web.tsx ·
-                packages/app/src/agent-stream/view.tsx · b40ee00a6
-              </div>
-            </div>
-            <div class="card" data-tag="session">
-              <div class="t">
-                平板侧栏宽度设置 + 主机连接维护<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                外观设置新增侧栏宽度数字输入，默认 320px、范围 200–600px，输入后即时生效并持久化，
-                非法值自动夹到合法范围；桌面拖拽把手和数字输入共用同一个值。另补齐主机顺序调整、
-                通过配对链接更新主机连接并保留名称，以及触屏侧栏操作。
-              </div>
-              <div class="src">
-                packages/app/src/screens/settings/appearance/appearance-section.tsx ·
-                packages/app/src/stores/panel-store · packages/app/src/components/sidebar ·
-                packages/app/src/screens/settings/host-page.tsx · bfe62df40
-              </div>
-            </div>
-
-            <div class="card" data-tag="session">
-              <div class="t">
-                链接打开方式 + 工作区 WebView Tab<span class="tag g-session">会话</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                通用设置可选择默认使用系统浏览器或工作区
-                WebView；外部链接不再进入孤立页面，而是在工作区顶部新增可恢复的 Tab。
-              </div>
-              <div class="rq">
-                <span class="k">能力</span>
-                <div class="v">
-                  <ul>
-                    <li>
-                      系统浏览器与工作区 WebView 两种默认方式；聊天、笔记、PR 等外部链接统一遵守。
-                    </li>
-                    <li>WebView Tab 提供地址栏、前进 / 后退、刷新、错误提示和系统浏览器兜底。</li>
-                    <li>Android 返回键优先走进网页历史；Tab 与 URL 随工作区恢复。</li>
-                    <li>HarmonyOS 使用嵌入式 iframe；拒绝嵌入的站点转系统浏览器。</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="src">
-                packages/app/src/utils/open-external-url.ts ·
-                packages/app/src/screens/settings/general/link-opening-section.tsx ·
-                packages/app/src/desktop/browser/pane ·
-                packages/app/src/workspace-tabs/url-opener.ts · 26294f90f
-              </div>
-            </div>
-          </div>
-        </section>
-        <section class="filter-section">
-          <h2>平台与发布 <span class="n">5 项 · 已能使用，个别真机效果仍需复核</span></h2>
-          <div class="grid">
-            <div class="card" data-tag="release">
-              <div class="t">
-                打包与发布链路<span class="tag g-release">构建发布</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                Android APK 构建脚本与 CI（可裁剪 ABI、缓存、磁盘清理）、未签名 macOS
-                桌面构建、Windows 安装包拆分上传、HarmonyOS ArkTS 外壳（web 资源导出 / 校验 / 构建 /
-                hdc 安装 / DevEco Studio 工程导出）、daemon 包发布到 GitHub Packages、web
-                客户端部署到 fork 的 Cloudflare 账号。
-              </div>
-              <div class="src">
-                .github/workflows · scripts · packages/harmony · 2d2ec8e9a · 1bd56d870 · 6af70fded ·
-                87d2708fe · 3e135931a · df4c1bcf6 · 24a37b63f
-              </div>
-            </div>
-            <div class="card" data-tag="release">
-              <div class="t">
-                二开门户站点<span class="tag g-release">构建发布</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                paseo.zxyz.app：宝塔 nginx 站点指向仓库 docs/webview/，软链即时生效；页面用「计划中
-                / 未开发 / 已实现 / Bug / 下载」分类索引需求与状态，带功能域标签筛选。
-              </div>
-              <div class="src">
-                docs/webview/index.html · /www/server/panel/vhost/nginx/paseo.zxyz.app.conf
-              </div>
-            </div>
-            <div class="card" data-tag="release">
-              <div class="t">
-                全平台 App 图标刷新（修复鸿蒙白边）<span class="tag g-release">构建发布</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                重新生成 Android、iOS / Expo、Web、Desktop 与 HarmonyOS 图标。HarmonyOS
-                源图改为无白边的全幅深色背景，系统再裁圆角时不会露出白色四角；代码与资源修复已落地，
-                仍需在鸿蒙 3 折叠真机上复核安装后的最终系统图。
-              </div>
-              <div class="src">
-                packages/harmony/assets/app_icon.png · packages/app/assets/images/icon.png ·
-                packages/desktop/assets/icon.png · d8259fe7f
-              </div>
-            </div>
-            <div class="card" data-tag="release">
-              <div class="t">
-                鸿蒙全面屏与 Web 安全区适配<span class="tag g-release">构建发布</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                HarmonyOS ArkTS 页面改为铺到系统栏后方，Web
-                组件填满窗口；顶部、底部和侧边安全区改由标题栏、 输入框、桌面侧栏和 Web
-                文件树分别避让，不再给整个工作区留整条背景边。代码已落地，
-                仍需在鸿蒙折叠屏真机复核状态栏、导航条和侧边方向的最终效果。
-              </div>
-              <div class="src">
-                packages/harmony/entry/src/main/ets/{entryability/EntryAbility,pages/Index}.ets ·
-                packages/app/src/app/_layout.tsx · packages/app/src/composer/dock/index.tsx ·
-                packages/app/src/screens/workspace/explorer-sidebar/geometry.web.tsx · 4631343a2 ·
-                6de34d420
-              </div>
-            </div>
-
-            <div class="card" data-tag="release">
-              <div class="t">
-                鸿蒙二维码配对扫描<span class="tag g-release">构建发布</span
-                ><span class="badge b-live">已实现</span>
-              </div>
-              <div class="d">
-                HarmonyOS
-                原生外壳接入系统扫码能力：申请相机权限后打开系统扫码界面，把配对二维码内容转交给 App
-                的配对流程；不再要求用户手动复制链接。
-              </div>
-              <div class="src">
-                packages/harmony/entry/src/main/ets/pages/Index.ets ·
-                packages/harmony/entry/src/main/module.json5 · packages/app/src/app/pair-scan.tsx ·
-                packages/app/src/utils/harmony-shell.ts · 90746b640
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
       <div class="pane" id="pane-download">
         <section>
           <h2>
             桌面端
-            <span class="n">WINDOWS V0.13.9 / MACOS V0.13.9 / LINUX V0.13.8 · GITHUB RELEASE</span>
+            <span class="n">WINDOWS V0.14.0 / MACOS V0.14.0 / LINUX V0.13.8 · GITHUB RELEASE</span>
           </h2>
           <div class="grid">
             <div class="card">
               <div class="t">Windows 安装包<span class="badge b-live">EXE</span></div>
               <div class="d">
-                Paseo-Setup-0.13.9.exe · 约 277 MB · Windows 10/11（x64 + arm64 通用安装器）
+                Paseo-Setup-0.14.0.exe · 约 277 MB · Windows 10/11（x64 + arm64 通用安装器）
               </div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.9/Paseo-Setup-0.13.9.exe"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.14.0/Paseo-Setup-0.14.0.exe"
                   >下载 Windows 版</a
                 >
               </div>
               <div class="src">
-                GitHub Release v0.13.9 ·
+                GitHub Release v0.14.0 ·
                 <a
-                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.13.9"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/tag/v0.14.0"
                   style="color: var(--accent, #38bdf8)"
                   >Release 页面</a
                 >还有 x64 / arm64 单独安装器与 zip
@@ -2267,11 +1775,11 @@
             </div>
             <div class="card">
               <div class="t">macOS 安装包<span class="badge b-live">DMG</span></div>
-              <div class="d">Paseo-0.13.9-arm64.dmg · 约 179 MB · Apple Silicon（M 系列芯片）</div>
+              <div class="d">Paseo-0.14.0-arm64.dmg · 约 179 MB · Apple Silicon（M 系列芯片）</div>
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.13.9/Paseo-0.13.9-arm64.dmg"
+                  href="https://github.com/ggNoob-Team/JianShan/releases/download/v0.14.0/Paseo-0.14.0-arm64.dmg"
                   >下载 macOS 版</a
                 >
               </div>
@@ -2330,30 +1838,13 @@
               <div class="card-actions">
                 <a
                   class="primary-button"
-                  href="https://appgallery.huawei.com/link/invite-test-wap?taskId=17a8a16f0694f0c917d52dc0d5c85ce5"
+                  href="https://appgallery.huawei.com/link/invite-test-wap?taskId=880332f59012eb916628df629ddd15a6"
                   target="_blank"
                   rel="noreferrer"
                   >前往 AppGallery 加入测试</a
                 >
               </div>
               <div class="src">AppGallery 邀请测试 · 需华为账号 · 当前不是公开商店版本</div>
-            </div>
-            <div class="card">
-              <div class="t">鸿蒙测试包<span class="badge b-live">HARMONYOS</span></div>
-              <div class="d">
-                新的 AppGallery
-                邀请测试入口。请在鸿蒙设备上登录华为账号，按邀请页提示加入测试并安装。
-              </div>
-              <div class="card-actions">
-                <a
-                  class="primary-button"
-                  href="https://appgallery.huawei.com/link/invite-test-wap?taskId=122632be34e160b829b9850ed5c0a206"
-                  target="_blank"
-                  rel="noreferrer"
-                  >前往 AppGallery 加入测试</a
-                >
-              </div>
-              <div class="src">AppGallery 邀请测试 · 需华为账号 · 新测试任务</div>
             </div>
           </div>
         </section>
@@ -2402,6 +1893,19 @@
       </div>
 
       <footer>
+        更新于 <code>2026-11-19 12:20 CST</code> · 下载页升级到 <code>v0.14.0</code>：Windows
+        <code>Paseo-Setup-0.14.0.exe</code>、macOS arm64 DMG、Android arm64
+        APK；客户端内部版本统一为 <code>0.14.0</code>；Linux 保持 v0.13.8。<br />
+        更新于 <code>2026-11-18 17:49 CST</code> · 关闭并移除已解决的「切换会话 /
+        回前台重连慢」痛点；分布式 Agent 提升为 P0 最高优先级，首个硬验收为服务器生成文件
+        <code>123</code> 后由本地 Agent
+        复制到本机桌面。安装与交互、意图路由、代码与需求可视化标记为持续迭代。笔记代码核对仍未覆盖拖拽排序、待处理
+        / 已完成和来源回跳，需求保持开放。计划中仍 21，P0 4 → 5，P1 8 → 7，痛点 1 → 0。<br />
+        更新于 <code>2026-11-17 15:16 CST</code> ·
+        门户改为只展示未完成事项，移除「已实现」Tab、全部已完成需求卡片和已关闭
+        Bug。服务端需求收敛为 Windows / Linux 原生安装包与 Share 页入口；角色二维码、团队管理与本地
+        Web 管理台已完成并整体移出；笔记需求收敛为拖动排序、待办状态和来源回跳。计划中 22 → 21，P0 5
+        → 4。<br />
         更新于 <code>2026-11-17 11:55 CST</code> · 下载页升级到 <code>v0.13.9</code>：Windows
         <code>Paseo-Setup-0.13.9.exe</code>、macOS arm64 DMG 与 Android arm64
         APK（<code>de801afa…</code>）；Linux 保持 v0.13.8。<br />

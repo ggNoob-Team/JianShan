@@ -1,4 +1,23 @@
-const ENGLISH_RELEASE_NOTES = `## 0.13.9 - 2026-11-17
+const ENGLISH_RELEASE_NOTES = `## 0.14.0 - 2026-11-19
+
+Cross-host file handoff, clearer team host states, role-aware workspaces, and local Git workspace choice.
+
+### Added
+
+- Added cross-host file handoff, so an agent can send files to another connected host.
+- Added role ordering and virtual ownership views to the admin console.
+- Kept the local workspace choice for Git projects.
+
+### Improved
+
+- Team analytics now distinguishes offline and unsupported hosts and matches the admin styling.
+- Note details stay inside the workspace dialog.
+
+### Fixed
+
+- Enforced role ownership for agent-created workspaces.
+
+## 0.13.9 - 2026-11-17
 
 Worktree-first Git workspaces, per-client host registrations, prefetched workspace notes, and a team analytics refresh.
 
@@ -58,7 +77,26 @@ JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup,
 - Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
 `;
 
-const CHINESE_RELEASE_NOTES = `## 0.13.9 - 2026-11-17
+const CHINESE_RELEASE_NOTES = `## 0.14.0 - 2026-11-19
+
+跨主机文件传交、更清晰的团队主机状态、角色化工作区，以及 Git 项目的本地工作区选择。
+
+### 新增
+
+- 新增跨主机文件传交，Agent 可以把文件发送到另一台已连接主机。
+- 管理端新增角色排序和虚拟归属视图。
+- Git 项目保留本地工作区选择。
+
+### 改进
+
+- 团队分析区分离线与不支持的主机，并与管理端样式对齐。
+- 笔记详情保持在当前工作区对话框内打开。
+
+### 修复
+
+- 修复 Agent 创建工作区的角色归属校验问题。
+
+## 0.13.9 - 2026-11-17
 
 Git 工作区默认使用 worktree、按客户端隔离主机注册、预取工作区笔记，以及团队分析看板更新。
 

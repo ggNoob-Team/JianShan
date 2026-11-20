@@ -118,6 +118,11 @@ import {
   renderArchifyArtifact,
 } from "../../archify/service.js";
 import { notifyArchifyArtifactDelivered } from "../../archify/delivery-events.js";
+import { openExplorerFileReadSource } from "../../file-explorer/service.js";
+import {
+  MAX_FILE_UPLOAD_BYTES,
+  MAX_FILE_UPLOAD_LABEL,
+} from "@getpaseo/protocol/file-upload-limits";
 import type { BrowserToolsBroker } from "../../browser-tools/broker.js";
 import {
   PaseoToolInputError,
@@ -1354,6 +1359,47 @@ function createToolCatalog(
   };
   const sendAgentPromptInputSchema =
     scope === "agent" ? agentToAgentSendAgentPromptInputSchema : topLevelSendAgentPromptInputSchema;
+  const sendFileToAgentInputSchema = {
+    activeTurnBehavior: commonSendAgentPromptInputSchema.activeTurnBehavior,
+    agentId: z.string().min(1),
+    sourcePath: z
+      .string()
+      .trim()
+      .min(1)
+      .describe(
+        "File path relative to your workspace. The file is streamed, not embedded in the prompt.",
+      ),
+    prompt: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("What the target agent should do with the transferred file."),
+    serverId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Destination server ID from list_hosts; omit for this host."),
+    fileName: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(
+        (name) => name !== "." && name !== ".." && !name.includes("/") && !name.includes("\\"),
+        { message: "fileName must be a file name, not a path" },
+      )
+      .optional()
+      .describe(
+        "Name to give the transferred file on the destination host. Defaults to the source name.",
+      ),
+    sessionMode: commonSendAgentPromptInputSchema.sessionMode,
+    notifyOnFinish: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe(
+        "Get notified when the target agent finishes, errors, or needs permission. Set false for fire-and-forget file handoff.",
+      ),
+  };
   const inspectProviderInputSchema = {
     provider: ProviderOrProviderModelInputSchema.describe(
       "Provider ID, optionally with a model ID (for example codex or codex/gpt-5.4).",
@@ -2422,6 +2468,240 @@ function createToolCatalog(
       };
     },
   );
+
+  if (scope === "agent") {
+    registerTool(
+      "send_file_to_agent",
+      {
+        title: "Send file to agent",
+        description:
+          "Transfer a file to another agent and send it a task. The target agent receives a structured uploaded-file attachment with path, name, MIME type, and size, so it can read or copy the file without guessing. Use this when one agent creates a file and another agent must handle or move it. The caller is notified when the target agent finishes by default.",
+        inputSchema: sendFileToAgentInputSchema,
+        outputSchema: {
+          success: z.boolean(),
+          agentId: z.string(),
+          deliveryStatus: z.literal("queued").optional(),
+          messageId: z.string().optional(),
+          status: AgentStatusEnum,
+          guidance: z.string().optional(),
+          transfer: z.object({
+            sourcePath: z.string(),
+            destinationPath: z.string(),
+            fileName: z.string(),
+            mimeType: z.string(),
+            size: z.number().int().nonnegative(),
+            delivery: z.enum(["local_path", "uploaded_attachment"]),
+            serverId: z.string().optional(),
+          }),
+        },
+      },
+      async (input, context) => {
+        if (!callerAgentId) {
+          throw new PaseoToolInputError(
+            "send_file_to_agent is only available to agent-scoped tool sessions",
+          );
+        }
+        const callerAgent = resolveCallerAgent();
+        if (!callerAgent) {
+          throw new PaseoToolInputError(`Parent agent ${callerAgentId} not found`);
+        }
+        const {
+          agentId,
+          sourcePath,
+          prompt,
+          serverId,
+          fileName,
+          sessionMode,
+          notifyOnFinish,
+          activeTurnBehavior,
+        } = input as {
+          agentId: string;
+          sourcePath: string;
+          prompt: string;
+          serverId?: string;
+          fileName?: string;
+          sessionMode?: string;
+          notifyOnFinish: boolean;
+          activeTurnBehavior?: "steer" | "interrupt";
+        };
+        const destination = serverId ?? options.serverId;
+        const source = await openExplorerFileReadSource({
+          root: callerAgent.cwd,
+          relativePath: sourcePath,
+        });
+        const buildHandoffPrompt = (
+          file: {
+            path: string;
+            fileName: string;
+            mimeType: string;
+            size: number;
+          },
+          delivery: "local_path" | "uploaded_attachment",
+        ) =>
+          [
+            "A file was made available to you by another agent.",
+            `Path: ${file.path}`,
+            `Name: ${file.fileName}`,
+            `MIME: ${file.mimeType}`,
+            `Size: ${file.size} bytes`,
+            delivery === "uploaded_attachment"
+              ? "The file is available as an uploaded-file attachment. Read or copy it from Path."
+              : "The file is available at Path.",
+            "",
+            "Requested action:",
+            prompt,
+          ].join("\n");
+        const closeSource = async () => {
+          try {
+            await source.close();
+          } catch (error) {
+            throw new PaseoToolInputError(
+              error instanceof Error ? error.message : "Source file changed before transfer",
+            );
+          }
+        };
+
+        try {
+          if (destination === options.serverId) {
+            if (fileName !== undefined) {
+              throw new PaseoToolInputError("fileName only applies when sending to another host");
+            }
+            await closeSource();
+            const dispatchTool = tools.get("send_agent_prompt");
+            if (!dispatchTool) {
+              throw new Error("send_agent_prompt is not enabled for this agent");
+            }
+            const dispatch = await dispatchTool.handler(
+              {
+                agentId,
+                prompt: buildHandoffPrompt(
+                  {
+                    path: source.absolutePath,
+                    fileName: source.fileName,
+                    mimeType: source.mimeType,
+                    size: source.size,
+                  },
+                  "local_path",
+                ),
+                sessionMode,
+                notifyOnFinish,
+                activeTurnBehavior: activeTurnBehavior ?? "steer",
+              },
+              context,
+            );
+            return {
+              content: [],
+              structuredContent: ensureValidJson({
+                ...(dispatch.structuredContent as Record<string, unknown>),
+                agentId,
+                transfer: {
+                  sourcePath: source.path,
+                  destinationPath: source.absolutePath,
+                  fileName: source.fileName,
+                  mimeType: source.mimeType,
+                  size: source.size,
+                  delivery: "local_path",
+                  ...(destination ? { serverId: destination } : {}),
+                },
+              }),
+            };
+          }
+
+          const destinationServerId = destination;
+          if (!destinationServerId) {
+            throw new PaseoToolInputError("Destination server ID is required for remote transfer");
+          }
+          if (!options.hosts) {
+            throw new PaseoToolInputError("Connected hosts are not configured for file transfer");
+          }
+          if (source.size > MAX_FILE_UPLOAD_BYTES) {
+            throw new PaseoToolInputError(
+              `File is too large to transfer (max ${MAX_FILE_UPLOAD_LABEL}).`,
+            );
+          }
+
+          const targetFileName = fileName ?? source.fileName;
+          const transfer = await options.hosts().use(destinationServerId, async (client) => {
+            const target = (await client.fetchAgent(agentId))?.agent;
+            if (!target) {
+              throw new PaseoToolInputError(`Agent ${agentId} not found on ${destinationServerId}`);
+            }
+            const upload = await client.uploadFile({
+              fileName: targetFileName,
+              mimeType: source.mimeType,
+              modifiedAt: source.modifiedAt,
+              source,
+            });
+            if (upload.error || !upload.file) {
+              throw new Error(upload.error ?? "File transfer failed");
+            }
+            await closeSource();
+            const text = buildHandoffPrompt(upload.file, "uploaded_attachment");
+            const receipt = await client.sendMessage(agentId, text, {
+              sourceAgentId: callerAgentId,
+              sourceAgentServerId: options.serverId,
+              sessionMode,
+              activeTurnBehavior: activeTurnBehavior ?? "steer",
+              attachments: [upload.file],
+            });
+            const afterDispatch = (await client.fetchAgent(agentId))?.agent;
+            return {
+              file: upload.file,
+              text,
+              receipt,
+              status: afterDispatch?.status ?? "idle",
+            };
+          });
+
+          if (notifyOnFinish) {
+            setupFinishWait({
+              agentMessages: agentMessages(),
+              agentManager,
+              agentStorage,
+              originServerId: options.serverId,
+              childServerId: destinationServerId,
+              childAgentId: agentId,
+              callerAgentId,
+              requireCallerOwnership: false,
+              wait: (signal) =>
+                hostResolver.use(destinationServerId, (host) => host.wait(agentId, signal)),
+              afterPermission: (requestId, signal) =>
+                hostResolver.use(destinationServerId, (host) =>
+                  waitForPermissionChange(host, agentId, requestId, signal),
+                ),
+              logger: childLogger,
+            });
+          }
+
+          return {
+            content: [],
+            structuredContent: ensureValidJson({
+              success: true,
+              agentId,
+              ...(transfer.receipt.deliveryStatus
+                ? { deliveryStatus: transfer.receipt.deliveryStatus }
+                : {}),
+              status: transfer.status,
+              guidance: notifyOnFinish
+                ? `File transferred to ${destinationServerId}. ${PROMPTED_AGENT_NOTIFICATION_GUIDANCE}`
+                : `File transferred to ${destinationServerId}. The target agent was prompted without a finish notification.`,
+              transfer: {
+                sourcePath: source.path,
+                destinationPath: transfer.file.path,
+                fileName: transfer.file.fileName,
+                mimeType: transfer.file.mimeType,
+                size: transfer.file.size,
+                delivery: "uploaded_attachment",
+                serverId: destinationServerId,
+              },
+            }),
+          };
+        } finally {
+          await source.close().catch(() => undefined);
+        }
+      },
+    );
+  }
 
   registerTool(
     "list_agents",

@@ -511,6 +511,8 @@ export function setupFinishWait(params: {
   childServerId?: string;
   childAgentId: string;
   callerAgentId: string;
+  /** Remote follow-ups default to parent-owned children; direct file handoffs may target any agent. */
+  requireCallerOwnership?: boolean;
   wait(signal: AbortSignal): Promise<WaitForFinishResult>;
   afterPermission(requestId: string, signal: AbortSignal): Promise<void>;
   logger: Logger;
@@ -542,19 +544,19 @@ export function setupFinishWait(params: {
     },
   };
   registrations.add(registration);
+  function callerOwnsResult(result: WaitForFinishResult): boolean {
+    if (params.requireCallerOwnership === false) return true;
+    const parent = getParentAddressFromLabels(result.final?.labels, params.childServerId ?? "self");
+    return (
+      parent?.agentId === params.callerAgentId &&
+      parent.serverId === (params.originServerId ?? "self")
+    );
+  }
   async function watch(): Promise<void> {
     while (!controller.signal.aborted) {
       const result = await params.wait(controller.signal);
       if (controller.signal.aborted || (await superseded) || result.status === "timeout") return;
-      const parent = getParentAddressFromLabels(
-        result.final?.labels,
-        params.childServerId ?? "self",
-      );
-      if (
-        parent?.agentId !== params.callerAgentId ||
-        parent.serverId !== (params.originServerId ?? "self")
-      )
-        return;
+      if (!callerOwnsResult(result)) return;
       if ((await params.agentStorage.get(params.callerAgentId))?.archivedAt) return;
       const reason = { idle: "finished", error: "errored", permission: "needs permission" }[
         result.status
