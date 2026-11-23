@@ -7,6 +7,7 @@ import {
   useSessionStore,
 } from "@/stores/session-store";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { deriveWorkspaceAgentVisibility } from "@/workspace-tabs/agent-visibility";
 import type { DirectoryReplicaMutation } from "@/runtime/replica-cache";
 import { AgentDirectoryReplica } from "./agent-replica";
 
@@ -140,6 +141,42 @@ describe("AgentDirectoryReplica", () => {
     expect(useSessionStore.getState().sessions[serverId]?.agents.get("agent")?.title).toBe(
       "network",
     );
+    store.clearSession(serverId);
+  });
+
+  it("keeps an internal timeline agent as a detail instead of directory membership", () => {
+    const serverId = "agent-replica-internal-detail";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null as unknown as DaemonClient);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+
+    expect(
+      replica.submitTimelineAgent(replica.captureTimeline("agent"), {
+        ...payload("internal"),
+        internal: true,
+        workspaceId: "workspace-1",
+      }),
+    ).toBe(true);
+
+    const session = useSessionStore.getState().sessions[serverId];
+    expect(session?.agents.has("agent")).toBe(false);
+    expect(session?.agentDetails.has("agent")).toBe(true);
+    expect(
+      deriveWorkspaceAgentVisibility({
+        sessionAgents: session?.agents,
+        agentDetails: session?.agentDetails,
+        workspaceId: "workspace-1",
+      }).activeAgentIds,
+    ).toEqual(new Set());
+
+    replica.commitChanges([], [], []);
+    const afterDirectoryUpdate = useSessionStore.getState().sessions[serverId];
+    expect(afterDirectoryUpdate?.agents.has("agent")).toBe(false);
+    expect(afterDirectoryUpdate?.agentDetails.has("agent")).toBe(true);
     store.clearSession(serverId);
   });
 

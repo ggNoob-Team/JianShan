@@ -68,6 +68,16 @@ export class AgentStoreProjection {
     return accepted;
   }
 
+  storeDetail(agent: Agent): void {
+    const store = useSessionStore.getState();
+    store.setAgents(this.serverId, withoutAgent(agent.id));
+    store.setAgentDetails(this.serverId, (current) => {
+      const next = new Map(current);
+      next.set(agent.id, agent);
+      return next;
+    });
+  }
+
   applyDelta(delta: AgentDirectoryDelta): {
     agentId: string;
     stoppedRunning: boolean;
