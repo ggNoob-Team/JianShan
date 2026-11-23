@@ -99,7 +99,10 @@ describe("workspace ownership", () => {
   test("recognizes a legacy dream workspace from its immutable display name", () => {
     expect(
       resolveWorkspaceCreatedBy({
-        workspace: { displayName: "dream/dream-20261120093744-6fb64766" },
+        workspace: {
+          workspaceId: "wks_legacy",
+          displayName: "dream/dream-20261120093744-6fb64766",
+        },
         agents: [
           {
             workspaceId: "wks_legacy",
@@ -114,7 +117,10 @@ describe("workspace ownership", () => {
   test("keeps a named legacy role on a dream workspace", () => {
     expect(
       resolveWorkspaceCreatedBy({
-        workspace: { displayName: "dream/dream-20261120093744-6fb64766" },
+        workspace: {
+          workspaceId: "wks_dream_named",
+          displayName: "dream/dream-20261120093744-6fb64766",
+        },
         agents: [
           {
             workspaceId: "wks_dream_named",
@@ -129,7 +135,7 @@ describe("workspace ownership", () => {
   test("keeps a named legacy human role unchanged", () => {
     expect(
       resolveWorkspaceCreatedBy({
-        workspace: { displayName: "feature/login" },
+        workspace: { workspaceId: "wks_human", displayName: "feature/login" },
         agents: [
           {
             workspaceId: "wks_human",
@@ -141,10 +147,30 @@ describe("workspace ownership", () => {
     ).toEqual({ clientId: "mobile-client", clientName: "书记" });
   });
 
+  test("never borrows the oldest agent from a different workspace", () => {
+    expect(
+      resolveWorkspaceCreatedBy({
+        workspace: { workspaceId: "wks_target", displayName: "feature/login" },
+        agents: [
+          {
+            workspaceId: "wks_other",
+            createdAt: "2026-09-01T00:00:00.000Z",
+            createdBy: { clientId: "other-client", clientName: "书记" },
+          },
+          {
+            workspaceId: "wks_target",
+            createdAt: "2026-11-18T00:00:00.000Z",
+            createdBy: { clientId: "target-client", clientName: "少爷" },
+          },
+        ],
+      }),
+    ).toEqual({ clientId: "target-client", clientName: "少爷" });
+  });
+
   test("does not invent a role for an unnamed non-dream legacy workspace", () => {
     expect(
       resolveWorkspaceCreatedBy({
-        workspace: { displayName: "feature/login" },
+        workspace: { workspaceId: "wks_legacy", displayName: "feature/login" },
         agents: [
           {
             workspaceId: "wks_legacy",

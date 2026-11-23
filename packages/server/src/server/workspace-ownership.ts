@@ -21,6 +21,7 @@ interface WorkspaceOwnerAgent {
  */
 export function resolveWorkspaceCreatedBy(input: {
   workspace: {
+    workspaceId: string;
     createdBy?: AgentActor;
     displayName?: string | null;
     branch?: string | null;
@@ -48,7 +49,9 @@ export function resolveWorkspaceCreatedBy(input: {
   const ownerAgent = input.agents
     .filter(
       (agent) =>
-        !agent.internal && agent.workspaceId !== undefined && agent.createdBy !== undefined,
+        !agent.internal &&
+        agent.workspaceId === input.workspace.workspaceId &&
+        agent.createdBy !== undefined,
     )
     .sort(
       (left, right) => Date.parse(String(left.createdAt)) - Date.parse(String(right.createdAt)),
