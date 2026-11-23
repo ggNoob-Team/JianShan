@@ -95,6 +95,8 @@ import { isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { resolveAppVersion } from "@/utils/app-version";
+import { useAndroidAppUpdate } from "@/android/updates/android-app-update-provider";
+import { shouldCheckAndroidAppUpdate } from "@/android/updates/android-app-update";
 import { openChangelog } from "@/changelog";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { settingsStyles } from "@/styles/settings";
@@ -482,6 +484,7 @@ function AboutSection({ appVersion, appVersionText, isDesktopApp }: AboutSection
           </View>
           <WhatsNewRow />
           {isDesktopApp ? <DesktopAppUpdateRow /> : null}
+          {!isDesktopApp && shouldCheckAndroidAppUpdate() ? <AndroidAppUpdateRow /> : null}
         </View>
       </SettingsSection>
       <ConnectedHostsSection clientVersion={appVersion} />
@@ -743,6 +746,51 @@ function DesktopAppUpdateRow() {
         </View>
       </View>
     </>
+  );
+}
+
+function AndroidAppUpdateRow() {
+  const { t } = useTranslation();
+  const { status, result, errorMessage, isChecking, checkForUpdates, downloadUpdate } =
+    useAndroidAppUpdate();
+
+  const handleCheckForUpdates = useCallback(() => {
+    void checkForUpdates();
+  }, [checkForUpdates]);
+  const handleDownloadUpdate = useCallback(() => {
+    void downloadUpdate();
+  }, [downloadUpdate]);
+
+  let statusText: string;
+  if (status === "checking") statusText = t("androidUpdates.status.checking");
+  else if (status === "available") {
+    statusText = t("androidUpdates.status.available", {
+      version: formatVersionWithPrefix(result?.latestVersion ?? ""),
+    });
+  } else if (status === "up-to-date") statusText = t("androidUpdates.status.upToDate");
+  else if (status === "error") statusText = errorMessage ?? t("androidUpdates.status.error");
+  else statusText = t("androidUpdates.status.idle");
+
+  return (
+    <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>{t("settings.about.updates.label")}</Text>
+        <Text style={settingsStyles.rowHint}>{statusText}</Text>
+      </View>
+      <View style={styles.aboutUpdateActions}>
+        <Button variant="outline" size="sm" onPress={handleCheckForUpdates} disabled={isChecking}>
+          {isChecking ? t("settings.about.updates.checking") : t("settings.about.updates.check")}
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          onPress={handleDownloadUpdate}
+          disabled={isChecking || !result?.hasUpdate}
+        >
+          {t("androidUpdates.settings.download")}
+        </Button>
+      </View>
+    </View>
   );
 }
 

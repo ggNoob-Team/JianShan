@@ -1734,6 +1734,24 @@ export const es: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  androidUpdates: {
+    status: {
+      idle: "Update status has not been checked yet.",
+      checking: "Checking for Android updates...",
+      upToDate: "The Android app is up to date.",
+      available: "Android update available: {{version}}.",
+      error: "Unable to check for an Android update.",
+    },
+    settings: {
+      download: "Download update",
+    },
+    callout: {
+      title: "Android update available",
+      description: "Current version {{currentVersion}}. Latest version {{version}}.",
+      installHint: "Download the APK, then let Android install it over this app.",
+      download: "Download APK",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "Minimizar ventana",

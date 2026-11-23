@@ -1667,6 +1667,24 @@ export const zhCN: TranslationResources = {
       commandPlaceholder: "Run a command, or leave empty for a blank terminal",
     },
   },
+  androidUpdates: {
+    status: {
+      idle: "尚未检查更新。",
+      checking: "正在检查 Android 更新...",
+      upToDate: "Android 应用已是最新版本。",
+      available: "发现 Android 新版本：{{version}}。",
+      error: "检查 Android 更新失败。",
+    },
+    settings: {
+      download: "下载更新",
+    },
+    callout: {
+      title: "发现 Android 新版本",
+      description: "当前版本 {{currentVersion}}，最新版本 {{version}}。",
+      installHint: "下载 APK 后由 Android 系统覆盖安装。",
+      download: "下载 APK",
+    },
+  },
   desktop: {
     windowControls: {
       minimize: "最小化窗口",

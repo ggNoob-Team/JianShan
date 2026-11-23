@@ -94,6 +94,14 @@ personal dogfooding. Android system-trace spans require the separate `PASEO_PROF
 watchdog recording does not send duplicate spans to that sink by default. Normal store/release
 workflows leave diagnostics disabled.
 
+### In-app update checks
+
+Production `sh.paseo` builds fetch `https://paseo.zxyz.app/apk/latest.json` on startup, on return to
+the foreground after the check interval, and when **设置 → 关于 → 应用更新** is checked manually.
+When the published version is newer, the app shows a dismissible update callout and opens the APK
+download in the system browser. Android completes the install; Paseo does not silently install apps.
+Development builds, F-Droid builds, iOS, and web do not run this check.
+
 ### Production arm64 APK
 
 Use the production script for an APK that will be published. The dogfood commands above enable

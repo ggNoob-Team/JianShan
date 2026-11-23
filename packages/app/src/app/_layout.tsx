@@ -84,6 +84,8 @@ import { getDesktopHost } from "@/desktop/host";
 import { loadDesktopSettings } from "@/desktop/settings/desktop-settings";
 import { RosettaCalloutSource } from "@/desktop/updates/rosetta-callout-source";
 import { UpdateCalloutSource } from "@/desktop/updates/update-callout-source";
+import { AndroidAppUpdateProvider } from "@/android/updates/android-app-update-provider";
+import { AndroidAppUpdateSource } from "@/android/updates/android-app-update-source";
 import { useActiveWorktreeNewAction } from "@/hooks/use-active-worktree-new-action";
 import { useGlobalNewWorkspaceAction } from "@/hooks/use-global-new-workspace-action";
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
@@ -497,6 +499,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
         <DownloadToast />
         <RosettaCalloutSource />
         <UpdateCalloutSource />
+        <AndroidAppUpdateSource />
         <LegacyAgentSkillsMigration />
         <WorktreeSetupCalloutSource />
         <CommandCenterRootActions />
@@ -885,19 +888,27 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
 // context and need one shared provider for sibling sheets to stack.
 function RootProviders({ children }: { children: ReactNode }) {
   return (
-    <KeyboardActionDispatcherProvider>
-      <WindowChromeProvider>
-        <KeyboardProvider>
-          <KeyboardShiftProvider>
-            <ToastProvider>
-              <PortalProvider>
-                <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
-              </PortalProvider>
-            </ToastProvider>
-          </KeyboardShiftProvider>
-        </KeyboardProvider>
-      </WindowChromeProvider>
-    </KeyboardActionDispatcherProvider>
+    <AndroidAppUpdateProvider>
+      <KeyboardActionDispatcherProvider>
+        <WindowChromeProvider>
+          <KeyboardProvider>
+            <KeyboardShiftProvider>
+              <ToastProvider>
+                <ModalProviders>{children}</ModalProviders>
+              </ToastProvider>
+            </KeyboardShiftProvider>
+          </KeyboardProvider>
+        </WindowChromeProvider>
+      </KeyboardActionDispatcherProvider>
+    </AndroidAppUpdateProvider>
+  );
+}
+
+function ModalProviders({ children }: { children: ReactNode }) {
+  return (
+    <PortalProvider>
+      <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
+    </PortalProvider>
   );
 }
 
