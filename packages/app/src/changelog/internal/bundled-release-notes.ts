@@ -1,4 +1,23 @@
-const ENGLISH_RELEASE_NOTES = `## 0.14.0 - 2026-11-19
+const ENGLISH_RELEASE_NOTES = `## 0.14.1 - 2026-11-23
+
+Screenshot annotations, virtual ownership for dream workspaces, richer message feedback, and Archify generator inspection.
+
+### Added
+
+- Added a screenshot annotation workflow for marking up captures before sharing.
+- Added Archify generator-agent inspection from diagram rows.
+- Added message shadows and a completion time in the turn footer.
+
+### Improved
+
+- Dream-prefixed workspaces without a role now attribute to the virtual "筑梦" role, and dream agents inherit the workspace owner.
+- Restored the composer gallery shortcut.
+
+### Fixed
+
+- Show only the completion time in the turn footer instead of duplicating timestamps.
+
+## 0.14.0 - 2026-11-19
 
 Cross-host file handoff, clearer team host states, role-aware workspaces, and local Git workspace choice.
 
@@ -77,7 +96,26 @@ JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup,
 - Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
 `;
 
-const CHINESE_RELEASE_NOTES = `## 0.14.0 - 2026-11-19
+const CHINESE_RELEASE_NOTES = `## 0.14.1 - 2026-11-23
+
+截图标注、筑梦工作区的虚拟归属、更丰富的消息反馈,以及 Archify 生成器 Agent 查看。
+
+### 新增
+
+- 新增截图标注工作流,分享前可以直接在截图上标记。
+- Archify 支持从图表行直接查看生成器 Agent。
+- 消息增加阴影和回合完成时间。
+
+### 改进
+
+- 无角色名的 dream 工作区归属虚拟角色「筑梦」,dream Agent 继承工作区所有者的归属。
+- 恢复输入框的相册快捷入口。
+
+### 修复
+
+- 回合底部只显示完成时间,不再重复时间戳。
+
+## 0.14.0 - 2026-11-19
 
 跨主机文件传交、更清晰的团队主机状态、角色化工作区，以及 Git 项目的本地工作区选择。
 

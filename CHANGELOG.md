@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.1 - 2026-11-23
+
+Screenshot annotations, virtual ownership for dream workspaces, richer message feedback, and Archify generator inspection.
+
+### Added
+
+- Added a screenshot annotation workflow for marking up captures before sharing.
+- Added Archify generator-agent inspection from diagram rows.
+- Added message shadows and a completion time in the turn footer.
+
+### Improved
+
+- Dream-prefixed workspaces without a role now attribute to the virtual "筑梦" role, and dream agents inherit the workspace owner.
+- Restored the composer gallery shortcut.
+
+### Fixed
+
+- Show only the completion time in the turn footer instead of duplicating timestamps.
+
 ## 0.14.0 - 2026-11-19
 
 Cross-host file handoff, clearer team host states, role-aware workspaces, and local Git workspace choice.
