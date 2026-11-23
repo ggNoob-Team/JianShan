@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
-import { normalizeAgentSnapshot, projectAgentSnapshot } from "./agent-snapshots";
+import {
+  normalizeAgentSnapshot,
+  projectAgentSnapshot,
+  shouldStoreFetchedAgentInActiveDirectory,
+} from "./agent-snapshots";
 
 function createSnapshot(
   input: Partial<Omit<AgentSnapshotPayload, "labels">> & {
@@ -30,6 +34,7 @@ function createSnapshot(
     availableModes: input.availableModes ?? [],
     pendingPermissions: input.pendingPermissions ?? [],
     persistence: input.persistence ?? null,
+    internal: input.internal,
     createdBy: input.createdBy,
     title: input.title ?? null,
     labels: (input.labels ?? {}) as AgentSnapshotPayload["labels"],
@@ -56,6 +61,52 @@ describe("normalizeAgentSnapshot", () => {
       status: "running",
       activeTurn: snapshot.activeTurn,
     });
+  });
+
+  it("round-trips the private internal-agent marker", () => {
+    const snapshot = createSnapshot({ internal: true });
+    const agent = normalizeAgentSnapshot(snapshot, "server-1");
+
+    expect(agent.internal).toBe(true);
+    expect(projectAgentSnapshot(agent)).toMatchObject({ internal: true });
+  });
+
+  it("keeps internal and archived fetched agents out of the active directory", () => {
+    const projectPlacement = {
+      projectKey: "project-1",
+      projectName: "repo",
+      checkout: {
+        cwd: "/repo",
+        isGit: false,
+        currentBranch: null,
+        remoteUrl: null,
+        worktreeRoot: null,
+        isPaseoOwnedWorktree: false,
+        mainRepoRoot: null,
+      },
+    } as const;
+
+    expect(
+      shouldStoreFetchedAgentInActiveDirectory({
+        internal: false,
+        archivedAt: null,
+        projectPlacement,
+      }),
+    ).toBe(true);
+    expect(
+      shouldStoreFetchedAgentInActiveDirectory({
+        internal: true,
+        archivedAt: null,
+        projectPlacement,
+      }),
+    ).toBe(false);
+    expect(
+      shouldStoreFetchedAgentInActiveDirectory({
+        internal: false,
+        archivedAt: new Date("2026-11-23T00:00:00.000Z"),
+        projectPlacement,
+      }),
+    ).toBe(false);
   });
 
   it("normalizes identified and legacy active turns at the snapshot boundary", () => {

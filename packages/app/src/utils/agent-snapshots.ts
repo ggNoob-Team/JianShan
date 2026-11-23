@@ -85,6 +85,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
+    ...(agent.internal ? { internal: true } : {}),
     ...(agent.createdBy ? { createdBy: agent.createdBy } : {}),
   };
 }
@@ -134,8 +135,15 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     attentionReason: snapshot.attentionReason ?? null,
     attentionTimestamp,
     archivedAt,
+    internal: snapshot.internal,
     createdBy: snapshot.createdBy,
     parentAgentId,
     labels: snapshot.labels,
   };
+}
+
+export function shouldStoreFetchedAgentInActiveDirectory(
+  agent: Pick<Agent, "internal" | "archivedAt" | "projectPlacement">,
+): boolean {
+  return !agent.internal && !agent.archivedAt && Boolean(agent.projectPlacement);
 }

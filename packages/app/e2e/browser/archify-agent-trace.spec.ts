@@ -5,6 +5,7 @@ import { ensureExplorerSidebar } from "../support/helpers/workspace-tabs";
 
 interface ArchifyTraceSeedClient extends SeedDaemonClient {
   openArchifyWorkspace(workspaceId: string): Promise<{ autoGenerate: boolean }>;
+  getArchifyGeneration(workspaceId: string): Promise<{ status: string } | null>;
 }
 
 test("opens an Archify generator in a normal agent tab", async ({
@@ -63,4 +64,12 @@ test("opens an Archify generator in a normal agent tab", async ({
       exact: false,
     }),
   ).toBeVisible({ timeout: 30_000 });
+
+  await expect
+    .poll(
+      async () => (await archifyClient.getArchifyGeneration(workspace.workspaceId))?.status ?? null,
+      { timeout: 60_000 },
+    )
+    .not.toBe("running");
+  await expect(agentTab).toBeVisible();
 });

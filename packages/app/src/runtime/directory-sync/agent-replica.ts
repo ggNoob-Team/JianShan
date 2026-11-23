@@ -86,6 +86,12 @@ export class AgentDirectoryReplica {
       ...timelineAgent,
       projectPlacement: timelineAgent.projectPlacement ?? existing?.projectPlacement,
     };
+    if (normalized.internal) {
+      this.members.delete(normalized.id);
+      this.storeProjection.storeDetail(normalized);
+      this.storeProjection.replacePendingPermissions(normalized);
+      return true;
+    }
     const accepted = this.storeProjection.accept(normalized);
     this.members.add(accepted.id);
     this.storeProjection.replacePendingPermissions(accepted);
