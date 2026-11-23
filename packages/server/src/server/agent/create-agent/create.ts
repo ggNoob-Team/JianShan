@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 
 import type { TerminalManager } from "../../../terminal/terminal-manager.js";
 import type { CreatePaseoWorktreeInput } from "../../paseo-worktree-service.js";
+import type { WorkspaceRegistry } from "../../workspace-registry.js";
 import { expandUserPath, resolvePathFromBase } from "../../path-utils.js";
 import { toWorktreeRequestError } from "../../worktree-errors.js";
 import type {
@@ -22,7 +23,10 @@ import { buildAgentPrompt } from "../prompt-attachments.js";
 import { normalizeClientMessageId, resolveClientMessageId } from "../../client-message-id.js";
 import { resolveRequiredProviderModel, type ResolvedProviderModel } from "../mcp-shared.js";
 import { resolveCreateAgentIntent } from "./intent.js";
-import { resolveWorkspaceCreationOwner } from "../../workspace-ownership.js";
+import {
+  resolveWorkspaceCreatedBy,
+  resolveWorkspaceCreationOwner,
+} from "../../workspace-ownership.js";
 
 export interface CreateAgentCommandDependencies {
   agentMessages?: AgentMessageDelivery;
@@ -34,6 +38,7 @@ export interface CreateAgentCommandDependencies {
   terminalManager?: TerminalManager | null;
   providerSnapshotManager: Pick<ProviderSnapshotManager, "resolveCreateConfig">;
   createPaseoWorktree?: CreatePaseoWorktreeWorkflowFn;
+  workspaceRegistry?: Pick<WorkspaceRegistry, "get">;
   // Mints a fresh directory workspace for a cwd and returns its id.
   ensureWorkspaceForCreate?: EnsureWorkspaceForCreate;
 }
@@ -245,6 +250,10 @@ async function resolveSessionCreateAgent(
         }
       : undefined;
   const workspaceId = input.workspaceId;
+  const workspaceOwner = await resolveExistingWorkspaceOwner(dependencies, workspaceId);
+  const createdBy = workspaceOwner
+    ? { ...workspaceOwner, ...(workspaceOwner.virtual === true ? { virtual: true } : {}) }
+    : input.actor;
 
   return {
     config: sessionConfig,
@@ -253,7 +262,7 @@ async function resolveSessionCreateAgent(
       initialPrompt: trimmedPrompt,
       env: input.env,
       initialTitle: input.provisionalTitle,
-      createdBy: input.actor,
+      createdBy,
       // Paseo never persists an internal agent, so nothing could resume its
       // provider session either. Same as the daemon's own ephemeral helpers.
       ...(sessionConfig.internal ? { persistSession: false } : {}),
@@ -279,7 +288,7 @@ async function resolveMcpCreateAgent(
   const parentAgent = input.callerAgentId
     ? requireParentAgent(dependencies.agentManager, input.callerAgentId)
     : null;
-  const createdBy = resolveMcpWorkspaceCreator(parentAgent, input);
+  const createdBy = await resolveMcpWorkspaceCreator(dependencies, parentAgent, input);
   const cwd = resolveMcpInitialCwd(input, parentAgent);
   const { resolvedCwd, createdWorkspaceId, createdWorktree } = await resolveMcpCwd({
     dependencies,
@@ -362,16 +371,40 @@ function resolveMcpCreatedBy(
   });
 }
 
-function resolveMcpWorkspaceCreator(
+async function resolveMcpWorkspaceCreator(
+  dependencies: CreateAgentCommandDependencies,
   parentAgent: ManagedAgent | null,
   input: CreateAgentFromMcpInput,
-): AgentActor | undefined {
+): Promise<AgentActor | undefined> {
+  const targetWorkspaceId = input.worktree
+    ? undefined
+    : (input.workspaceId ?? parentAgent?.workspaceId);
+  const workspaceOwner = await resolveExistingWorkspaceOwner(dependencies, targetWorkspaceId);
+  if (workspaceOwner) {
+    return {
+      ...workspaceOwner,
+      ...(workspaceOwner.virtual === true || parentAgent ? { virtual: true } : {}),
+    };
+  }
   const workspaceName =
     input.worktree?.branchName ??
     input.worktree?.refName ??
     input.worktree?.worktreeName ??
     input.title;
   return resolveMcpCreatedBy(parentAgent, workspaceName);
+}
+
+async function resolveExistingWorkspaceOwner(
+  dependencies: CreateAgentCommandDependencies,
+  workspaceId: string | undefined,
+): Promise<AgentActor | undefined> {
+  if (!workspaceId || !dependencies.workspaceRegistry) return undefined;
+  const workspace = await dependencies.workspaceRegistry.get(workspaceId);
+  if (!workspace) return undefined;
+  return resolveWorkspaceCreatedBy({
+    workspace,
+    agents: dependencies.agentManager.listAgents(),
+  });
 }
 
 function resolveMcpInitialCwd(

@@ -429,6 +429,52 @@ test("unnamed CLI clients cannot create a non-dream workspace", async () => {
   }
 }, 60000);
 
+test("unnamed CLI agents inherit ownership from an existing dream workspace", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "creation-dream-agent-"));
+  const daemon = await createCreationDaemon();
+  const peer = await connectCreationPeer(daemon.port, {
+    clientType: "cli",
+    clientName: null,
+  });
+  try {
+    const workspaceResponse = await peer.request({
+      type: "workspace.create.request",
+      requestId: "dream-workspace-for-agent",
+      idempotencyKey: "dream-workspace-for-agent",
+      source: { kind: "directory", path: directory },
+      title: "dream/20261123-task",
+    });
+    if (workspaceResponse.type !== "workspace.create.response") {
+      throw new Error("Expected workspace.create.response");
+    }
+    const workspaceId = workspaceResponse.payload.workspace?.id;
+    expect(workspaceId).toBeTypeOf("string");
+
+    const response = await peer.request({
+      type: "create_agent_request",
+      requestId: "dream-agent-in-existing-workspace",
+      workspaceId: workspaceId!,
+      config: { provider: "codex", cwd: directory },
+      initialPrompt: "Do dream work",
+    });
+
+    expect(response).toMatchObject({
+      type: "status",
+      payload: {
+        status: "agent_created",
+        agent: {
+          workspaceId,
+          createdBy: { clientName: "筑梦", virtual: true },
+        },
+      },
+    });
+  } finally {
+    peer.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+}, 60000);
+
 test("a named mobile client can still create an agent", async () => {
   const directory = await mkdtemp(join(tmpdir(), "creation-named-mobile-"));
   let sessions = 0;

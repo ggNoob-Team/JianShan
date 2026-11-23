@@ -2098,6 +2098,65 @@ describe("create_agent MCP tool", () => {
     );
   });
 
+  it("inherits the target workspace's virtual role when the caller has no role", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const parent = createManagedAgent({
+      id: "dream-parent",
+      cwd: "/tmp/dream-parent",
+      workspaceId: "wks_dream",
+      createdBy: { clientId: "cid-dream" },
+    });
+    spies.agentManager.getAgent.mockReturnValue(parent);
+    spies.agentManager.createAgent.mockResolvedValue(
+      createManagedAgent({
+        id: "dream-child",
+        cwd: "/tmp/dream-parent",
+        workspaceId: "wks_dream",
+        config: { title: "Dream child" },
+        createdBy: { clientId: "cid-dream", clientName: "筑梦", virtual: true },
+      }),
+    );
+    const dreamWorkspace = createPersistedWorkspaceRecord({
+      workspaceId: "wks_dream",
+      projectId: "project-1",
+      cwd: "/tmp/dream-parent",
+      kind: "worktree",
+      displayName: "dream/dream-task",
+      branch: "dream/dream-task",
+      createdBy: { clientId: "cid-dream", clientName: "筑梦", virtual: true },
+      createdAt: "2026-11-23T03:34:02.779Z",
+      updatedAt: "2026-11-23T03:34:02.779Z",
+    });
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: parent.id,
+      workspaceRegistry: {
+        get: vi.fn(async () => dreamWorkspace),
+        list: vi.fn(async () => [dreamWorkspace]),
+        upsert: vi.fn(async () => undefined),
+      },
+      logger,
+    });
+
+    await registeredTool(server, "create_agent").handler({
+      ...subagentCurrentWorkspace(),
+      title: "Dream child",
+      provider: "codex/gpt-5.4",
+      initialPrompt: "Do work",
+    });
+
+    expect(spies.agentManager.createAgent).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.objectContaining({
+        workspaceId: "wks_dream",
+        createdBy: { clientId: "cid-dream", clientName: "筑梦", virtual: true },
+      }),
+    );
+  });
+
   it("rejects agent-scoped creation when the caller has no assigned role", async () => {
     const { agentManager, agentStorage, spies } = createTestDeps();
     spies.agentManager.getAgent.mockReturnValue(

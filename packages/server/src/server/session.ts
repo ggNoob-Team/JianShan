@@ -4834,7 +4834,14 @@ export class Session {
         firstAgentContext,
         background: msg.background,
         callerWorkspaceId: this.getCallerWorkspaceId(msg.callerAgentId),
-        createdBy: this.workspaceCreationOwner(msg.callerAgentId, createAgentWorkspaceName(msg)),
+        ...(worktree
+          ? {
+              createdBy: this.workspaceCreationOwner(
+                msg.callerAgentId,
+                createAgentWorkspaceName(msg),
+              ),
+            }
+          : {}),
       });
       createdWorktreeForCleanup = createdWorktree;
       const resolvedIntent = await this.resolveSessionCreateAgentIntent({
@@ -4855,6 +4862,7 @@ export class Session {
           paseoHome: this.paseoHome,
           worktreesRoot: this.worktreesRoot,
           providerSnapshotManager: this.providerSnapshotManager,
+          workspaceRegistry: this.workspaceRegistry,
         },
         {
           kind: "session",

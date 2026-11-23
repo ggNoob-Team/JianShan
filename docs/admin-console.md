@@ -104,6 +104,9 @@ workspace named `dream/...`; the daemon otherwise returns
 `dream/` fallback attributes the workspace to the virtual role **筑梦**.
 Agent-created sessions and workspaces persist `createdBy.virtual = true`.
 Renaming a workspace does not change its stored owner.
+Creating an agent in an existing workspace inherits that workspace's stored
+owner, so an unnamed CLI/MCP caller can continue work in its virtual `筑梦`
+workspace without inventing a second role.
 
 Team statistics keep virtual activity in separate member views. A virtual
 workspace without a session still appears in title attribution. Virtual

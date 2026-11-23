@@ -1962,6 +1962,7 @@ function createToolCatalog(
           terminalManager,
           providerSnapshotManager,
           createPaseoWorktree: options.createPaseoWorktree,
+          ...(options.workspaceRegistry ? { workspaceRegistry: options.workspaceRegistry } : {}),
           ...(options.ensureWorkspaceForCreate
             ? { ensureWorkspaceForCreate: options.ensureWorkspaceForCreate }
             : {}),
@@ -2055,7 +2056,8 @@ function createToolCatalog(
       );
     }
     if (callerAgentId) {
-      const createdBy = resolveVirtualWorkspaceOwner(callerAgentId, resolveCallerAgent());
+      const resolveCreatedBy = () =>
+        resolveVirtualWorkspaceOwner(callerAgentId, resolveCallerAgent());
       if (hasLegacyCreateAgentPlacement(args)) {
         // COMPAT(nestedCreateAgentPlacement): accept the old relationship/workspace shape without
         // advertising it to models. Added in v0.2.0; remove after 2027-01-17.
@@ -2063,7 +2065,7 @@ function createToolCatalog(
         const { cwd, workspaceId } = await resolveCreateAgentWorkspace(
           parsed.workspace,
           { prompt: parsed.initialPrompt },
-          createdBy,
+          resolveCreatedBy,
         );
         return {
           kind: "agent-scoped",
@@ -2077,7 +2079,7 @@ function createToolCatalog(
       const { cwd, workspaceId } = await resolveCanonicalCreateAgentWorkspace(
         parsed.workspaceId,
         { prompt: parsed.initialPrompt },
-        createdBy,
+        resolveCreatedBy,
       );
       return {
         kind: "agent-scoped",
@@ -2145,7 +2147,7 @@ function createToolCatalog(
   async function resolveCanonicalCreateAgentWorkspace(
     workspaceId?: string,
     firstAgentContext?: FirstAgentContext,
-    createdBy?: AgentActor,
+    resolveCreatedBy?: () => AgentActor | undefined,
   ): Promise<{
     cwd: string | undefined;
     workspaceId: string;
@@ -2162,6 +2164,7 @@ function createToolCatalog(
         throw new Error("Workspace creation is not configured");
       }
       const cwd = process.cwd();
+      const createdBy = resolveCreatedBy?.();
       return {
         cwd,
         workspaceId: await options.ensureWorkspaceForCreate(cwd, firstAgentContext, {
@@ -2221,7 +2224,7 @@ function createToolCatalog(
       | LegacyAgentToAgentCreateAgentArgs["workspace"]
       | NonNullable<LegacyTopLevelCreateAgentArgs["workspace"]>,
     firstAgentContext: FirstAgentContext | undefined,
-    createdBy?: AgentActor,
+    resolveCreatedBy?: () => AgentActor | undefined,
   ): Promise<{
     cwd: string | undefined;
     workspaceId: string | undefined;
@@ -2270,6 +2273,7 @@ function createToolCatalog(
       if (!options.ensureWorkspaceForCreate) {
         throw new Error("Workspace creation is not configured");
       }
+      const createdBy = resolveCreatedBy?.();
       return {
         cwd,
         workspaceId: await options.ensureWorkspaceForCreate(cwd, firstAgentContext, {
