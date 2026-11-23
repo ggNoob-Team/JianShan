@@ -4734,6 +4734,10 @@ export const WorkspaceDescriptorPayloadSchema = z
     pinnedAt: z.string().nullable().optional(),
     // COMPAT(workspaceLabels): added in v0.5.0, remove optional after 2027-08-14.
     labels: z.array(z.string()).optional(),
+    // COMPAT(workspaceOwnership): added in v0.14.1, remove optional after 2027-11-23.
+    // Persisted creator identity for agent-created and programmatic workspaces.
+    // Human-created workspaces may omit it and continue to derive identity from agents.
+    createdBy: AgentActorSchema.optional(),
     // Retained for wire parsing of older daemon descriptors.
     internal: z.boolean().optional(),
     background: z.boolean().optional(),

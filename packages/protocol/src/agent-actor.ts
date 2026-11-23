@@ -2,6 +2,16 @@ import { z } from "zod";
 
 export const MAX_CLIENT_NAME_LENGTH = 120;
 
+/** Display role for work created programmatically by an agent rather than a person. */
+export const VIRTUAL_ACTOR_ROLE_NAME = "筑梦";
+
+/** Workspace branch/name prefix reserved for the virtual 筑梦 role. */
+export const DREAM_WORKSPACE_PREFIX = "dream/";
+
+export function isDreamWorkspaceName(value: string | null | undefined): boolean {
+  return value?.trim().startsWith(DREAM_WORKSPACE_PREFIX) === true;
+}
+
 export const ClientNameSchema = z.string().trim().min(1).max(MAX_CLIENT_NAME_LENGTH);
 
 /** UI role carried by a pairing link. It grants no daemon authority. */

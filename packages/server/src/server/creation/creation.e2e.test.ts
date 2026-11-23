@@ -367,6 +367,68 @@ test.each([
   },
 );
 
+test("unnamed CLI clients may create a dream-prefixed workspace as 筑梦", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "creation-dream-workspace-"));
+  const daemon = await createCreationDaemon();
+  const peer = await connectCreationPeer(daemon.port, {
+    clientType: "cli",
+    clientName: null,
+  });
+  try {
+    const response = await peer.request({
+      type: "workspace.create.request",
+      requestId: "unnamed-cli-dream-workspace",
+      idempotencyKey: "unnamed-cli-dream-workspace",
+      source: { kind: "directory", path: directory },
+      title: "dream/20261120-task",
+    });
+
+    expect(response).toMatchObject({
+      type: "workspace.create.response",
+      payload: {
+        error: null,
+        workspace: {
+          createdBy: {
+            clientName: "筑梦",
+            virtual: true,
+          },
+        },
+      },
+    });
+  } finally {
+    peer.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+}, 60000);
+
+test("unnamed CLI clients cannot create a non-dream workspace", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "creation-unnamed-cli-"));
+  const daemon = await createCreationDaemon();
+  const peer = await connectCreationPeer(daemon.port, {
+    clientType: "cli",
+    clientName: null,
+  });
+  try {
+    const response = await peer.request({
+      type: "workspace.create.request",
+      requestId: "unnamed-cli-workspace",
+      idempotencyKey: "unnamed-cli-workspace",
+      source: { kind: "directory", path: directory },
+      title: "feature/login",
+    });
+
+    expect(response).toMatchObject({
+      type: "workspace.create.response",
+      payload: { error: CLIENT_NAME_REQUIRED_MESSAGE },
+    });
+  } finally {
+    peer.close();
+    await daemon.close();
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+}, 60000);
+
 test("a named mobile client can still create an agent", async () => {
   const directory = await mkdtemp(join(tmpdir(), "creation-named-mobile-"));
   let sessions = 0;

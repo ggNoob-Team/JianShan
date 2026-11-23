@@ -239,6 +239,33 @@ describe("team screen model", () => {
     expect(merged?.members.map((entry) => entry.name)).toEqual(["书记", "村长"]);
   });
 
+  it("keeps virtual members separate while merging hosts", () => {
+    const virtualMember = {
+      ...member,
+      id: "virtual_dream",
+      name: "筑梦",
+      virtual: true,
+      seconds: 300,
+    };
+    const merged = mergeTeamInsightsForHosts([
+      {
+        serverId: "srv_a",
+        label: "办公室",
+        team: { ...team, members: [member, virtualMember] },
+      },
+      {
+        serverId: "srv_b",
+        label: "家里",
+        team: { ...team, members: [{ ...virtualMember, seconds: 180 }] },
+      },
+    ]);
+
+    expect(merged?.members).toEqual([
+      expect.objectContaining({ id: "role_admin", virtual: false }),
+      expect.objectContaining({ id: "virtual_dream", virtual: true, seconds: 480 }),
+    ]);
+  });
+
   it("formats the same values and heat levels as the admin page", () => {
     expect(formatTeamDuration(540)).toBe("9 分钟");
     expect(formatTeamDuration(5400)).toBe("1 小时 30 分钟");

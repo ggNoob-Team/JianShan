@@ -98,14 +98,16 @@ The role name is the `--name` value supplied to `paseo daemon pair`. The optiona
 `--role` is `admin` or `member` and defaults to `member`. The client embeds both
 values in the pairing offer and sends the name with every prompt. Team views
 group questions by that name and use `createdBy` for current session ownership.
-An unnamed mobile or browser client cannot create a workspace or agent; the
-daemon returns **请联系管理员分配角色**.
-User-created sessions keep that role directly. An agent-created session inherits
-its caller's role (`createdBy.virtual = true`) so the UI can distinguish virtual
-attribution from a user launch.
-Workspaces minted by an agent follow the same rule and persist the caller role
-with `virtual = true`. A virtual workspace without a session still appears in the
-title-attribution list; manually created workspaces keep their existing behavior.
+An unnamed client cannot create a workspace or agent unless it is a CLI/MCP
+workspace named `dream/...`; the daemon otherwise returns
+**请联系管理员分配角色**. A named caller keeps its role. With no role name, the
+`dream/` fallback attributes the workspace to the virtual role **筑梦**.
+Agent-created sessions and workspaces persist `createdBy.virtual = true`.
+Renaming a workspace does not change its stored owner.
+
+Team statistics keep virtual activity in separate member views. A virtual
+workspace without a session still appears in title attribution. Virtual
+attribution never changes the role name recorded on an existing workspace.
 
 Roles can be reordered from the admin console. The order is persisted in
 `$PASEO_HOME/admin/roles.json` and is reused by both the standalone admin team

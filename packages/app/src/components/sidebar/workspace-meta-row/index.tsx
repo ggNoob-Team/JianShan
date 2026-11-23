@@ -67,6 +67,7 @@ export function WorkspaceMetaRow({
   hostBadge,
   statusEnteredAt = null,
   createdByName = null,
+  createdByVirtual = false,
   prHint,
   serviceSummary,
   labels = EMPTY_LABELS,
@@ -77,6 +78,7 @@ export function WorkspaceMetaRow({
   hostBadge: HostBadgeModel | null;
   statusEnteredAt?: Date | null;
   createdByName?: string | null;
+  createdByVirtual?: boolean;
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
@@ -89,6 +91,7 @@ export function WorkspaceMetaRow({
     hasHostBadge: hostBadge !== null,
     statusEnteredAt,
     createdByName,
+    createdByVirtual,
     prHint,
     serviceSummary,
     labels,
@@ -133,7 +136,7 @@ function MetaItemNode({
     return <WorkspaceTimestamp enteredAt={item.enteredAt} />;
   }
   if (item.kind === "creator") {
-    return <WorkspaceCreator name={item.name} />;
+    return <WorkspaceCreator name={item.name} virtual={item.virtual} />;
   }
   if (item.kind === "changeRequest") {
     return <PullRequestItem hint={item.hint} />;
@@ -157,12 +160,19 @@ function WorkspaceTimestamp({ enteredAt }: { enteredAt: Date }) {
   );
 }
 
-function WorkspaceCreator({ name }: { name: string }) {
+function WorkspaceCreator({ name, virtual }: { name: string | null; virtual: boolean }) {
   return (
     <View style={styles.creatorItem} testID="sidebar-workspace-creator">
-      <Text style={styles.creatorText} numberOfLines={1}>
-        {name}
-      </Text>
+      {name ? (
+        <Text style={styles.creatorText} numberOfLines={1}>
+          {name}
+        </Text>
+      ) : null}
+      {virtual ? (
+        <Text style={styles.virtualBadge} numberOfLines={1}>
+          虚拟{name ? "" : " · 未分配角色"}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -385,6 +395,9 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
   },
   creatorItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     minWidth: 0,
     flexShrink: 1,
   },
@@ -393,6 +406,13 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.sm,
     lineHeight: 16,
     flexShrink: 1,
+  },
+  virtualBadge: {
+    color: theme.colors.accent,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    lineHeight: 16,
+    flexShrink: 0,
   },
   itemPressed: {
     opacity: 0.82,

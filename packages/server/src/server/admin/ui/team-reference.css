@@ -587,6 +587,19 @@
   white-space: nowrap;
 }
 
+.team-reference-page .team-member-tab .virtual-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #eef3ff;
+  color: var(--accent);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .team-reference-page .team-member-tab span {
   color: var(--muted);
   font-size: 9.5px;

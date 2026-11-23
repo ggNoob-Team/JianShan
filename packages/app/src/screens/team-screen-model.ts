@@ -159,6 +159,7 @@ export function formatTeamHostLoadFailure(
 interface MemberAccumulator {
   id: string;
   name: string;
+  virtual: boolean;
   seconds: number;
   sessions: number;
   timeComponents: Map<string, { label: string; seconds: number }>;
@@ -211,6 +212,7 @@ function accumulatorFor(
   const created: MemberAccumulator = {
     id: member.id,
     name: member.name,
+    virtual: member.virtual === true,
     seconds: 0,
     sessions: 0,
     timeComponents: new Map(),
@@ -280,6 +282,7 @@ function finishMember(accumulator: MemberAccumulator): TeamMemberInsights {
   return {
     id: accumulator.id,
     name: accumulator.name,
+    virtual: accumulator.virtual,
     seconds: accumulator.seconds,
     sessions: accumulator.sessions,
     projects: finishBuckets(accumulator.projects, accumulator.seconds),

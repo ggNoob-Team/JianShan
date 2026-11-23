@@ -149,6 +149,7 @@ describe("workspace agent activity index", () => {
             status: "needs_input",
             enteredAt: new Date("2026-06-01T10:01:00.000Z"),
             createdByName: "Harmony Emulator",
+            createdByVirtual: false,
           },
         ],
         [
@@ -158,6 +159,7 @@ describe("workspace agent activity index", () => {
             status: "attention",
             enteredAt: new Date("2026-06-01T10:02:00.000Z"),
             createdByName: null,
+            createdByVirtual: false,
           },
         ],
       ]),
@@ -193,6 +195,7 @@ describe("workspace agent activity index", () => {
     expect(index.get("workspace-a")).toMatchObject({
       agentId: "newer",
       createdByName: "少爷",
+      createdByVirtual: false,
     });
   });
 
@@ -237,6 +240,7 @@ describe("workspace agent activity index", () => {
       status: "running",
       enteredAt: new Date("2026-06-01T10:00:00.000Z"),
       createdByName: null,
+      createdByVirtual: false,
     });
   });
 
@@ -273,6 +277,7 @@ describe("workspace agent activity index", () => {
             status: "done",
             enteredAt: new Date("2026-06-01T10:00:00.000Z"),
             createdByName: null,
+            createdByVirtual: false,
           },
         ],
         [
@@ -282,6 +287,7 @@ describe("workspace agent activity index", () => {
             status: "running",
             enteredAt: new Date("2026-06-01T10:03:00.000Z"),
             createdByName: null,
+            createdByVirtual: false,
           },
         ],
       ]),
@@ -359,6 +365,28 @@ describe("workspace agent activity index", () => {
       status: "needs_input",
       enteredAt: new Date("2026-06-01T10:05:00.000Z"),
       createdByName: null,
+      createdByVirtual: false,
+    });
+  });
+
+  it("marks an unnamed root agent creator as virtual", () => {
+    const index = buildWorkspaceAgentActivityIndex(
+      new Map([
+        [
+          "legacy",
+          agent({
+            id: "legacy",
+            workspaceId: "workspace-a",
+            updatedAt: "2026-06-01T10:00:00.000Z",
+            createdBy: { clientId: "legacy-cli-client" },
+          }),
+        ],
+      ]),
+    );
+
+    expect(index.get("workspace-a")).toMatchObject({
+      createdByName: null,
+      createdByVirtual: true,
     });
   });
 });

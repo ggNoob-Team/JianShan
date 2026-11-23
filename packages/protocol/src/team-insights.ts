@@ -15,6 +15,8 @@ export const TeamHeatmapDaySchema = z.object({
 export const TeamMemberInsightsSchema = z.object({
   id: z.string(),
   name: z.string(),
+  // COMPAT(teamVirtualMembers): added in v0.14.1, remove optional after 2027-11-23.
+  virtual: z.boolean().optional(),
   seconds: z.number(),
   sessions: z.number(),
   projects: z.array(TeamMetricBucketSchema),

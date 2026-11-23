@@ -12,6 +12,7 @@ import { aggregateSidebarStateBuckets } from "@/utils/sidebar-agent-state";
 import { shortenPath } from "@/utils/shorten-path";
 import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import { VIRTUAL_ACTOR_ROLE_NAME, isDreamWorkspaceName } from "@getpaseo/protocol/agent-actor";
 
 const EMPTY_PROJECTS: SidebarProjectEntry[] = [];
 
@@ -56,6 +57,7 @@ export interface SidebarWorkspaceEntry extends SidebarStatusWorkspacePlacement {
   scripts: WorkspaceDescriptor["scripts"];
   hasRunningScripts: boolean;
   createdByName: string | null;
+  createdByVirtual: boolean;
 }
 
 export interface SidebarProjectEntry {
@@ -157,6 +159,7 @@ export function createSidebarWorkspaceEntry(input: {
   const projectViewKey = input.projectViewKey ?? input.workspace.projectId;
   const effectiveStatus = deriveEffectiveWorkspaceStatus(input);
   const rootAgentActivity = input.workspaceAgentActivity?.get(input.workspace.id);
+  const creator = resolveWorkspaceCreator(input.workspace, rootAgentActivity);
   return {
     workspaceKey: `${input.serverId}:${input.workspace.id}`,
     serverId: input.serverId,
@@ -188,8 +191,26 @@ export function createSidebarWorkspaceEntry(input: {
     archiveUnpushedCommitCount: input.workspace.gitRuntime?.aheadOfOrigin ?? null,
     scripts: input.workspace.scripts,
     hasRunningScripts: input.workspace.scripts.some((script) => script.lifecycle === "running"),
-    createdByName: rootAgentActivity?.createdByName ?? null,
+    createdByName: creator.name,
+    createdByVirtual: creator.virtual,
   };
+}
+
+function resolveWorkspaceCreator(
+  workspace: WorkspaceDescriptor,
+  rootAgentActivity: WorkspaceAgentActivity | undefined,
+): { name: string | null; virtual: boolean } {
+  const workspaceOwner = workspace.createdBy;
+  const virtual = workspaceOwner?.virtual === true || rootAgentActivity?.createdByVirtual === true;
+  const dreamWorkspace =
+    isDreamWorkspaceName(workspace.name) ||
+    isDreamWorkspaceName(workspace.gitRuntime?.currentBranch);
+  const name =
+    workspaceOwner?.clientName?.trim() ||
+    (virtual && dreamWorkspace ? VIRTUAL_ACTOR_ROLE_NAME : null) ||
+    rootAgentActivity?.createdByName ||
+    null;
+  return { name, virtual };
 }
 
 const EMPTY_WORKSPACE_LABELS: string[] = [];

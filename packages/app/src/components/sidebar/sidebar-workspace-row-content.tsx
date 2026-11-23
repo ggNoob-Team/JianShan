@@ -180,6 +180,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
             hostBadge={hostBadge ?? null}
             statusEnteredAt={statusEnteredAt}
             createdByName={workspace.createdByName}
+            createdByVirtual={workspace.createdByVirtual}
             prHint={workspace.prHint}
             serviceSummary={serviceSummary}
             labels={labels}

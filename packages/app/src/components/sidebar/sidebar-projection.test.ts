@@ -41,6 +41,7 @@ function makeWorkspace(
     scripts: [],
     hasRunningScripts: false,
     createdByName: null,
+    createdByVirtual: false,
     labels,
   };
   return { placement, entry };

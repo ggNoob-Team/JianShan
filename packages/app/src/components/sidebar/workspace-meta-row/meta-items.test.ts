@@ -26,6 +26,7 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
     hasHostBadge: true,
     statusEnteredAt: null,
     createdByName: null,
+    createdByVirtual: false,
     prHint: PR_HINT,
     serviceSummary: SERVICE,
     labels: LABELS,
@@ -75,12 +76,22 @@ describe("selectMetaRowItems", () => {
     });
 
     expect(kinds(items).slice(0, 4)).toEqual(["host", "timestamp", "creator", "changeRequest"]);
-    expect(items[2]).toEqual({ kind: "creator", name: "Harmony Emulator Final" });
+    expect(items[2]).toEqual({
+      kind: "creator",
+      name: "Harmony Emulator Final",
+      virtual: false,
+    });
   });
 
   it("shows a creator without a timestamp", () => {
     const items = select({ createdByName: "Harmony Emulator Final" });
     expect(kinds(items).slice(0, 2)).toEqual(["host", "creator"]);
+  });
+
+  it("shows a virtual marker even when the legacy creator has no role name", () => {
+    const items = select({ createdByName: null, createdByVirtual: true });
+
+    expect(items).toContainEqual({ kind: "creator", name: null, virtual: true });
   });
 
   it("uses the host position for the timestamp when the host is hidden", () => {

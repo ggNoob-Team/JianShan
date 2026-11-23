@@ -103,12 +103,14 @@ describe("createSidebarWorkspaceEntry creator name", () => {
             status: "done",
             enteredAt: null,
             createdByName: "Harmony Emulator Final",
+            createdByVirtual: false,
           },
         ],
       ]),
     });
 
     expect(entry.createdByName).toBe("Harmony Emulator Final");
+    expect(entry.createdByVirtual).toBe(false);
   });
 
   it("leaves the creator name empty when the workspace has no root activity", () => {
@@ -118,6 +120,69 @@ describe("createSidebarWorkspaceEntry creator name", () => {
     });
 
     expect(entry.createdByName).toBeNull();
+  });
+
+  it("prefers persisted workspace ownership and carries the virtual marker", () => {
+    const descriptor = workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42");
+    descriptor.createdBy = {
+      clientId: "client-role",
+      clientName: "书记",
+      virtual: true,
+    };
+
+    const entry = createSidebarWorkspaceEntry({ serverId: "srv", workspace: descriptor });
+
+    expect(entry.createdByName).toBe("书记");
+    expect(entry.createdByVirtual).toBe(true);
+  });
+
+  it("falls back to a legacy unnamed root agent as virtual", () => {
+    const descriptor = workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42");
+    const entry = createSidebarWorkspaceEntry({
+      serverId: "srv",
+      workspace: descriptor,
+      workspaceAgentActivity: new Map([
+        [
+          descriptor.id,
+          {
+            agentId: "agent-1",
+            status: "done",
+            enteredAt: null,
+            createdByName: null,
+            createdByVirtual: true,
+          },
+        ],
+      ]),
+    });
+
+    expect(entry.createdByName).toBeNull();
+    expect(entry.createdByVirtual).toBe(true);
+  });
+
+  it("names an unnamed dream-prefixed workspace as the virtual role", () => {
+    const descriptor = workspaceWithForge(undefined, "https://github.com/acme/repo/pull/42");
+    descriptor.name = "dream/dream-20261120093744-6fb64766";
+    descriptor.gitRuntime = { currentBranch: descriptor.name };
+
+    const entry = createSidebarWorkspaceEntry({
+      serverId: "srv",
+      workspace: descriptor,
+      workspaceAgentActivity: new Map([
+        [
+          descriptor.id,
+          {
+            agentId: "agent-1",
+            status: "done",
+            enteredAt: null,
+            createdByName: null,
+            createdByVirtual: true,
+          },
+        ],
+      ]),
+    });
+
+    expect(entry.createdByName).toBe("筑梦");
+    expect(entry.createdByVirtual).toBe(true);
   });
 });
 

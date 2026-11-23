@@ -321,7 +321,10 @@ function MemberTab({
       highlightStyle={styles.memberTabHighlight}
       testID={`team-member-${member.id}`}
     >
-      <Text style={[styles.memberName, active && styles.memberNameActive]}>{member.name}</Text>
+      <View style={styles.memberNameRow}>
+        <Text style={[styles.memberName, active && styles.memberNameActive]}>{member.name}</Text>
+        {member.virtual ? <Text style={styles.virtualBadge}>虚拟</Text> : null}
+      </View>
       <Text style={styles.memberMeta}>
         {formatTeamDuration(member.seconds)} · {member.sessions} 会话
       </Text>
@@ -688,6 +691,18 @@ const styles = StyleSheet.create((theme) => {
       fontSize: theme.fontSize.sm,
       fontWeight: theme.fontWeight.medium,
       minWidth: 0,
+      flexShrink: 1,
+    },
+    memberNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: theme.spacing[1],
+    },
+    virtualBadge: {
+      color: accent,
+      fontSize: theme.fontSize.sm,
+      fontWeight: theme.fontWeight.medium,
     },
     memberNameActive: {
       color: accent,

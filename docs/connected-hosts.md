@@ -106,9 +106,11 @@ subscription demand is rebuilt by its owning client on reconnect.
 
 `clientName` is display and audit metadata bound to the stable `clientId`; it is not an
 authorization credential. A resumed session keeps the name it already has when a hello omits
-`clientName`. An unnamed mobile or browser client cannot create a workspace or agent; pair it with a
-role name first. Host profiles created before `clientName` was stored backfill it from cached agent
-creator metadata; do not treat the fallback as a user-selected name.
+`clientName`. Workspace ownership is captured when the workspace is created; later renames do not
+change it. An unnamed client cannot create a workspace or agent, except that CLI/MCP may create a
+`dream/...` workspace, which is attributed to the virtual role **筑梦**. Every other unnamed create
+returns **请联系管理员分配角色**. Host profiles created before `clientName` was stored backfill it
+from cached agent creator metadata; do not treat the fallback as a user-selected name.
 
 See the [SDK reference](../public-docs/sdk/reference.md#clienthosts),
 [CLI reference](../public-docs/cli.md#connected-hosts), and

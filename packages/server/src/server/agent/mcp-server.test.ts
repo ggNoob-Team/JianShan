@@ -2054,7 +2054,7 @@ describe("create_agent MCP tool", () => {
     );
   });
 
-  it("marks agent-scoped creation as virtual and inherits the caller role", async () => {
+  it("marks agent-scoped creation as virtual with the caller role", async () => {
     const { agentManager, agentStorage, spies } = createTestDeps();
     const parent = createManagedAgent({
       id: "role-parent",
@@ -2130,7 +2130,7 @@ describe("create_agent MCP tool", () => {
     expect(spies.agentManager.createAgent).not.toHaveBeenCalled();
   });
 
-  it("passes the inherited virtual role when an agent mints a new workspace", async () => {
+  it("passes the caller's virtual role when an agent mints a new workspace", async () => {
     const { agentManager, agentStorage, spies } = createTestDeps();
     const parent = createManagedAgent({
       id: "workspace-owner-parent",

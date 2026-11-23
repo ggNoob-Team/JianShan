@@ -22,6 +22,7 @@ import { buildAgentPrompt } from "../prompt-attachments.js";
 import { normalizeClientMessageId, resolveClientMessageId } from "../../client-message-id.js";
 import { resolveRequiredProviderModel, type ResolvedProviderModel } from "../mcp-shared.js";
 import { resolveCreateAgentIntent } from "./intent.js";
+import { resolveWorkspaceCreationOwner } from "../../workspace-ownership.js";
 
 export interface CreateAgentCommandDependencies {
   agentMessages?: AgentMessageDelivery;
@@ -278,7 +279,7 @@ async function resolveMcpCreateAgent(
   const parentAgent = input.callerAgentId
     ? requireParentAgent(dependencies.agentManager, input.callerAgentId)
     : null;
-  const createdBy = resolveMcpCreatedBy(parentAgent);
+  const createdBy = resolveMcpWorkspaceCreator(parentAgent, input);
   const cwd = resolveMcpInitialCwd(input, parentAgent);
   const { resolvedCwd, createdWorkspaceId, createdWorktree } = await resolveMcpCwd({
     dependencies,
@@ -346,12 +347,31 @@ async function resolveMcpCreateAgent(
   };
 }
 
-function resolveMcpCreatedBy(parentAgent: ManagedAgent | null): AgentActor | undefined {
+function resolveMcpCreatedBy(
+  parentAgent: ManagedAgent | null,
+  workspaceName?: string | null,
+): AgentActor | undefined {
   if (!parentAgent) return undefined;
   const createdBy = parentAgent.createdBy;
-  const clientName = createdBy?.clientName?.trim();
-  if (!createdBy || !clientName) throw new Error("请联系管理员分配角色");
-  return { ...createdBy, clientName, virtual: true };
+  if (!createdBy) throw new Error("请联系管理员分配角色");
+  return resolveWorkspaceCreationOwner({
+    actor: createdBy,
+    clientType: "mcp",
+    callerAgent: parentAgent,
+    workspaceName,
+  });
+}
+
+function resolveMcpWorkspaceCreator(
+  parentAgent: ManagedAgent | null,
+  input: CreateAgentFromMcpInput,
+): AgentActor | undefined {
+  const workspaceName =
+    input.worktree?.branchName ??
+    input.worktree?.refName ??
+    input.worktree?.worktreeName ??
+    input.title;
+  return resolveMcpCreatedBy(parentAgent, workspaceName);
 }
 
 function resolveMcpInitialCwd(

@@ -45,6 +45,7 @@ function workspace(input: {
     scripts: [],
     hasRunningScripts: false,
     createdByName: null,
+    createdByVirtual: false,
   };
 }
 

@@ -263,6 +263,7 @@ import {
   type CreatePaseoWorktreeInput,
   type CreatePaseoWorktreeResult,
 } from "./paseo-worktree-service.js";
+import { resolveWorkspaceCreatedBy, resolveWorkspaceCreationOwner } from "./workspace-ownership.js";
 import { WorkspaceAutoName } from "./workspace-auto-name.js";
 import {
   createPaseoWorktreeWorkflow as createWorktreeWorkflow,
@@ -1353,6 +1354,22 @@ export class Session {
       clientId: this.clientId,
       ...(this.clientName ? { clientName: this.clientName } : {}),
     };
+  }
+
+  private workspaceCreationOwner(
+    callerAgentId?: string,
+    workspaceName?: string | null,
+  ): AgentActor {
+    const callerAgent = callerAgentId ? this.agentManager.getAgent(callerAgentId) : null;
+    if (callerAgentId && !callerAgent) {
+      throw new Error(`Caller agent ${callerAgentId} not found`);
+    }
+    return resolveWorkspaceCreationOwner({
+      actor: this.currentActor(),
+      clientType: this.clientType,
+      callerAgent,
+      workspaceName,
+    });
   }
 
   updateClientCapabilities(
@@ -4817,6 +4834,7 @@ export class Session {
         firstAgentContext,
         background: msg.background,
         callerWorkspaceId: this.getCallerWorkspaceId(msg.callerAgentId),
+        createdBy: this.workspaceCreationOwner(msg.callerAgentId, createAgentWorkspaceName(msg)),
       });
       createdWorktreeForCleanup = createdWorktree;
       const resolvedIntent = await this.resolveSessionCreateAgentIntent({
@@ -4931,6 +4949,10 @@ export class Session {
           initialTitle: input.workspacePromptTitle,
           background: request.background,
           callerWorkspaceId: callerAgent?.workspaceId,
+          createdBy: this.workspaceCreationOwner(
+            callerAgent?.id,
+            input.workspacePromptTitle ?? config.title,
+          ),
         }),
         cwd: config.cwd,
       }),
@@ -6054,6 +6076,10 @@ export class Session {
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
+      createdBy: resolveWorkspaceCreatedBy({
+        workspace,
+        agents: this.agentManager.listAgents(),
+      }),
       background: workspace.background,
       archivingAt: null,
       status: "done",
@@ -6151,6 +6177,10 @@ export class Session {
       ...(result.workspace.labels && result.workspace.labels.length > 0
         ? { labels: result.workspace.labels }
         : {}),
+      createdBy: resolveWorkspaceCreatedBy({
+        workspace: result.workspace,
+        agents: this.agentManager.listAgents(),
+      }),
       archivingAt: null,
       status: "done",
       statusEnteredAt: result.workspace.createdAt,
@@ -7387,6 +7417,7 @@ export class Session {
         workspaceId,
         background: request.background,
         callerWorkspaceId: this.getCallerWorkspaceId(request.callerAgentId),
+        createdBy: this.workspaceCreationOwner(request.callerAgentId, explicitTitle ?? promptTitle),
       },
     );
     await this.syncWorkspaceGitObserverForWorkspace(workspace);
@@ -7451,6 +7482,10 @@ export class Session {
         title: request.title,
         background: request.background,
         callerWorkspaceId: this.getCallerWorkspaceId(request.callerAgentId),
+        createdBy: this.workspaceCreationOwner(
+          request.callerAgentId,
+          source.branchName ?? source.refName ?? source.worktreeSlug ?? request.title,
+        ),
       },
       source.baseBranch
         ? { resolveDefaultBranch: async () => source.baseBranch as string }
@@ -7955,7 +7990,11 @@ export class Session {
         describeWorkspaceRecord: (result) => this.describeCreatedWorktreeWorkspace(result),
         emit: (message) => this.emit(message),
         sessionLogger: this.sessionLogger,
-        createPaseoWorktreeWorkflow: (input) => this.createPaseoWorktreeWorkflow(input),
+        createPaseoWorktreeWorkflow: (input) =>
+          this.createPaseoWorktreeWorkflow({
+            ...input,
+            createdBy: this.workspaceCreationOwner(undefined, input.refName ?? input.worktreeSlug),
+          }),
       },
       request,
     );
@@ -9605,6 +9644,12 @@ function hostSource(options: SessionOptions): string {
 
 function normalizeSessionClientName(clientName: string | undefined): string | null {
   return clientName ?? null;
+}
+
+function createAgentWorkspaceName(msg: CreateAgentRequestMessage): string | undefined {
+  if (msg.worktree?.mode === "branch-off") return msg.worktree.newBranch;
+  if (msg.worktree?.mode === "checkout-branch") return msg.worktree.branch;
+  return msg.worktreeName;
 }
 
 function normalizeSessionClientType(

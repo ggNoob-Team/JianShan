@@ -236,4 +236,96 @@ describe("admin data projection", () => {
       }),
     );
   });
+
+  test("reports normal and virtual member activity as separate members", async () => {
+    const home = await fixture();
+    await upsertRole(home, "书记");
+    await upsertRole(home, "村长");
+    const snapshot = await loadAdminSnapshot(home);
+    snapshot.agents[0]!.createdBy = {
+      clientId: "client-a",
+      clientName: "书记",
+      virtual: true,
+    };
+    snapshot.workspaces[0]!.createdBy = {
+      clientId: "client-a",
+      clientName: "书记",
+      virtual: true,
+    };
+    snapshot.actors[0]!.actor = {
+      clientId: "client-a",
+      clientName: "书记",
+      virtual: true,
+    };
+    snapshot.usages[0]!.actor = {
+      clientId: "client-a",
+      clientName: "书记",
+      virtual: true,
+    };
+    snapshot.workspaces.push({
+      workspaceId: "wks_virtual_owner_only",
+      projectId: "prj_1",
+      cwd: "/workspace/virtual-owner",
+      displayName: "virtual owner only",
+      createdBy: { clientId: "client-b", clientName: "村长", virtual: true },
+      updatedAt: "2026-11-02T00:03:00.000Z",
+    });
+
+    const team = buildTeamInsights({
+      snapshot,
+      start: "2026-11-02T00:00:00.000Z",
+      end: "2026-11-02T00:05:00.000Z",
+      timeZone: "Asia/Shanghai",
+    });
+
+    const normalSecretary = team.members.find(
+      (member) => member.name === "书记" && member.virtual !== true,
+    );
+    const virtualMember = team.members.find(
+      (member) => member.name === "书记" && member.virtual === true,
+    );
+    const virtualOwnerOnly = team.members.find(
+      (member) => member.name === "村长" && member.virtual === true,
+    );
+    expect(normalSecretary).toMatchObject({ sessions: 0, questionCount: 0, virtual: false });
+    expect(virtualMember).toMatchObject({
+      name: "书记",
+      sessions: 1,
+      questionCount: 2,
+      inputTokens: 100,
+      virtual: true,
+    });
+    expect(virtualOwnerOnly).toMatchObject({ sessions: 0, virtual: true });
+    expect(team.members.filter((member) => member.virtual === true)).toHaveLength(2);
+    expect(team.summary.sessions).toBe(1);
+  });
+
+  test("separates legacy unnamed virtual sessions from normal unassigned sessions", async () => {
+    const home = await fixture();
+    const snapshot = await loadAdminSnapshot(home);
+    snapshot.agents[0]!.createdBy = { clientId: "legacy-cli-client" };
+    snapshot.workspaces[0]!.displayName = "dream/dream-20261120093744-6fb64766";
+    snapshot.actors[0]!.actor = { clientId: "legacy-cli-client" };
+    snapshot.actors[1]!.actor = { clientId: "legacy-cli-client" };
+    snapshot.usages[0]!.actor = { clientId: "legacy-cli-client" };
+
+    const team = buildTeamInsights({
+      snapshot,
+      start: "2026-11-02T00:00:00.000Z",
+      end: "2026-11-02T00:05:00.000Z",
+      timeZone: "Asia/Shanghai",
+    });
+
+    expect(team.members).toContainEqual(
+      expect.objectContaining({
+        id: "virtual_dream",
+        name: "筑梦",
+        sessions: 1,
+        questionCount: 2,
+        virtual: true,
+      }),
+    );
+    expect(team.unassigned).toMatchObject({ sessions: 0, questionCount: 0, virtual: false });
+    expect(team.summary.sessions).toBe(1);
+  });
 });

@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   DEFAULT_PAIRING_ROLE,
   resolvePairingRole,
+  VIRTUAL_ACTOR_ROLE_NAME,
   type AgentActor,
   type PairingRole,
 } from "@getpaseo/protocol/agent-actor";
@@ -14,6 +15,7 @@ import type {
   TeamMemberInsights as MemberInsights,
   TeamInsights,
 } from "@getpaseo/protocol/team-insights";
+import { isDreamWorkspaceRecord, resolveWorkspaceCreatedBy } from "../workspace-ownership.js";
 export type {
   TeamHeatmapDay as HeatmapDay,
   TeamMemberInsights as MemberInsights,
@@ -138,6 +140,11 @@ interface Allocation {
   sessionSeconds: Record<string, number>;
   projectSeconds: Record<string, number>;
   slices: Array<{ start: number; end: number; sessionIds: string[] }>;
+}
+
+interface AgentAttribution {
+  name: string | null;
+  virtual: boolean;
 }
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -287,7 +294,9 @@ export function discoverRoles(snapshot: AdminSnapshot): AdminRoleRecord[] {
   };
   for (const agent of snapshot.agents) add(agent.createdBy);
   for (const actor of snapshot.actors) add(actor.actor);
-  for (const workspace of snapshot.workspaces) add(workspace.createdBy);
+  for (const workspace of snapshot.workspaces) {
+    add(resolveWorkspaceCreatedBy({ workspace, agents: snapshot.agents }));
+  }
   return [...values.values()].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
 }
 
@@ -335,6 +344,17 @@ export function buildTeamInsights(input: {
   const workspaceById = new Map(
     input.snapshot.workspaces.map((workspace) => [workspace.workspaceId, workspace]),
   );
+  const workspaceOwnerById = new Map(
+    input.snapshot.workspaces.map((workspace) => [
+      workspace.workspaceId,
+      resolveWorkspaceCreatedBy({ workspace, agents: input.snapshot.agents }),
+    ]),
+  );
+  const attributionByAgentId = buildAgentAttributions(
+    input.snapshot,
+    workspaceById,
+    workspaceOwnerById,
+  );
   const projectById = new Map(
     input.snapshot.projects.map((project) => [project.projectId, project]),
   );
@@ -353,24 +373,123 @@ export function buildTeamInsights(input: {
     const at = Date.parse(entry.completedAt);
     return Number.isFinite(at) && at >= startMs && at <= endMs;
   });
-  const members = roles.map((role) =>
-    buildMember({
-      id: role.id,
-      name: role.name,
+  const normalMembers = roles
+    .filter((role) => role.name !== VIRTUAL_ACTOR_ROLE_NAME)
+    .map((role) =>
+      buildMember({
+        id: role.id,
+        name: role.name,
+        virtual: false,
+        snapshot: input.snapshot,
+        attributionByAgentId,
+        actors: actorsInRange.filter((entry) =>
+          matchesActorAttribution(entry, attributionByAgentId, {
+            name: role.name,
+            virtual: false,
+          }),
+        ),
+        usages: usageInRange.filter((entry) =>
+          matchesActorAttribution(entry, attributionByAgentId, {
+            name: role.name,
+            virtual: false,
+          }),
+        ),
+        startMs,
+        endMs,
+        timeZone,
+        projectLabel,
+        accountName: input.accountName?.trim() || "本机",
+      }),
+    );
+
+  const hasVirtual =
+    [...attributionByAgentId.values()].some((attribution) => attribution.virtual) ||
+    [...workspaceOwnerById.values()].some((owner) => owner?.virtual === true) ||
+    [...actorsInRange, ...usageInRange].some((entry) =>
+      isVirtualActor(entry, attributionByAgentId),
+    );
+  const virtualNames = new Set<string>();
+  let hasVirtualUnnamed = false;
+  const addVirtualName = (name: string | null | undefined) => {
+    if (name) virtualNames.add(name);
+    else if (hasVirtual) hasVirtualUnnamed = true;
+  };
+  for (const attribution of attributionByAgentId.values()) {
+    if (attribution.virtual) addVirtualName(attribution.name);
+  }
+  for (const owner of workspaceOwnerById.values()) {
+    if (owner?.virtual) addVirtualName(owner.clientName);
+  }
+  for (const entry of [...actorsInRange, ...usageInRange]) {
+    if (isVirtualActor(entry, attributionByAgentId)) {
+      addVirtualName(attributionByAgentId.get(entry.agentId)?.name);
+    }
+  }
+  const virtualRolesByName = new Map(roles.map((role) => [role.name, role]));
+  const virtualMembers = [...virtualNames].map((name) => {
+    const role = virtualRolesByName.get(name);
+    return buildMember({
+      id:
+        name === VIRTUAL_ACTOR_ROLE_NAME ? "virtual_dream" : `${role?.id ?? roleId(name)}:virtual`,
+      name,
+      virtual: true,
       snapshot: input.snapshot,
-      actors: actorsInRange.filter((entry) => entry.actor.clientName === role.name),
-      usages: usageInRange.filter((entry) => entry.actor.clientName === role.name),
+      attributionByAgentId,
+      actors: actorsInRange.filter((entry) =>
+        matchesActorAttribution(entry, attributionByAgentId, {
+          name,
+          virtual: true,
+        }),
+      ),
+      usages: usageInRange.filter((entry) =>
+        matchesActorAttribution(entry, attributionByAgentId, {
+          name,
+          virtual: true,
+        }),
+      ),
       startMs,
       endMs,
       timeZone,
       projectLabel,
       accountName: input.accountName?.trim() || "本机",
-    }),
-  );
+    });
+  });
+  const virtualUnassigned = hasVirtualUnnamed
+    ? [
+        buildMember({
+          id: "virtual_unassigned",
+          name: "未分配（虚拟）",
+          virtual: true,
+          snapshot: input.snapshot,
+          attributionByAgentId,
+          actors: actorsInRange.filter((entry) =>
+            matchesActorAttribution(entry, attributionByAgentId, {
+              name: null,
+              virtual: true,
+            }),
+          ),
+          usages: usageInRange.filter((entry) =>
+            matchesActorAttribution(entry, attributionByAgentId, {
+              name: null,
+              virtual: true,
+            }),
+          ),
+          startMs,
+          endMs,
+          timeZone,
+          projectLabel,
+          accountName: input.accountName?.trim() || "本机",
+          virtualUnassigned: true,
+        }),
+      ]
+    : [];
+  const members = [...normalMembers, ...virtualMembers, ...virtualUnassigned];
   const unassigned = buildMember({
     id: "unassigned",
     name: "未分配",
+    virtual: false,
     snapshot: input.snapshot,
+    attributionByAgentId,
     actors: [],
     usages: [],
     startMs,
@@ -421,7 +540,7 @@ export function buildTitleMap(snapshot: AdminSnapshot): TitleMapItem[] {
     .filter((agent) => !agent.internal)
     .map((agent) => {
       const workspace = agent.workspaceId ? workspaces.get(agent.workspaceId) : undefined;
-      const owner = resolveTitleOwner(agent, manualAgentIds);
+      const owner = resolveTitleOwner(agent, manualAgentIds, workspace, snapshot.agents);
       return {
         agentId: agent.id,
         workspaceId: agent.workspaceId ?? "",
@@ -438,7 +557,8 @@ export function buildTitleMap(snapshot: AdminSnapshot): TitleMapItem[] {
     agentRows.map((item) => item.workspaceId).filter((workspaceId) => workspaceId.length > 0),
   );
   const workspaceRows = snapshot.workspaces.flatMap((workspace) => {
-    const ownerName = workspace.createdBy?.clientName?.trim();
+    const owner = resolveWorkspaceCreatedBy({ workspace, agents: snapshot.agents });
+    const ownerName = owner?.clientName?.trim();
     if (!ownerName || representedWorkspaceIds.has(workspace.workspaceId)) return [];
     return [
       {
@@ -449,7 +569,7 @@ export function buildTitleMap(snapshot: AdminSnapshot): TitleMapItem[] {
         providerTitle: "",
         ownerName,
         ownerSource: "role" as const,
-        ownerVirtual: workspace.createdBy?.virtual === true,
+        ownerVirtual: owner?.virtual === true,
         updatedAt: workspace.updatedAt ?? workspace.createdAt ?? "",
       } satisfies TitleMapItem,
     ];
@@ -459,21 +579,77 @@ export function buildTitleMap(snapshot: AdminSnapshot): TitleMapItem[] {
   );
 }
 
-function resolveTitleOwner(agent: AdminAgentRecord, manualAgentIds: ReadonlySet<string>) {
-  const ownerName = agent.createdBy?.clientName?.trim();
+function resolveTitleOwner(
+  agent: AdminAgentRecord,
+  manualAgentIds: ReadonlySet<string>,
+  workspace: AdminWorkspaceRecord | undefined,
+  agents: readonly AdminAgentRecord[],
+) {
+  const workspaceOwner = workspace ? resolveWorkspaceCreatedBy({ workspace, agents }) : undefined;
+  const virtual = agent.createdBy?.virtual === true || workspaceOwner?.virtual === true;
+  const ownerName =
+    workspaceOwner?.clientName?.trim() ||
+    agent.createdBy?.clientName?.trim() ||
+    (virtual && workspace && isDreamWorkspaceRecord(workspace)
+      ? VIRTUAL_ACTOR_ROLE_NAME
+      : undefined);
   let ownerSource: TitleMapItem["ownerSource"] = "unassigned";
   if (ownerName) ownerSource = manualAgentIds.has(agent.id) ? "manual" : "role";
   return {
     ownerName: ownerName || "未分配",
     ownerSource,
-    ownerVirtual: agent.createdBy?.virtual === true,
+    ownerVirtual: virtual,
   };
+}
+
+function buildAgentAttributions(
+  snapshot: AdminSnapshot,
+  workspaceById: ReadonlyMap<string, AdminWorkspaceRecord>,
+  workspaceOwnerById: ReadonlyMap<string, AgentActor | undefined>,
+): Map<string, AgentAttribution> {
+  const attributions = new Map<string, AgentAttribution>();
+  for (const agent of snapshot.agents) {
+    const workspaceOwner = agent.workspaceId
+      ? workspaceOwnerById.get(agent.workspaceId)
+      : undefined;
+    const workspace = agent.workspaceId ? workspaceById.get(agent.workspaceId) : undefined;
+    const dream = workspace ? isDreamWorkspaceRecord(workspace) : false;
+    const sourceName =
+      agent.createdBy?.clientName?.trim() || workspaceOwner?.clientName?.trim() || null;
+    const virtual = agent.createdBy?.virtual === true || workspaceOwner?.virtual === true;
+    attributions.set(agent.id, {
+      name: sourceName || (virtual && dream ? VIRTUAL_ACTOR_ROLE_NAME : null),
+      virtual,
+    });
+  }
+  return attributions;
+}
+
+function matchesActorAttribution(
+  entry: { actor: AgentActor; agentId: string },
+  attributionByAgentId: ReadonlyMap<string, AgentAttribution>,
+  expected: AgentAttribution,
+): boolean {
+  const attribution = attributionByAgentId.get(entry.agentId);
+  const name = attribution?.virtual
+    ? attribution.name || entry.actor.clientName?.trim() || null
+    : entry.actor.clientName?.trim() || attribution?.name || null;
+  return name === expected.name && isVirtualActor(entry, attributionByAgentId) === expected.virtual;
+}
+
+function isVirtualActor(
+  entry: { actor: AgentActor; agentId: string },
+  attributionByAgentId: ReadonlyMap<string, AgentAttribution>,
+): boolean {
+  return entry.actor.virtual === true || attributionByAgentId.get(entry.agentId)?.virtual === true;
 }
 
 function buildMember(input: {
   id: string;
   name: string;
+  virtual: boolean;
   snapshot: AdminSnapshot;
+  attributionByAgentId: ReadonlyMap<string, AgentAttribution>;
   actors: Array<AdminActorEntry & { agentId: string }>;
   usages: AdminUsageEntry[];
   startMs: number;
@@ -482,6 +658,7 @@ function buildMember(input: {
   projectLabel: (agentId: string) => string;
   accountName: string;
   unassignedOnly?: boolean;
+  virtualUnassigned?: boolean;
 }): MemberInsights {
   const agentById = new Map(input.snapshot.agents.map((agent) => [agent.id, agent]));
   const ownedSessions = input.snapshot.agents.filter((agent) => {
@@ -489,8 +666,13 @@ function buildMember(input: {
     const updated = Date.parse(agent.lastActivityAt ?? agent.updatedAt);
     const created = Date.parse(agent.createdAt);
     if (updated < input.startMs || created > input.endMs) return false;
-    if (input.unassignedOnly) return !agent.createdBy?.clientName;
-    return agent.createdBy?.clientName === input.name;
+    const attribution = input.attributionByAgentId.get(agent.id) ?? {
+      name: null,
+      virtual: false,
+    };
+    if (input.virtualUnassigned) return attribution.virtual && !attribution.name;
+    if (input.unassignedOnly) return !attribution.virtual && !attribution.name;
+    return attribution.virtual === input.virtual && attribution.name === input.name;
   });
   const intervals = buildIntervals(
     input.actors,
@@ -522,6 +704,7 @@ function buildMember(input: {
   return {
     id: input.id,
     name: input.name,
+    virtual: input.virtual,
     seconds: allocation.totalSeconds,
     sessions: ownedSessions.length,
     projects: bucketEntries(Object.fromEntries(projects), allocation.totalSeconds),

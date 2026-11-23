@@ -93,6 +93,12 @@ describe("admin server", () => {
     expect(teamCssText).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(teamCssText).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
 
+    const teamScript = await fetch(new URL("/team-reference.js", handle.url));
+    expect(teamScript.status).toBe(200);
+    const teamScriptText = await teamScript.text();
+    expect(teamScriptText).toContain("virtual-badge");
+    expect(teamScriptText).toContain("项虚拟统计");
+
     const adminCss = await fetch(new URL("/style.css", handle.url));
     expect(adminCss.status).toBe(200);
     const adminCssText = await adminCss.text();

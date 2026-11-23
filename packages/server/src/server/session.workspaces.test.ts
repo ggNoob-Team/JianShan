@@ -8186,6 +8186,7 @@ test("workspace.title.set.request stores the title and emits an updated descript
     cwd: REPO_CWD,
     kind: "local_checkout",
     displayName: "main",
+    createdBy: { clientId: "client-role", clientName: "书记" },
     createdAt: "2026-03-01T12:00:00.000Z",
     updatedAt: "2026-03-01T12:00:00.000Z",
   });
@@ -8227,6 +8228,10 @@ test("workspace.title.set.request stores the title and emits an updated descript
   });
 
   expect(workspaces.get(workspace.workspaceId)?.title).toBe("Payments work");
+  expect(workspaces.get(workspace.workspaceId)?.createdBy).toEqual({
+    clientId: "client-role",
+    clientName: "书记",
+  });
 
   const update = findByType(emitted, "workspace_update");
   expect(update?.payload).toMatchObject({

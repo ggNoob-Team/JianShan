@@ -619,7 +619,8 @@
           member.id === "unassigned"
             ? `${member.sessions} 个会话`
             : `${formatDuration(member.seconds)} · ${member.sessions} 会话`;
-        return `<button type="button" class="team-member-tab${active}" role="tab" aria-selected="${Boolean(active)}" data-team-member="${escapeHtml(member.id)}"><strong>${escapeHtml(member.name)}</strong><span>${escapeHtml(subtitle)}</span></button>`;
+        const virtual = member.virtual ? ' <em class="virtual-badge">虚拟</em>' : "";
+        return `<button type="button" class="team-member-tab${active}" role="tab" aria-selected="${Boolean(active)}" data-team-member="${escapeHtml(member.id)}"><strong>${escapeHtml(member.name)}${virtual}</strong><span>${escapeHtml(subtitle)}</span></button>`;
       })
       .join("");
   }
@@ -663,8 +664,13 @@
     }
     $("#team-cache-status", root).textContent =
       `已重新计算 · ${formatCompactDate(data.generatedAt)}`;
-    $("#team-member-count", root).textContent =
-      `${values.filter((member) => member.id !== "unassigned").length} 人团队`;
+    const humanCount = values.filter(
+      (member) => member.id !== "unassigned" && member.virtual !== true,
+    ).length;
+    const virtualCount = values.filter((member) => member.virtual === true).length;
+    $("#team-member-count", root).textContent = `${humanCount} 人团队${
+      virtualCount > 0 ? ` · ${virtualCount} 项虚拟统计` : ""
+    }`;
     renderTabs();
     renderMember();
     $("#team-gate", root).hidden = true;

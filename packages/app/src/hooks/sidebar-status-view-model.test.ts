@@ -35,6 +35,7 @@ function ws(
     scripts: [],
     hasRunningScripts: false,
     createdByName: input.createdByName ?? null,
+    createdByVirtual: input.createdByVirtual ?? false,
     workspaceKey: input.workspaceKey,
   };
 }

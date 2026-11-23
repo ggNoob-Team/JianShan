@@ -121,6 +121,7 @@ export interface WorkspaceDescriptor {
   title?: string | null;
   pinnedAt?: string | null;
   labels?: string[];
+  createdBy?: AgentActor;
   status: WorkspaceDescriptorPayload["status"];
   statusEnteredAt: Date | null;
   /**
@@ -179,6 +180,8 @@ export function normalizeWorkspaceDescriptor(
     pinnedAt: payload.pinnedAt ?? null,
     // COMPAT(workspaceLabels): old daemons omit assignments.
     labels: payload.labels ?? [],
+    // COMPAT(workspaceOwnership): old daemons omit it; sidebar falls back to agent metadata.
+    createdBy: payload.createdBy,
     status: payload.status,
     statusEnteredAt,
     activityAt,

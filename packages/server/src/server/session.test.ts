@@ -4249,6 +4249,76 @@ describe("session workspace descriptors", () => {
     expect(descriptor.diffStat).toEqual({ additions: 7, deletions: 2 });
   });
 
+  test("carries persisted workspace ownership into the descriptor", async () => {
+    const session = createSessionForTest();
+    const createdBy = {
+      clientId: "client-role",
+      clientName: "书记",
+      virtual: true,
+    };
+
+    const descriptor = await asSessionInternals(session).describeWorkspaceRecord(
+      {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        cwd: "/tmp/workspace",
+        kind: "checkout",
+        displayName: "dream/original-name",
+        title: "renamed later",
+        createdBy,
+      },
+      {
+        projectId: "project-1",
+        rootPath: "/tmp/workspace",
+        displayName: "Project",
+        kind: "git",
+      },
+    );
+
+    expect(descriptor.createdBy).toEqual({
+      clientId: "client-role",
+      clientName: "书记",
+      virtual: true,
+    });
+  });
+
+  test("derives a virtual owner for a legacy workspace created by an unnamed agent", async () => {
+    const session = createSessionForTest({
+      agentManager: {
+        listAgents: vi.fn(() => [
+          {
+            id: "agent-1",
+            workspaceId: "workspace-1",
+            createdAt: new Date("2026-11-20T09:38:02.264Z"),
+            createdBy: { clientId: "legacy-cli-client" },
+          },
+        ]),
+      },
+    });
+
+    const descriptor = await asSessionInternals(session).describeWorkspaceRecord(
+      {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        cwd: "/tmp/workspace",
+        kind: "worktree",
+        displayName: "dream/dream-20261120093744-6fb64766",
+      },
+      {
+        projectId: "project-1",
+        rootPath: "/tmp/workspace",
+        displayName: "Project",
+        kind: "git",
+      },
+    );
+
+    expect(descriptor.createdBy).toEqual({
+      clientId: "legacy-cli-client",
+      clientName: "筑梦",
+      virtual: true,
+    });
+  });
+
   test("does not cold-load git data while describing a workspace", async () => {
     const workspaceGitService = {
       getSnapshot: vi.fn().mockResolvedValue(createWorkspaceGitSnapshot("/tmp/workspace")),

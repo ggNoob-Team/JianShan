@@ -51,6 +51,7 @@ import type { VoiceCallerContext, VoiceSpeakHandler } from "../../voice-types.js
 import type { FirstAgentContext } from "../../messages.js";
 import { everyMsToFiveFieldCron } from "@getpaseo/protocol/schedule/cadence";
 import { expandUserPath, isSameOrDescendantPath, resolvePathFromBase } from "../../path-utils.js";
+import { resolveWorkspaceCreationOwner } from "../../workspace-ownership.js";
 import type { TerminalManager } from "../../../terminal/terminal-manager.js";
 import type { LocalJobService } from "../../local-jobs/local-job-service.js";
 import { encodeTerminalKeyInput } from "@getpaseo/protocol/terminal-key-input";
@@ -223,12 +224,21 @@ const WorkspaceAutomationSummarySchema = z.object({
 function resolveVirtualWorkspaceOwner(
   callerAgentId: string | undefined,
   caller: ManagedAgent | null,
+  workspaceName?: string | null,
 ): AgentActor | undefined {
   if (!callerAgentId) return undefined;
   const createdBy = caller?.createdBy;
-  const clientName = createdBy?.clientName?.trim();
-  if (!createdBy || !clientName) throw new PaseoToolInputError("请联系管理员分配角色");
-  return { ...createdBy, clientName, virtual: true };
+  if (!createdBy) throw new PaseoToolInputError("请联系管理员分配角色");
+  try {
+    return resolveWorkspaceCreationOwner({
+      actor: createdBy,
+      clientType: "mcp",
+      callerAgent: caller,
+      workspaceName,
+    });
+  } catch (error) {
+    throw new PaseoToolInputError(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function persistWorkspaceOwner(
@@ -1765,7 +1775,11 @@ function createToolCatalog(
       prNumber,
       forge,
     }) => {
-      const createdBy = resolveVirtualWorkspaceOwner(callerAgentId, resolveCallerAgent());
+      const createdBy = resolveVirtualWorkspaceOwner(
+        callerAgentId,
+        resolveCallerAgent(),
+        branchName ?? branch ?? worktreeSlug ?? title,
+      );
       let workspace: PersistedWorkspaceRecord;
       if (isolation === "local") {
         const cwd = resolveScopedCwd(path, { required: true });

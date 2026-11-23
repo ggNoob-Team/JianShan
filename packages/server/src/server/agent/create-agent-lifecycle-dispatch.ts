@@ -1,4 +1,5 @@
 import type { CreatePaseoWorktreeInput } from "../paseo-worktree-service.js";
+import type { AgentActor } from "@getpaseo/protocol/agent-actor";
 import { randomUUID } from "node:crypto";
 import type pino from "pino";
 
@@ -64,6 +65,7 @@ export class CreateAgentLifecycleDispatch {
     firstAgentContext: FirstAgentContext;
     background?: boolean;
     callerWorkspaceId?: string;
+    createdBy?: AgentActor;
   }): Promise<CreatePaseoWorktreeWorkflowResult | null> {
     const target = input.target;
     if (!target) return null;
@@ -88,6 +90,7 @@ export class CreateAgentLifecycleDispatch {
         ...placement,
         background: input.background,
         callerWorkspaceId: input.callerWorkspaceId,
+        ...(input.createdBy ? { createdBy: input.createdBy } : {}),
         firstAgentContext: input.firstAgentContext,
         paseoHome: this.dependencies.paseoHome,
         worktreesRoot: this.dependencies.worktreesRoot,
