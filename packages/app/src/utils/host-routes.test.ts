@@ -17,6 +17,7 @@ import {
   encodeFilePathForPathSegment,
   encodeWorkspaceIdForPathSegment,
   isSettingsSectionSlug,
+  SETTINGS_SECTION_SLUGS,
   normalizeHostSectionSlug,
   normalizeProjectSettingsRouteId,
   parseHostAgentRouteFromPathname,
@@ -265,6 +266,16 @@ describe("host settings section slugs", () => {
 });
 
 describe("settings section slugs", () => {
+  it("places the local admin console between diagnostics and about", () => {
+    expect(SETTINGS_SECTION_SLUGS.indexOf("admin")).toBeGreaterThan(
+      SETTINGS_SECTION_SLUGS.indexOf("diagnostics"),
+    );
+    expect(SETTINGS_SECTION_SLUGS.indexOf("admin")).toBeLessThan(
+      SETTINGS_SECTION_SLUGS.indexOf("about"),
+    );
+    expect(isSettingsSectionSlug("admin")).toBe(true);
+  });
+
   it("includes desktop notification settings", () => {
     expect(isSettingsSectionSlug("notifications")).toBe(true);
   });

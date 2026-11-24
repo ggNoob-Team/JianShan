@@ -17,7 +17,6 @@ import {
   getCliDaemonStatus,
   shouldUseDesktopDaemon,
   confirmAndStopDesktopDaemon,
-  type DesktopDaemonStatus,
 } from "@/desktop/daemon/desktop-daemon";
 import { useBuiltInDaemonManagement } from "@/desktop/hooks/use-built-in-daemon-management";
 import { useDaemonStatus } from "@/desktop/hooks/use-daemon-status";
@@ -264,43 +263,6 @@ function StartAtLoginRow(props: {
         disabled={props.isUpdatingStartAtLogin}
         accessibilityLabel={t("desktop.daemon.startAtLogin.title")}
       />
-    </View>
-  );
-}
-
-function AdminConsoleCard({ daemonStatus }: { daemonStatus: DesktopDaemonStatus | null }) {
-  const { t } = useTranslation();
-  const { theme } = useUnistyles();
-  const adminUrl = daemonStatus?.adminUrl ?? null;
-  const handleOpen = useCallback(() => {
-    if (adminUrl) void openExternalUrl(adminUrl);
-  }, [adminUrl]);
-  const icon = useMemo(
-    () => <ArrowUpRight size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
-    [theme.iconSize.sm, theme.colors.foregroundMuted],
-  );
-  if (!adminUrl) return null;
-
-  return (
-    <View style={settingsStyles.card}>
-      <View style={settingsStyles.row}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("desktop.daemon.admin.title")}</Text>
-          <Text style={settingsStyles.rowHint} selectable>
-            {adminUrl}
-          </Text>
-          <Text style={settingsStyles.rowHint}>{t("desktop.daemon.admin.hint")}</Text>
-        </View>
-        <Button
-          variant="outline"
-          size="sm"
-          leftIcon={icon}
-          onPress={handleOpen}
-          testID="open-admin-console-button"
-        >
-          {t("desktop.daemon.admin.open")}
-        </Button>
-      </View>
     </View>
   );
 }
@@ -580,8 +542,6 @@ export function LocalDaemonSection() {
               </View>
             </View>
           ) : null}
-
-          <AdminConsoleCard daemonStatus={daemonStatus} />
 
           {daemonVersionMismatch ? (
             <View style={styles.warningCard}>

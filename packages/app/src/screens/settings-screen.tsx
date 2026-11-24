@@ -42,6 +42,7 @@ import {
   PanelLeft,
   MessageSquare,
   ChevronRight,
+  LayoutDashboard,
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
@@ -90,6 +91,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/component
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
 import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-section";
+import { LocalAdminConsoleSection } from "@/desktop/components/local-admin-console-section";
 import { IntegrationsSection } from "@/desktop/components/integrations-section";
 import { isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
@@ -221,6 +223,13 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     Content: DesktopPermissionsSection,
   },
   { id: "diagnostics", labelKey: "settings.sections.diagnostics", icon: Stethoscope },
+  {
+    id: "admin",
+    labelKey: "desktop.daemon.admin.title",
+    icon: LayoutDashboard,
+    desktopOnly: true,
+    Content: LocalAdminConsoleSection,
+  },
   { id: "about", labelKey: "settings.sections.about", icon: Info },
 ];
 
