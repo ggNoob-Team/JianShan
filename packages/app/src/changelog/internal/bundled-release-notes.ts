@@ -1,4 +1,21 @@
-const ENGLISH_RELEASE_NOTES = `## 0.14.1 - 2026-11-23
+const ENGLISH_RELEASE_NOTES = `## 0.14.2 - 2026-11-24
+
+Android update checks, quieter ownership labels, workspace-scoped owner fallback, and persistent Archify generator tabs.
+
+### Added
+
+- Added update checks on Android, so the app can tell when a newer APK is available.
+
+### Improved
+
+- Hid virtual ownership labels where they added noise.
+
+### Fixed
+
+- Scoped the workspace owner fallback to the workspace instead of leaking across workspaces.
+- Kept Archify generator agent tabs open while inspecting diagram rows.
+
+## 0.14.1 - 2026-11-23
 
 Screenshot annotations, virtual ownership for dream workspaces, richer message feedback, and Archify generator inspection.
 
@@ -96,7 +113,24 @@ JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup,
 - Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
 `;
 
-const CHINESE_RELEASE_NOTES = `## 0.14.1 - 2026-11-23
+const CHINESE_RELEASE_NOTES = `## 0.14.2 - 2026-11-24
+
+Android 更新检查、更安静的归属标签、按工作区限定所有者回退,以及保持打开的 Archify 生成器标签页。
+
+### 新增
+
+- Android 端新增更新检查,可以发现新的 APK 版本。
+
+### 改进
+
+- 在会干扰阅读的位置隐藏虚拟归属标签。
+
+### 修复
+
+- 工作区所有者回退限定在当前工作区内,不再串到其他工作区。
+- 查看 Archify 图表行时保持生成器 Agent 标签页打开。
+
+## 0.14.1 - 2026-11-23
 
 截图标注、筑梦工作区的虚拟归属、更丰富的消息反馈,以及 Archify 生成器 Agent 查看。
 

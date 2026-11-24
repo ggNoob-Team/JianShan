@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.2 - 2026-11-24
+
+Android update checks, quieter ownership labels, workspace-scoped owner fallback, and persistent Archify generator tabs.
+
+### Added
+
+- Added update checks on Android, so the app can tell when a newer APK is available.
+
+### Improved
+
+- Hid virtual ownership labels where they added noise.
+
+### Fixed
+
+- Scoped the workspace owner fallback to the workspace instead of leaking across workspaces.
+- Kept Archify generator agent tabs open while inspecting diagram rows.
+
 ## 0.14.1 - 2026-11-23
 
 Screenshot annotations, virtual ownership for dream workspaces, richer message feedback, and Archify generator inspection.
