@@ -458,7 +458,7 @@ export function buildTeamInsights(input: {
     ? [
         buildMember({
           id: "virtual_unassigned",
-          name: "未分配（虚拟）",
+          name: "未分配（自动）",
           virtual: true,
           snapshot: input.snapshot,
           attributionByAgentId,

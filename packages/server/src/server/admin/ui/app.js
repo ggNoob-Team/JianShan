@@ -492,7 +492,6 @@ function renderAgents() {
             </div>
             <span>
               <span class="badge ${agent.ownerName === "未分配" ? "warning" : ""}">${escapeHtml(agent.ownerName)}</span>
-              ${agent.ownerVirtual ? '<span class="badge virtual">虚拟</span>' : ""}
             </span>
             <span>${escapeHtml(agent.projectName)}</span>
             <span class="badge ${agent.status === "running" ? "success" : ""}">${escapeHtml(agent.status)}</span>
@@ -557,7 +556,6 @@ function renderTitles() {
             </div>
             <span>
               <span class="badge ${item.ownerSource === "unassigned" ? "warning" : ""}">${escapeHtml(item.ownerName)}</span>
-              ${item.ownerVirtual ? '<span class="badge virtual">虚拟</span>' : ""}
             </span>
             <span>${sourceLabel[item.ownerSource]}</span>
             <span>${formatDate(item.updatedAt)}</span>

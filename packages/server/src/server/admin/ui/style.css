@@ -1037,12 +1037,6 @@ textarea {
   color: var(--accent);
 }
 
-.badge.virtual {
-  margin-left: 6px;
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
 .text-button {
   min-height: 36px;
   padding: 0 8px;

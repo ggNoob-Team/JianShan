@@ -619,8 +619,7 @@
           member.id === "unassigned"
             ? `${member.sessions} 个会话`
             : `${formatDuration(member.seconds)} · ${member.sessions} 会话`;
-        const virtual = member.virtual ? ' <em class="virtual-badge">虚拟</em>' : "";
-        return `<button type="button" class="team-member-tab${active}" role="tab" aria-selected="${Boolean(active)}" data-team-member="${escapeHtml(member.id)}"><strong>${escapeHtml(member.name)}${virtual}</strong><span>${escapeHtml(subtitle)}</span></button>`;
+        return `<button type="button" class="team-member-tab${active}" role="tab" aria-selected="${Boolean(active)}" data-team-member="${escapeHtml(member.id)}"><strong>${escapeHtml(member.name)}</strong><span>${escapeHtml(subtitle)}</span></button>`;
       })
       .join("");
   }
@@ -669,7 +668,7 @@
     ).length;
     const virtualCount = values.filter((member) => member.virtual === true).length;
     $("#team-member-count", root).textContent = `${humanCount} 人团队${
-      virtualCount > 0 ? ` · ${virtualCount} 项虚拟统计` : ""
+      virtualCount > 0 ? ` · ${virtualCount} 项自动统计` : ""
     }`;
     renderTabs();
     renderMember();

@@ -20,7 +20,7 @@ export type MetaRowItem =
   | { kind: "project"; name: string }
   | { kind: "host" }
   | { kind: "timestamp"; enteredAt: Date }
-  | { kind: "creator"; name: string | null; virtual: boolean }
+  | { kind: "creator"; name: string }
   | { kind: "changeRequest"; hint: PrHint }
   | { kind: "checks"; summary: CheckSummary; label: boolean }
   | { kind: "services"; summary: WorkspaceServiceSummary }
@@ -42,7 +42,6 @@ export function selectMetaRowItems(input: {
   hasHostBadge: boolean;
   statusEnteredAt: Date | null;
   createdByName: string | null;
-  createdByVirtual: boolean;
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels: readonly WorkspaceLabelDefinition[];
@@ -55,7 +54,6 @@ export function selectMetaRowItems(input: {
     hasHostBadge,
     statusEnteredAt,
     createdByName,
-    createdByVirtual,
     prHint,
     serviceSummary,
     labels,
@@ -76,8 +74,8 @@ export function selectMetaRowItems(input: {
   if (statusEnteredAt) {
     items.push({ kind: "timestamp", enteredAt: statusEnteredAt });
   }
-  if (createdByName || createdByVirtual) {
-    items.push({ kind: "creator", name: createdByName, virtual: createdByVirtual });
+  if (createdByName) {
+    items.push({ kind: "creator", name: createdByName });
   }
   if (prHint && visible.changeRequest) {
     items.push({ kind: "changeRequest", hint: prHint });

@@ -83,7 +83,7 @@ describe("admin server", () => {
     expect(roleScriptText).toContain("data-role-regenerate");
     expect(roleScriptText).toContain("data-role-delete");
     expect(roleScriptText).toContain("data-role-move");
-    expect(roleScriptText).toContain("badge virtual");
+    expect(roleScriptText).not.toContain(">虚拟</span>");
     expect(roleScriptText).toContain("data-owner-agent");
 
     const teamCss = await fetch(new URL("/team-reference.css", handle.url));
@@ -96,8 +96,9 @@ describe("admin server", () => {
     const teamScript = await fetch(new URL("/team-reference.js", handle.url));
     expect(teamScript.status).toBe(200);
     const teamScriptText = await teamScript.text();
-    expect(teamScriptText).toContain("virtual-badge");
-    expect(teamScriptText).toContain("项虚拟统计");
+    expect(teamScriptText).not.toContain("virtual-badge");
+    expect(teamScriptText).not.toContain("项虚拟统计");
+    expect(teamScriptText).toContain("项自动统计");
 
     const adminCss = await fetch(new URL("/style.css", handle.url));
     expect(adminCss.status).toBe(200);
