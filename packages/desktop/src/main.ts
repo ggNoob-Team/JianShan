@@ -92,6 +92,7 @@ import {
 } from "./window/desktop-window-owner.js";
 import { getDesktopSettingsStore } from "./settings/desktop-settings-electron.js";
 import { clampWindowStateToWorkAreas, createWindowStateStore } from "./settings/window-state.js";
+import { resolveLegacyUserDataPath } from "./settings/legacy-user-data.js";
 import {
   isDesktopManagedDaemonRunningSync,
   stopDesktopDaemonViaCli,
@@ -117,6 +118,7 @@ const APP_SCHEME = "paseo";
 const PASEO_DEBUG = process.env.PASEO_DEBUG === "1";
 const DISABLE_SINGLE_INSTANCE_LOCK = process.env.PASEO_DISABLE_SINGLE_INSTANCE_LOCK === "1";
 const APP_NAME = process.env.PASEO_TEST_APP_NAME?.trim() || "JianShan";
+const FORCED_USER_DATA_DIR = process.env.PASEO_ELECTRON_USER_DATA_DIR?.trim();
 const DESKTOP_WINDOW_CHROME_MODE = resolveDesktopWindowChromeMode({
   platform: process.platform,
   override: process.env.PASEO_DESKTOP_WINDOW_CONTROLS,
@@ -136,6 +138,19 @@ const bootstrapComplete = new Promise<void>((resolve) => {
 let bootstrapIsComplete = false;
 
 app.setName(APP_NAME);
+const legacyUserDataPath =
+  app.isPackaged && !FORCED_USER_DATA_DIR
+    ? resolveLegacyUserDataPath({
+        appDataPath: app.getPath("appData"),
+        currentName: APP_NAME,
+        legacyName: "Paseo",
+        pathExists: existsSync,
+      })
+    : null;
+if (legacyUserDataPath) {
+  app.setPath("userData", legacyUserDataPath);
+  log.info("[desktop] reusing pre-rename Paseo userData:", legacyUserDataPath);
+}
 log.info("[desktop] app startup", {
   version: app.getVersion(),
   platform: process.platform,
@@ -301,10 +316,9 @@ function installBrowserWindowOpenHandler(input: {
 // In dev mode, detect git worktrees and isolate each instance so multiple
 // Electron windows can run side-by-side (separate userData = separate lock).
 let devWorktreeName: string | null = null;
-const forcedUserDataDir = process.env.PASEO_ELECTRON_USER_DATA_DIR?.trim();
-if (forcedUserDataDir) {
-  app.setPath("userData", forcedUserDataDir);
-  log.info("[dev-user-data] forced userData dir:", forcedUserDataDir);
+if (FORCED_USER_DATA_DIR) {
+  app.setPath("userData", FORCED_USER_DATA_DIR);
+  log.info("[dev-user-data] forced userData dir:", FORCED_USER_DATA_DIR);
 } else if (!app.isPackaged) {
   try {
     const topLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
