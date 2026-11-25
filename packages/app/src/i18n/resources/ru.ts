@@ -2994,6 +2994,7 @@ export const ru: TranslationResources = {
         removeErrorMessage: "Не удалось удалить подключение",
         timeout: "Время ожидания истекло",
       },
+      remoteLocalHost: en.settings.host.remoteLocalHost,
       pairDevices: {
         title: "Подключение устройств",
         rowTitle: "Подключить устройство",

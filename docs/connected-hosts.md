@@ -30,6 +30,22 @@ physical link principal, then intersects forwarded caller grants with that link'
 Changing or resuming a parent's grants closes its existing channels; reconnect re-admits demand with
 current authority. A routed API cannot select a second hop, and saving a host grants no reverse access.
 
+## Local host sharing
+
+The desktop client reports its local daemon's `serverId` as `originServerId` when connecting to a
+remote host. Host directories expose that daemon as `current`, even before it has a reverse
+registration.
+
+Sharing is opt-in per remote host. The first enable action confirms that the remote may execute work
+on the local machine. The client then registers the local daemon with a relay pairing offer, using
+the local `serverId` as the stable `sourceKey`. Later reconnects update that registration
+automatically. Disabling sharing removes the automatic registration before clearing the local
+opt-in.
+
+Multiple local daemons remain distinct registrations. `current` identifies the daemon associated
+with the active client origin; `registrationId` identifies its reverse execution link. An agent
+must select a concrete host when the current origin has no enabled registration.
+
 A producer that registers a host through a routed API is qualified on B as
 `route:<B principal>:<A serverId>:<A producer>`, with each component percent-encoded. For an ordinary
 A client, `<A producer>` is its principal-plus-client source. This namespace belongs to the

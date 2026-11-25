@@ -2909,6 +2909,14 @@ export const zhCN: TranslationResources = {
         removeErrorMessage: "无法移除连接",
         timeout: "超时",
       },
+      remoteLocalHost: {
+        title: "本地执行",
+        toggle: "允许此远程 Host 使用这台 Mac",
+        hint: "首次授权后，每次连接此远程 Host 都会自动维护本机 Host 注册。远程 Agent 可以在你关闭此选项前于本机运行任务。",
+        offline: "此远程 Host 和本地 daemon 都需要在线才能修改。",
+        accessibilityLabel: "允许此远程 Host 使用这台 Mac",
+        failed: "无法更新本机 Host 共享",
+      },
       pairDevices: {
         title: "配对设备",
         rowTitle: "配对设备",

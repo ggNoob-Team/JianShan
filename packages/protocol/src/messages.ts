@@ -8465,6 +8465,8 @@ export const WSHelloMessageSchema = z.object({
   clientId: z.string().min(1),
   clientName: ClientNameSchema.optional(),
   clientType: z.enum(["mobile", "browser", "cli", "mcp", "hub"]),
+  /** Daemon server ID of the connected host that originated this client session. */
+  originServerId: z.string().min(1).max(256).optional(),
   protocolVersion: z.number().int(),
   auth: z
     .discriminatedUnion("kind", [

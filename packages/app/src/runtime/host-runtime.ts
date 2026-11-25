@@ -546,6 +546,7 @@ function probeIntervalForConnection(
 
 function createDefaultDeps(
   resolveOrigin: (serverId: string) => DaemonClient | null = () => null,
+  resolveOriginServerId: () => string | null = () => null,
 ): HostRuntimeControllerDeps {
   const browserHostAvailable =
     typeof getDesktopHost()?.browser?.executeAutomationCommand === "function";
@@ -566,11 +567,13 @@ function createDefaultDeps(
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const clientName = resolveHostClientName(host);
+      const originServerId = resolveOriginServerId();
       const base = {
         suppressSendErrors: true,
         clientId,
         clientType: "mobile",
         ...(clientName ? { clientName } : {}),
+        ...(originServerId ? { originServerId } : {}),
         appVersion: resolveAppVersion() ?? undefined,
         runtimeGeneration,
         capabilities: appCapabilities,
@@ -638,6 +641,7 @@ function createDefaultDeps(
     },
     connectToDaemon: async ({ host, connection, timeoutMs }) => {
       const clientName = resolveHostClientName(host);
+      const originServerId = resolveOriginServerId();
       if (connection.type === "routed") {
         const origin = resolveOrigin(connection.originServerId);
         if (!origin?.isConnected)
@@ -647,6 +651,7 @@ function createDefaultDeps(
           clientId: crypto.randomUUID(),
           clientType: "mobile",
           ...(clientName ? { clientName } : {}),
+          ...(originServerId ? { originServerId } : {}),
           transportFactory: createHostChannelTransport(
             origin,
             host.serverId,
@@ -668,6 +673,7 @@ function createDefaultDeps(
         ...(host.serverId ? { serverId: host.serverId } : {}),
         ...(host.password ? { password: host.password } : {}),
         ...(clientName ? { clientName } : {}),
+        ...(originServerId ? { originServerId } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         capabilities: appCapabilities,
@@ -1627,6 +1633,7 @@ export class HostRuntimeStore {
   private lastConnectionStatusByServer = new Map<string, HostRuntimeConnectionStatus>();
   private connectionStatusStartedAtByServer = new Map<string, number>();
   private queuedAgentDrainInFlight = new Set<string>();
+  private remoteLocalHostSyncInFlight = new Set<string>();
   private directorySyncByServer = new Map<string, DirectorySync>();
   private nextCancellationRequestId = 0;
   private timelineReplicaByServer = new Map<string, TimelineReplica>();
@@ -1644,7 +1651,12 @@ export class HostRuntimeStore {
     replicaRowStore?: ReplicaRowStore;
     revokePushNotifications?: typeof revokePushNotifications;
   }) {
-    this.deps = input?.deps ?? createDefaultDeps((serverId) => this.getClient(serverId));
+    this.deps =
+      input?.deps ??
+      createDefaultDeps(
+        (serverId) => this.getClient(serverId),
+        () => this.resolveLocalServerId(),
+      );
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
@@ -1654,6 +1666,26 @@ export class HostRuntimeStore {
 
   getHosts(): HostProfile[] {
     return this.hosts;
+  }
+
+  private resolveLocalServerId(): string | null {
+    return (
+      this.hosts.find((host) =>
+        host.connections.some((connection) => {
+          if (connection.type === "directSocket" || connection.type === "directPipe") return true;
+          if (connection.type !== "directTcp") return false;
+          const endpoint = connection.endpoint.trim().toLowerCase();
+          return (
+            endpoint === "localhost" ||
+            endpoint.startsWith("localhost:") ||
+            endpoint === "127.0.0.1" ||
+            endpoint.startsWith("127.0.0.1:") ||
+            endpoint === "[::1]" ||
+            endpoint.startsWith("[::1]:")
+          );
+        }),
+      )?.serverId ?? null
+    );
   }
 
   getHostRegistryStatus(): HostRegistryStatus {
@@ -2387,6 +2419,113 @@ export class HostRuntimeStore {
     }));
   }
 
+  async setRemoteLocalHostAccess(remoteServerId: string, enabled: boolean): Promise<void> {
+    const host = this.hosts.find((candidate) => candidate.serverId === remoteServerId);
+    if (!host) throw new Error(`Host ${remoteServerId} was not found`);
+    const localServerId = this.resolveLocalServerId();
+    if (!localServerId) {
+      throw new Error("The local daemon is not available.");
+    }
+    if (localServerId === remoteServerId) {
+      throw new Error("Choose a remote host before sharing the local daemon.");
+    }
+
+    if (enabled) {
+      await this.syncRemoteLocalHostRegistration(remoteServerId, localServerId);
+    } else {
+      await this.removeRemoteLocalHostRegistration(remoteServerId, localServerId);
+    }
+
+    await this.updateHost(remoteServerId, (current) => ({
+      ...current,
+      remoteLocalHost: { enabled, localServerId },
+    }));
+  }
+
+  private async syncRemoteLocalHostRegistration(
+    remoteServerId: string,
+    localServerId: string,
+  ): Promise<void> {
+    const remoteClient = this.getClient(remoteServerId);
+    const localClient = this.getClient(localServerId);
+    if (!remoteClient?.isConnected) {
+      throw new Error("The remote host is offline.");
+    }
+    if (!localClient?.isConnected) {
+      throw new Error("The local daemon is offline.");
+    }
+
+    const offer = await localClient.getDaemonPairingOffer();
+    if (!offer.relayEnabled || !offer.url) {
+      throw new Error("Enable Relay on the local daemon before sharing it with a remote host.");
+    }
+
+    const directory = await remoteClient.listHosts();
+    const existing = directory.hosts.find((candidate) => candidate.source.key === localServerId);
+    const localHost = this.hosts.find((candidate) => candidate.serverId === localServerId);
+    const label = localHost?.label ?? localServerId;
+    if (existing) {
+      if (!existing.enabled) {
+        throw new Error("The remote host has disabled this local host registration.");
+      }
+      await remoteClient.updateHost(existing.registrationId, {
+        connection: offer.url,
+        label,
+        metadata: { ...existing.metadata, autoRegistered: "local" },
+        ...(existing.serverId && existing.serverId !== localServerId
+          ? { replaceIdentity: true }
+          : {}),
+      });
+      return;
+    }
+
+    await remoteClient.addHost({
+      connection: offer.url,
+      label,
+      metadata: { autoRegistered: "local" },
+      sourceKey: localServerId,
+    });
+  }
+
+  private async removeRemoteLocalHostRegistration(
+    remoteServerId: string,
+    localServerId: string,
+  ): Promise<void> {
+    const remoteClient = this.getClient(remoteServerId);
+    if (!remoteClient?.isConnected) {
+      throw new Error("The remote host is offline.");
+    }
+    const directory = await remoteClient.listHosts();
+    const registrations = directory.hosts.filter(
+      (candidate) =>
+        candidate.source.key === localServerId && candidate.metadata.autoRegistered === "local",
+    );
+    await Promise.all(
+      registrations.map((candidate) => remoteClient.removeHost(candidate.registrationId)),
+    );
+  }
+
+  private requestRemoteLocalHostRegistrationSync(triggerServerId: string): void {
+    const localServerId = this.resolveLocalServerId();
+    if (!localServerId || !this.getClient(localServerId)?.isConnected) return;
+
+    for (const host of this.hosts) {
+      const config = host.remoteLocalHost;
+      if (!config?.enabled || config.localServerId !== localServerId) continue;
+      if (host.serverId !== triggerServerId && triggerServerId !== localServerId) continue;
+      if (this.remoteLocalHostSyncInFlight.has(host.serverId)) continue;
+      this.remoteLocalHostSyncInFlight.add(host.serverId);
+      void this.syncRemoteLocalHostRegistration(host.serverId, localServerId)
+        .catch((error) => {
+          console.warn("[HostRuntime] Failed to sync local host registration", {
+            remoteServerId: host.serverId,
+            error,
+          });
+        })
+        .finally(() => this.remoteLocalHostSyncInFlight.delete(host.serverId));
+    }
+  }
+
   private updateHostAppearance(
     serverId: string,
     apply: (host: HostProfile) => HostProfile,
@@ -2764,6 +2903,7 @@ export class HostRuntimeStore {
     const didTransitionOnline =
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
+      this.requestRemoteLocalHostRegistrationSync(serverId);
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
       // Checkout git data is push-driven; pushes emitted while disconnected are gone for
       // good (the daemon dedupes by snapshot fingerprint). Mark the caches stale so active
@@ -3255,6 +3395,7 @@ export interface HostMutations {
   renameHost: (serverId: string, label: string) => Promise<void>;
   setHostColor: (serverId: string, color: HostColor) => Promise<void>;
   setHostBadgeDisplay: (serverId: string, badgeDisplay: HostBadgeDisplay) => Promise<void>;
+  setRemoteLocalHostAccess: (serverId: string, enabled: boolean) => Promise<void>;
   removeHost: (serverId: string) => Promise<void>;
   removeConnection: (serverId: string, connectionId: string) => Promise<void>;
 }
@@ -3272,6 +3413,8 @@ export function useHostMutations(): HostMutations {
       setHostColor: (serverId, color) => store.setHostColor(serverId, color),
       setHostBadgeDisplay: (serverId, badgeDisplay) =>
         store.setHostBadgeDisplay(serverId, badgeDisplay),
+      setRemoteLocalHostAccess: (serverId, enabled) =>
+        store.setRemoteLocalHostAccess(serverId, enabled),
       removeHost: (serverId) => store.removeHost(serverId),
       removeConnection: (serverId, connectionId) => store.removeConnection(serverId, connectionId),
     }),

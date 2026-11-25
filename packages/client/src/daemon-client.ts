@@ -419,6 +419,8 @@ export interface DaemonClientConfig {
   /** Human-readable client name for display and audit metadata, never authentication. */
   clientName?: string;
   clientType?: "mobile" | "browser" | "cli" | "mcp" | "hub";
+  /** Daemon server ID of the connected host that originated this client session. */
+  originServerId?: string;
   appVersion?: string;
   runtimeGeneration?: number | null;
   password?: string;
@@ -7499,6 +7501,7 @@ export class DaemonClient {
         clientId: this.config.clientId,
         ...(this.config.clientName ? { clientName: this.config.clientName } : {}),
         clientType: this.config.clientType ?? "cli",
+        ...(this.config.originServerId ? { originServerId: this.config.originServerId } : {}),
         protocolVersion: 1,
         ...(auth ? { auth } : {}),
         capabilities: {

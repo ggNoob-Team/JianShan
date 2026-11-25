@@ -1572,10 +1572,33 @@ function createToolCatalog(
       description: "Discover this host and registered destination hosts for fleet tools.",
       inputSchema: {},
     },
-    async () => ({
-      content: [],
-      structuredContent: ensureValidJson(await hostResolver.directory()),
-    }),
+    async () => {
+      const directory = await hostResolver.directory();
+      const caller = resolveCallerAgent();
+      const clientId = caller?.createdBy?.clientId;
+      const originServerId = caller?.labels?.["paseo.originServerId"];
+      const current = directory.hosts.find(
+        (host) =>
+          (originServerId && host.serverId === originServerId) ||
+          (clientId && host.source.id.endsWith(`:${encodeURIComponent(clientId)}`)),
+      );
+      const currentServerId = originServerId ?? current?.serverId;
+      return {
+        content: [],
+        structuredContent: ensureValidJson({
+          ...directory,
+          ...(currentServerId
+            ? {
+                current: {
+                  serverId: currentServerId,
+                  registrationId: current?.registrationId ?? null,
+                  label: current?.label ?? null,
+                },
+              }
+            : {}),
+        }),
+      };
+    },
   );
 
   registerTool(

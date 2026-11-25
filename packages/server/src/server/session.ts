@@ -467,6 +467,7 @@ export interface SessionOptions {
   connectedHosts?: ConnectedHosts;
   localJobService?: LocalJobService | null;
   sourceId?: string;
+  originServerId?: string | null;
   routed?: boolean;
   browserToolsBroker?: BrowserToolsBroker | null;
   clientId: string;
@@ -759,6 +760,7 @@ export class Session {
   private readonly clientId: string;
   private clientName: string | null;
   private clientType: WSHelloMessage["clientType"];
+  private originServerId: string | null;
   private readonly authorization: SessionAuthorization;
   private appVersion: string | null;
   private clientCapabilities: ReadonlySet<ClientCapability>;
@@ -871,6 +873,7 @@ export class Session {
       clientId,
       clientName,
       clientType,
+      originServerId,
       permissions,
       appVersion,
       clientCapabilities,
@@ -932,6 +935,7 @@ export class Session {
     this.clientId = clientId;
     this.clientName = normalizeSessionClientName(clientName);
     this.clientType = normalizeSessionClientType(clientType);
+    this.originServerId = normalizeOriginServerId(originServerId);
     this.authorization = new SessionAuthorization(permissions);
 
     this.appVersion = appVersion ?? null;
@@ -1337,6 +1341,14 @@ export class Session {
 
   updateClientType(clientType: WSHelloMessage["clientType"]): void {
     this.clientType = clientType;
+  }
+
+  updateOriginServerId(originServerId: string | undefined): void {
+    this.originServerId = normalizeOriginServerId(originServerId);
+  }
+
+  getOriginServerId(): string | null {
+    return this.originServerId;
   }
 
   private assertCanCreateSession(): void {
@@ -4881,7 +4893,10 @@ export class Session {
           outputSchema,
           images,
           attachments,
-          labels: resolvedIntent.intent.labels,
+          labels: {
+            ...resolvedIntent.intent.labels,
+            ...(this.originServerId ? { "paseo.originServerId": this.originServerId } : {}),
+          },
           env,
           provisionalTitle,
           firstAgentContext,
@@ -9637,7 +9652,11 @@ function createHostSession(options: SessionOptions, session: Session): Connected
   return new ConnectedHostSession(
     options.connectedHosts,
     session.delivery,
-    { sourceId: options.sourceId ?? "owner", manageSources: false },
+    {
+      sourceId: options.sourceId ?? "owner",
+      manageSources: false,
+      originServerId: session.getOriginServerId(),
+    },
     () => session.getPermissions(),
     (message) => session.publish(message),
     () => session.isRouted(),
@@ -9652,6 +9671,10 @@ function hostSource(options: SessionOptions): string {
 
 function normalizeSessionClientName(clientName: string | undefined): string | null {
   return clientName ?? null;
+}
+
+function normalizeOriginServerId(originServerId: string | null | undefined): string | null {
+  return originServerId?.trim() || null;
 }
 
 function createAgentWorkspaceName(msg: CreateAgentRequestMessage): string | undefined {

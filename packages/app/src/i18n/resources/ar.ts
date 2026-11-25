@@ -2979,6 +2979,7 @@ export const ar: TranslationResources = {
         removeErrorMessage: "غير قادر على إزالة الاتصال",
         timeout: "نفذ الوقت",
       },
+      remoteLocalHost: en.settings.host.remoteLocalHost,
       pairDevices: {
         title: "إقران الأجهزة",
         rowTitle: "إقران جهاز",

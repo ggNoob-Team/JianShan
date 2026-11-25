@@ -53,6 +53,13 @@ it("requests the managed connection credential through desktop main without a we
 });
 
 class FakeDaemonClient {
+  constructor(private readonly serverId = "srv_test") {
+    this.hostDirectory = Promise.resolve({
+      self: { serverId: this.serverId, label: "test" },
+      hosts: [],
+    });
+  }
+
   supportsBackgroundWorkspaces(): boolean {
     return false;
   }
@@ -168,10 +175,13 @@ class FakeDaemonClient {
   }
 
   public connectedHosts = false;
-  public hostDirectory: Promise<HostDirectory> = Promise.resolve({
-    self: { serverId: "srv_test", label: "test" },
-    hosts: [],
-  });
+  public hostDirectory: Promise<HostDirectory>;
+  public addedHosts: Array<Parameters<DaemonClient["addHost"]>[0]> = [];
+  public updatedHosts: Array<{
+    registrationId: string;
+    patch: Parameters<DaemonClient["updateHost"]>[1];
+  }> = [];
+  public removedHosts: string[] = [];
   private hostUpdateListeners = new Set<(message: SessionOutboundMessage) => void>();
 
   observeHosts() {
@@ -189,6 +199,56 @@ class FakeDaemonClient {
     for (const listener of this.hostUpdateListeners) listener(message);
   }
 
+  async listHosts(): ReturnType<DaemonClient["listHosts"]> {
+    return this.hostDirectory;
+  }
+
+  async addHost(input: Parameters<DaemonClient["addHost"]>[0]) {
+    this.addedHosts.push(input);
+    const host = {
+      registrationId: "hst_auto",
+      serverId: "srv_local",
+      label: input.label ?? null,
+      source: { id: "source", key: input.sourceKey ?? "source" },
+      metadata: input.metadata ?? {},
+      enabled: true,
+      status: "online" as const,
+      targetDescription: "relay",
+      lastOnlineAt: null,
+      nextRetryAt: null,
+      error: null,
+    };
+    const directory = await this.hostDirectory;
+    this.hostDirectory = Promise.resolve({ ...directory, hosts: [...directory.hosts, host] });
+    return host;
+  }
+
+  async updateHost(registrationId: string, patch: Parameters<DaemonClient["updateHost"]>[1]) {
+    this.updatedHosts.push({ registrationId, patch });
+    const directory = await this.hostDirectory;
+    const current = directory.hosts.find((host) => host.registrationId === registrationId);
+    if (!current) throw new Error("Unknown host");
+    return { ...current, ...patch, label: patch.label ?? current.label };
+  }
+
+  async removeHost(registrationId: string): Promise<void> {
+    this.removedHosts.push(registrationId);
+    const directory = await this.hostDirectory;
+    this.hostDirectory = Promise.resolve({
+      ...directory,
+      hosts: directory.hosts.filter((host) => host.registrationId !== registrationId),
+    });
+  }
+
+  async getDaemonPairingOffer() {
+    return {
+      relayEnabled: true,
+      url: "https://app.example/#offer=auto",
+      qr: null,
+      role: "member" as const,
+    };
+  }
+
   public ownedSubscriptions = true;
   private daemonVersion: string | null = "0.8.0";
 
@@ -196,7 +256,7 @@ class FakeDaemonClient {
     if (this.daemonVersion === null) return null;
     return {
       status: "server_info",
-      serverId: "srv_test",
+      serverId: this.serverId,
       hostname: "test",
       version: this.daemonVersion,
       features: {
@@ -1820,6 +1880,64 @@ describe("HostRuntimeController", () => {
 });
 
 describe("HostRuntimeStore", () => {
+  it("registers the local daemon on a remote host after explicit opt-in", async () => {
+    const localClient = new FakeDaemonClient("srv_local");
+    const remoteClient = new FakeDaemonClient("srv_remote");
+    localClient.setConnectionState({ status: "connected" });
+    remoteClient.setConnectionState({ status: "connected" });
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: {
+        createClient: ({ host }) =>
+          (host.serverId === "srv_local" ? localClient : remoteClient) as unknown as DaemonClient,
+        connectToDaemon: async ({ host }) => ({
+          client: (host.serverId === "srv_local"
+            ? localClient
+            : remoteClient) as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: host.label,
+        }),
+        getClientId: async () => "cid_auto_host",
+      },
+    });
+    try {
+      await store.upsertDirectConnection({
+        serverId: "srv_local",
+        endpoint: "localhost:6767",
+        label: "MacBook",
+      });
+      await store.upsertDirectConnection({
+        serverId: "srv_remote",
+        endpoint: "remote.example:6767",
+        label: "Fujie",
+      });
+      await waitForHostOnline(store, "srv_local");
+      await waitForHostOnline(store, "srv_remote");
+
+      await store.setRemoteLocalHostAccess("srv_remote", true);
+
+      expect(remoteClient.addedHosts).toEqual([
+        {
+          connection: "https://app.example/#offer=auto",
+          label: "MacBook",
+          metadata: { autoRegistered: "local" },
+          sourceKey: "srv_local",
+        },
+      ]);
+      expect(
+        store.getHosts().find((host) => host.serverId === "srv_remote")?.remoteLocalHost,
+      ).toEqual({ enabled: true, localServerId: "srv_local" });
+
+      await store.setRemoteLocalHostAccess("srv_remote", false);
+      expect(remoteClient.removedHosts).toEqual(["hst_auto"]);
+      expect(
+        store.getHosts().find((host) => host.serverId === "srv_remote")?.remoteLocalHost,
+      ).toEqual({ enabled: false, localServerId: "srv_local" });
+    } finally {
+      store.syncHosts([]);
+    }
+  });
+
   it.each([false, true])(
     "keeps B and C distinct with routed and direct candidates (B direct first: %s)",
     async (directFirst) => {

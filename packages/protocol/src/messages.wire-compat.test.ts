@@ -11,6 +11,40 @@ import {
   WorkspaceSetupProgressMessageSchema,
   AgentTimelineEntryPayloadSchema,
 } from "./messages.js";
+import { HostDirectorySchema } from "./hosts.js";
+
+test("hello origin and current host identity remain optional wire fields", () => {
+  const legacyHello = {
+    type: "hello",
+    clientId: "legacy-client",
+    clientType: "mobile",
+    protocolVersion: 1,
+  };
+  expect(WSHelloMessageSchema.safeParse(legacyHello).success).toBe(true);
+  expect(
+    WSHelloMessageSchema.parse({
+      ...legacyHello,
+      originServerId: "srv_mac",
+    }).originServerId,
+  ).toBe("srv_mac");
+
+  const directory = { self: { serverId: "srv_remote", label: "remote" }, hosts: [] };
+  expect(HostDirectorySchema.parse(directory)).toEqual(directory);
+  expect(
+    HostDirectorySchema.parse({
+      ...directory,
+      current: {
+        serverId: "srv_mac",
+        registrationId: "hst_mac",
+        label: "MacBook",
+      },
+    }).current,
+  ).toEqual({
+    serverId: "srv_mac",
+    registrationId: "hst_mac",
+    label: "MacBook",
+  });
+});
 
 test("terminal listings accept older rows and retain new per-terminal directories", () => {
   const response = {

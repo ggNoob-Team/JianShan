@@ -3015,6 +3015,7 @@ export const es: TranslationResources = {
         removeErrorMessage: "No se puede eliminar la conexión",
         timeout: "Se acabó el tiempo",
       },
+      remoteLocalHost: en.settings.host.remoteLocalHost,
       pairDevices: {
         title: "Emparejar dispositivos",
         rowTitle: "Emparejar un dispositivo",

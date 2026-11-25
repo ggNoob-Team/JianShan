@@ -30,6 +30,13 @@ export const HostSummarySchema = z.object({
 export const HostDirectorySchema = z.object({
   self: z.object({ serverId: z.string(), label: z.string() }),
   hosts: z.array(HostSummarySchema),
+  current: z
+    .object({
+      serverId: z.string(),
+      registrationId: z.string().nullable(),
+      label: z.string().nullable(),
+    })
+    .optional(),
 });
 export type HostAdd = z.infer<typeof HostAddSchema>;
 export type HostUpdate = z.infer<typeof HostUpdateSchema>;

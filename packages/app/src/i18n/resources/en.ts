@@ -3073,6 +3073,14 @@ export const en = {
         removeErrorMessage: "Unable to remove connection",
         timeout: "Timeout",
       },
+      remoteLocalHost: {
+        title: "Local execution",
+        toggle: "Allow this remote host to use this Mac",
+        hint: "After you enable this once, your local host is registered automatically whenever this remote host connects. The remote Agent can run work on this Mac until you turn it off.",
+        offline: "Both this host and the local daemon must be online to change this setting.",
+        accessibilityLabel: "Allow this remote host to use this Mac",
+        failed: "Unable to update local host sharing",
+      },
       pairDevices: {
         title: "Pair devices",
         rowTitle: "Pair a device",

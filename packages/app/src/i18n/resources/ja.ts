@@ -2975,6 +2975,7 @@ export const ja: TranslationResources = {
         removeErrorMessage: "接続を削除できません",
         timeout: "タイムアウト",
       },
+      remoteLocalHost: en.settings.host.remoteLocalHost,
       pairDevices: {
         title: "デバイスをペアリング",
         rowTitle: "デバイスをペアリング",

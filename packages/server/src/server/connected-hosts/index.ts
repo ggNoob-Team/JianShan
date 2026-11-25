@@ -36,6 +36,7 @@ type Saved = z.infer<typeof SavedSchema>;
 export interface HostActor {
   sourceId: string;
   manageSources: boolean;
+  originServerId?: string | null;
 }
 interface Live {
   client: DaemonClient;
@@ -89,11 +90,24 @@ export class ConnectedHosts {
   }
   async listFor(actor: HostActor): Promise<HostDirectory> {
     await this.ready;
+    const visibleRows = this.rows.filter(
+      (row) => actor.manageSources || row.source.id === actor.sourceId,
+    );
+    const currentRow = actor.originServerId
+      ? visibleRows.find((row) => row.serverId === actor.originServerId)
+      : undefined;
     return {
       self: { ...this.self },
-      hosts: this.rows
-        .filter((row) => actor.manageSources || row.source.id === actor.sourceId)
-        .map(({ connection: _secret, ...row }) => structuredClone(row)),
+      hosts: visibleRows.map(({ connection: _secret, ...row }) => structuredClone(row)),
+      ...(actor.originServerId
+        ? {
+            current: {
+              serverId: actor.originServerId,
+              registrationId: currentRow?.registrationId ?? null,
+              label: currentRow?.label ?? null,
+            },
+          }
+        : {}),
     };
   }
   observe(actor: HostActor, changed: () => void): () => void {

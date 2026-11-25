@@ -78,6 +78,16 @@ function normalizeNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function optionalOriginServerIdFields(
+  options:
+    | {
+        originServerId?: DaemonClientConfig["originServerId"];
+      }
+    | undefined,
+): Pick<DaemonClientConfig, "originServerId"> | Record<string, never> {
+  return options?.originServerId ? { originServerId: options.originServerId } : {};
+}
+
 function pickBestReason(reason: string | null, lastError: string | null): string {
   const genericReason =
     reason &&
@@ -143,6 +153,7 @@ export async function buildClientConfig(
     trace?: DaemonClientConfig["trace"];
     password?: string;
     clientName?: DaemonClientConfig["clientName"];
+    originServerId?: DaemonClientConfig["originServerId"];
     localCredential?: DaemonClientConfig["localCredential"];
   },
   deps: Pick<
@@ -160,6 +171,7 @@ export async function buildClientConfig(
   const base = {
     clientId,
     clientType: "mobile" as const,
+    ...optionalOriginServerIdFields(options),
     ...optionalClientNameFields(options?.clientName),
     appVersion: deps.resolveAppVersion() ?? undefined,
     suppressSendErrors: true,
@@ -290,6 +302,7 @@ interface ProbeOptions {
   timeoutMs?: number;
   password?: string;
   clientName?: DaemonClientConfig["clientName"];
+  originServerId?: DaemonClientConfig["originServerId"];
   localCredential?: DaemonClientConfig["localCredential"];
   capabilities?: DaemonClientConfig["capabilities"];
   trace?: DaemonClientConfig["trace"];

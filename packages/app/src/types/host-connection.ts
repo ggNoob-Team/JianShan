@@ -84,6 +84,11 @@ export interface HostProfile {
   label: string;
   appearance: HostAppearance;
   lifecycle: HostLifecycle;
+  /** Opt-in permission for this remote host to execute work on the current local daemon. */
+  remoteLocalHost?: {
+    enabled: boolean;
+    localServerId: string;
+  };
   connections: HostConnection[];
   preferredConnectionId: string | null;
   createdAt: string;
@@ -517,6 +522,12 @@ const StoredHostProfileSchema = z.strictObject({
   role: PairingRoleSchema.optional(),
   appearance: HostAppearanceSchema.optional(),
   lifecycle: z.strictObject({}).optional(),
+  remoteLocalHost: z
+    .strictObject({
+      enabled: z.boolean(),
+      localServerId: z.string().trim().min(1),
+    })
+    .optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),
   preferredConnectionId: z.string().nullable().optional(),
   createdAt: z.string().datetime({ offset: true }).optional(),
@@ -619,6 +630,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
     label,
     appearance: record.appearance ?? defaultHostAppearance(),
     lifecycle: defaultLifecycle(),
+    ...(record.remoteLocalHost ? { remoteLocalHost: record.remoteLocalHost } : {}),
     connections,
     preferredConnectionId,
     createdAt: record.createdAt ?? now,
