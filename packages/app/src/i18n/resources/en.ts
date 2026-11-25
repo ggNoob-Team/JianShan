@@ -3075,10 +3075,10 @@ export const en = {
       },
       remoteLocalHost: {
         title: "Local execution",
-        toggle: "Allow this remote host to use this Mac",
-        hint: "After you enable this once, your local host is registered automatically whenever this remote host connects. The remote Agent can run work on this Mac until you turn it off.",
+        toggle: "Allow this remote host to use this device",
+        hint: "After you enable this once, your local host is registered automatically whenever this remote host connects. The remote Agent can run work on this device until you turn it off.",
         offline: "Both this host and the local daemon must be online to change this setting.",
-        accessibilityLabel: "Allow this remote host to use this Mac",
+        accessibilityLabel: "Allow this remote host to use this device",
         failed: "Unable to update local host sharing",
       },
       pairDevices: {

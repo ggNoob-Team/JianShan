@@ -19,6 +19,7 @@ import {
   findCachedClientName,
   normalizeStoredHostProfile,
   resolveHostClientName,
+  resolveLocalServerIdFromHosts,
   upsertHostConnectionInProfiles,
   registryHasConnection,
   relayConnectionFromOffer,
@@ -1669,23 +1670,7 @@ export class HostRuntimeStore {
   }
 
   private resolveLocalServerId(): string | null {
-    return (
-      this.hosts.find((host) =>
-        host.connections.some((connection) => {
-          if (connection.type === "directSocket" || connection.type === "directPipe") return true;
-          if (connection.type !== "directTcp") return false;
-          const endpoint = connection.endpoint.trim().toLowerCase();
-          return (
-            endpoint === "localhost" ||
-            endpoint.startsWith("localhost:") ||
-            endpoint === "127.0.0.1" ||
-            endpoint.startsWith("127.0.0.1:") ||
-            endpoint === "[::1]" ||
-            endpoint.startsWith("[::1]:")
-          );
-        }),
-      )?.serverId ?? null
-    );
+    return resolveLocalServerIdFromHosts(this.hosts);
   }
 
   getHostRegistryStatus(): HostRegistryStatus {

@@ -8,6 +8,7 @@ import {
   resolveActiveHostServerId,
   resolveHostClientName,
   resolveHostRole,
+  resolveLocalServerIdFromHosts,
   upsertHostConnectionInProfiles,
   type HostConnection,
   type HostProfile,
@@ -49,6 +50,55 @@ describe("orderHostsLocalFirst", () => {
     const hosts = [makeHost("srv_remote"), makeHost("srv_another_remote")];
 
     expect(orderHostsLocalFirst(hosts, null)).toBe(hosts);
+  });
+});
+
+describe("resolveLocalServerIdFromHosts", () => {
+  it.each<HostConnection>([
+    {
+      id: "direct:localhost:6767",
+      type: "directTcp",
+      endpoint: "localhost:6767",
+    },
+    {
+      id: "direct:127.0.0.1:6767",
+      type: "directTcp",
+      endpoint: "127.0.0.1:6767",
+    },
+    {
+      id: "direct:[::1]:6767",
+      type: "directTcp",
+      endpoint: "[::1]:6767",
+    },
+    {
+      id: "socket:/tmp/paseo.sock",
+      type: "directSocket",
+      path: "/tmp/paseo.sock",
+    },
+    {
+      id: "pipe:/tmp/paseo.pipe",
+      type: "directPipe",
+      path: "/tmp/paseo.pipe",
+    },
+  ])("identifies a local $type connection", (connection) => {
+    const local = { ...makeHost("srv_local"), connections: [connection] };
+
+    expect(resolveLocalServerIdFromHosts([makeHost("srv_remote"), local])).toBe("srv_local");
+  });
+
+  it("rejects non-loopback TCP hosts", () => {
+    const remote = {
+      ...makeHost("srv_remote"),
+      connections: [
+        {
+          id: "direct:45.40.254.22:4100",
+          type: "directTcp" as const,
+          endpoint: "45.40.254.22:4100",
+        },
+      ],
+    };
+
+    expect(resolveLocalServerIdFromHosts([remote])).toBeNull();
   });
 });
 

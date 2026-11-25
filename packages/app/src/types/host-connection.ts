@@ -145,6 +145,31 @@ export function orderHostsLocalFirst<T extends { serverId: string }>(
   return ordered;
 }
 
+function isLoopbackTcpEndpoint(endpoint: string): boolean {
+  const normalized = endpoint.trim().toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized.startsWith("localhost:") ||
+    normalized === "127.0.0.1" ||
+    normalized.startsWith("127.0.0.1:") ||
+    normalized === "[::1]" ||
+    normalized.startsWith("[::1]:")
+  );
+}
+
+export function resolveLocalServerIdFromHosts(
+  hosts: readonly Pick<HostProfile, "serverId" | "connections">[],
+): string | null {
+  return (
+    hosts.find((host) =>
+      host.connections.some((connection) => {
+        if (connection.type === "directSocket" || connection.type === "directPipe") return true;
+        return connection.type === "directTcp" && isLoopbackTcpEndpoint(connection.endpoint);
+      }),
+    )?.serverId ?? null
+  );
+}
+
 /**
  * Resolves which host a settings host section should target: the picker
  * selection, else the local daemon, else the first connected host.

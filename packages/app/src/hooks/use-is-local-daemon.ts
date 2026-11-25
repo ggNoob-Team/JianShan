@@ -1,5 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { getDesktopDaemonStatus, shouldUseDesktopDaemon } from "@/desktop/daemon/desktop-daemon";
+import { useHosts } from "@/runtime/host-runtime";
+import { resolveLocalServerIdFromHosts } from "@/types/host-connection";
 
 const DESKTOP_DAEMON_SERVER_ID_QUERY_KEY = ["desktop-daemon-server-id"] as const;
 
@@ -32,15 +35,21 @@ function useLocalDaemonServerIdQuery() {
   });
 }
 
+function useRegisteredLocalServerId(): string | null {
+  const hosts = useHosts();
+  return useMemo(() => resolveLocalServerIdFromHosts(hosts), [hosts]);
+}
+
 export function useLocalDaemonServerId(): string | null {
   const isDesktopApp = shouldUseDesktopDaemon();
   const query = useLocalDaemonServerIdQuery();
+  const registeredLocalServerId = useRegisteredLocalServerId();
 
   if (!isDesktopApp) {
     return null;
   }
 
-  return query.data?.serverId ?? null;
+  return registeredLocalServerId ?? query.data?.serverId ?? null;
 }
 
 export type LocalDaemonServerIdState =
@@ -51,9 +60,13 @@ export type LocalDaemonServerIdState =
 export function useLocalDaemonServerIdState(): LocalDaemonServerIdState {
   const isDesktopApp = shouldUseDesktopDaemon();
   const query = useLocalDaemonServerIdQuery();
+  const registeredLocalServerId = useRegisteredLocalServerId();
 
   if (!isDesktopApp) {
     return { status: "resolved", serverId: null };
+  }
+  if (registeredLocalServerId) {
+    return { status: "resolved", serverId: registeredLocalServerId };
   }
   if (query.isError) {
     return { status: "error" };
