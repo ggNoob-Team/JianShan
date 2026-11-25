@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.3 - 2026-11-25
+
+Local host auto-registration, a local admin console entry, and safer desktop data migration.
+
+### Added
+
+- Auto-registered local hosts on remote daemons with the host's consent.
+- Added a local admin console settings entry in the desktop app.
+
+### Improved
+
+- Release packaging now syncs workspace versions and unpacks the admin UI for desktop builds.
+
+### Fixed
+
+- Preserved existing Paseo user data when the desktop app's identity changed after the rename.
+
 ## 0.14.2 - 2026-11-24
 
 Android update checks, quieter ownership labels, workspace-scoped owner fallback, and persistent Archify generator tabs.

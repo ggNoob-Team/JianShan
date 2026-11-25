@@ -1,4 +1,21 @@
-const ENGLISH_RELEASE_NOTES = `## 0.14.2 - 2026-11-24
+const ENGLISH_RELEASE_NOTES = `## 0.14.3 - 2026-11-25
+
+Local host auto-registration, a local admin console entry, and safer desktop data migration.
+
+### Added
+
+- Auto-registered local hosts on remote daemons with the host's consent.
+- Added a local admin console settings entry in the desktop app.
+
+### Improved
+
+- Release packaging now syncs workspace versions and unpacks the admin UI for desktop builds.
+
+### Fixed
+
+- Preserved existing Paseo user data when the desktop app's identity changed after the rename.
+
+## 0.14.2 - 2026-11-24
 
 Android update checks, quieter ownership labels, workspace-scoped owner fallback, and persistent Archify generator tabs.
 
@@ -113,7 +130,24 @@ JianShan branding, QR pairing on HarmonyOS, workspace link tabs, faster startup,
 - Fixed the app sometimes remaining on the splash screen when settings or workspace hydration stalled.
 `;
 
-const CHINESE_RELEASE_NOTES = `## 0.14.2 - 2026-11-24
+const CHINESE_RELEASE_NOTES = `## 0.14.3 - 2026-11-25
+
+本地主机自动注册、本地管理台入口,以及更安全的桌面端数据迁移。
+
+### 新增
+
+- 经主机同意后,自动把本地主机注册到远端 daemon。
+- 桌面端新增本地管理台设置入口。
+
+### 改进
+
+- 发布打包流程同步 workspace 版本,并在桌面构建中解包管理 UI。
+
+### 修复
+
+- 重命名后桌面端应用身份变化时,保留已有的 Paseo 用户数据。
+
+## 0.14.2 - 2026-11-24
 
 Android 更新检查、更安静的归属标签、按工作区限定所有者回退,以及保持打开的 Archify 生成器标签页。
 
