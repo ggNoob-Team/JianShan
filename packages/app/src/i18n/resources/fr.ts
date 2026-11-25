@@ -2934,6 +2934,7 @@ export const fr: TranslationResources = {
       commandLine: {
         title: "Ligne de commande",
         description: "Pilotez et scriptez vos agents depuis votre terminal",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "Installer",

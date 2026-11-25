@@ -2898,6 +2898,7 @@ export const ar: TranslationResources = {
       commandLine: {
         title: "سطر الأوامر",
         description: "وكلاء التحكم والبرنامج النصي من المحطة الطرفية الخاصة بك",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "ثَبَّتَ",

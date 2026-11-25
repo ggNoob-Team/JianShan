@@ -2912,6 +2912,7 @@ export const ptBR: TranslationResources = {
       commandLine: {
         title: "Linha de comando",
         description: "Controle agentes e execute scripts pelo terminal",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "Instalar",

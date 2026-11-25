@@ -2933,6 +2933,7 @@ export const es: TranslationResources = {
       commandLine: {
         title: "línea de comando",
         description: "Agentes de control y script desde tu terminal",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "Instalar",

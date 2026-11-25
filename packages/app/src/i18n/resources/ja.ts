@@ -2893,6 +2893,7 @@ export const ja: TranslationResources = {
       commandLine: {
         title: "コマンドライン",
         description: "ターミナルからエージェントを制御し、スクリプトで操作",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "インストール",

@@ -2992,6 +2992,8 @@ export const en = {
       commandLine: {
         title: "Command line",
         description: "Control and script agents from your terminal",
+        installedHint:
+          "Open terminals do not inherit the new PATH. Fully quit and reopen the terminal before running paseo.",
       },
       actions: {
         install: "Install",

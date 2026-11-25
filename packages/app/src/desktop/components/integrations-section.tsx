@@ -62,6 +62,11 @@ export function IntegrationsSection() {
             <Text style={settingsStyles.rowHint}>
               {t("settings.integrations.commandLine.description")}
             </Text>
+            {status?.installed ? (
+              <Text style={settingsStyles.rowHint}>
+                {t("settings.integrations.commandLine.installedHint")}
+              </Text>
+            ) : null}
           </View>
           {status?.installed ? (
             <View style={styles.installedLabel}>

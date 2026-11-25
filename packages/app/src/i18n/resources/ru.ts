@@ -2912,6 +2912,7 @@ export const ru: TranslationResources = {
       commandLine: {
         title: "Командная строка",
         description: "Управляйте агентами и автоматизируйте их работу из терминала",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "Установить",

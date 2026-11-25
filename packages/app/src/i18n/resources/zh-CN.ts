@@ -2828,6 +2828,8 @@ export const zhCN: TranslationResources = {
       commandLine: {
         title: "命令行",
         description: "从终端控制 Agent 并运行脚本",
+        installedHint:
+          "已打开的终端不会自动继承新的 PATH，请完全退出并重新打开终端后再运行 paseo。",
       },
       actions: {
         install: "安装",

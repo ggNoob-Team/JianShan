@@ -2881,6 +2881,7 @@ export const ko: TranslationResources = {
       commandLine: {
         title: "명령줄",
         description: "터미널에서 에이전트를 제어하고 스크립팅합니다",
+        installedHint: en.settings.integrations.commandLine.installedHint,
       },
       actions: {
         install: "설치",

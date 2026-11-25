@@ -3,11 +3,8 @@ import { app } from "electron";
 import log from "electron-log/main";
 import { resolveCliInstallSourcePath } from "./path.js";
 import { getBundledCliShimPath, getCliTargetPath, getLocalBinDir } from "./paths.js";
-import { ensurePathInShellRc } from "./shell-rc.js";
-
-interface InstallStatus {
-  installed: boolean;
-}
+import { ensureCliPath } from "./shell-rc.js";
+import { resolveCliInstallStatus, type InstallStatus } from "./status.js";
 
 async function pathOrSymlinkExists(p: string): Promise<boolean> {
   try {
@@ -57,9 +54,9 @@ export async function installCli(): Promise<InstallStatus> {
     await fs.symlink(installSourcePath, targetPath);
   }
 
-  const { shellUpdated } = await ensurePathInShellRc();
+  const { shellUpdated } = await ensureCliPath();
   if (shellUpdated) {
-    log.info("[integrations] Updated shell rc with ~/.local/bin PATH");
+    log.info("[integrations] Updated the CLI command path");
   }
 
   return getCliInstallStatus();
@@ -67,5 +64,12 @@ export async function installCli(): Promise<InstallStatus> {
 
 export async function getCliInstallStatus(): Promise<InstallStatus> {
   const targetPath = getCliTargetPath();
-  return { installed: await pathOrSymlinkExists(targetPath) };
+  const targetExists = await pathOrSymlinkExists(targetPath);
+  return resolveCliInstallStatus({
+    platform: process.platform,
+    targetExists,
+    pathEnv: process.env.PATH,
+    binDir: getLocalBinDir(),
+    env: process.env,
+  });
 }
