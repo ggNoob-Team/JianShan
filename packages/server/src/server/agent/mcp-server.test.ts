@@ -17,6 +17,7 @@ import { createTestLogger } from "../../test-utils/test-logger.js";
 import { createAgentMcpServer as createAgentMcpServerWithDependencies } from "./mcp-server.js";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { ToolHosts } from "../host-operations/index.js";
+import type { HostSummary } from "@getpaseo/protocol/hosts";
 import { AgentManager, type ManagedAgent } from "./agent-manager.js";
 import { AgentStorage, type StoredAgentRecord } from "./agent-storage.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
@@ -892,6 +893,66 @@ describe("bundled Paseo skill", () => {
       expect(documentedInputs.filter((name) => !advertisedNamesAndValues.has(name))).toEqual([]);
     } finally {
       await client.close();
+      await server.close();
+    }
+  });
+});
+
+describe("list_hosts MCP tool", () => {
+  it("marks the latest message sender origin as current", async () => {
+    const caller = createManagedAgent({
+      id: "agent-cross-client-origin",
+      labels: { "paseo.originServerId": "srv_mac" },
+      createdBy: { clientId: "cid-mac", clientName: "MacBook" },
+    });
+    const agentManager = {
+      getAgent: (agentId: string) => (agentId === caller.id ? caller : null),
+      getLatestActor: () => ({
+        clientId: "cid-windows",
+        clientName: "Windows workstation",
+        originServerId: "srv_windows",
+      }),
+    } as unknown as AgentManager;
+    const host = (serverId: string, label: string): HostSummary => ({
+      registrationId: "reg_" + serverId,
+      serverId,
+      label,
+      source: { id: "owner", key: serverId },
+      metadata: {},
+      enabled: true,
+      status: "online",
+      targetDescription: label,
+      lastOnlineAt: "2026-11-25T00:00:00.000Z",
+      nextRetryAt: null,
+      error: null,
+    });
+    const hostTools: ToolHosts = {
+      directory: async () => ({
+        self: { serverId: "srv_remote", label: "Remote daemon" },
+        hosts: [host("srv_mac", "MacBook"), host("srv_windows", "Windows workstation")],
+      }),
+      async use<T>(): Promise<T> {
+        throw new Error("list_hosts does not open a route");
+      },
+    };
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage: new BoundaryAgentStorageFake() as AgentStorage,
+      providerSnapshotManager:
+        new BoundaryProviderSnapshotManagerFake() as unknown as ProviderSnapshotManager,
+      callerAgentId: caller.id,
+      hosts: () => hostTools,
+      logger: createTestLogger(),
+    });
+
+    try {
+      const response = await invokeToolWithParsedInput(registeredTool(server, "list_hosts"), {});
+      expect(response.structuredContent.current).toEqual({
+        serverId: "srv_windows",
+        registrationId: "reg_srv_windows",
+        label: "Windows workstation",
+      });
+    } finally {
       await server.close();
     }
   });

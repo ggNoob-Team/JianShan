@@ -73,6 +73,7 @@ import type { CheckDetails, ForgeService } from "../services/forge-service.js";
 import type { GitHubPullRequestStatusFacts } from "../services/github-facts.js";
 
 interface SessionHandlerInternals {
+  currentActor(): { clientId: string; clientName?: string; originServerId?: string };
   interruptAgentIfRunning(agentId: string): Promise<void>;
   handleSendAgentMessage(
     agentId: string,
@@ -303,6 +304,8 @@ vi.mock("./worktree-bootstrap.js", async (importOriginal) => {
 interface SessionForTestOptions {
   sendToSource?: SessionOptions["onMessageToSource"];
   clientId?: string;
+  clientName?: string;
+  originServerId?: string;
   permissions?: readonly DaemonPermission[];
   agentManager?: { [K in keyof SessionOptions["agentManager"]]?: unknown };
   agentStorage?: { [K in keyof SessionOptions["agentStorage"]]?: unknown };
@@ -385,6 +388,8 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     agentMessages: createAgentMessageDeliveryStub(),
     creationService: createTestCreationService(),
     clientId: options.clientId ?? "test-client",
+    clientName: options.clientName,
+    originServerId: options.originServerId,
     onMessage: (message) => messages.push(message),
     ...(options.targetedMessages
       ? {
@@ -459,6 +464,20 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
   if (options.sendToSource) sessionOptions.onMessageToSource = options.sendToSource;
   return new Session(sessionOptions);
 }
+
+test("the current actor carries the session origin server id", () => {
+  const session = createSessionForTest({
+    clientId: "cid-windows",
+    clientName: "Windows workstation",
+    originServerId: "srv_windows",
+  });
+
+  expect(asSessionInternals(session).currentActor()).toEqual({
+    clientId: "cid-windows",
+    clientName: "Windows workstation",
+    originServerId: "srv_windows",
+  });
+});
 
 test("routes host-scoped agent skills requests through the daemon owner", async () => {
   const messages: SessionOutboundMessage[] = [];

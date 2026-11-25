@@ -46,6 +46,10 @@ Multiple local daemons remain distinct registrations. `current` identifies the d
 with the active client origin; `registrationId` identifies its reverse execution link. An agent
 must select a concrete host when the current origin has no enabled registration.
 
+Each human prompt carries the current client ID, client name, and `originServerId` as model-visible
+sender context. `list_hosts.current` follows the latest accepted human message, not the agent creator,
+so one remote agent can be used from different local machines without losing the sender identity.
+
 A producer that registers a host through a routed API is qualified on B as
 `route:<B principal>:<A serverId>:<A producer>`, with each component percent-encoded. For an ordinary
 A client, `<A producer>` is its principal-plus-client source. This namespace belongs to the

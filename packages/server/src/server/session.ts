@@ -141,6 +141,7 @@ import { assertPluginTimelineDataSize } from "./agent/agent-timeline-content.js"
 import { parsePluginClientId } from "./plugins/plugin-session-identity.js";
 import { buildAgentForkContextAttachment } from "./agent/activity-curator.js";
 import { buildAgentPrompt } from "./agent/prompt-attachments.js";
+import { buildHumanAgentPrompt } from "./agent/prompt-sender-context.js";
 import {
   resolveStructuredGenerationProviders,
   type StructuredGenerationDaemonConfig,
@@ -1365,6 +1366,7 @@ export class Session {
     return {
       clientId: this.clientId,
       ...(this.clientName ? { clientName: this.clientName } : {}),
+      ...(this.originServerId ? { originServerId: this.originServerId } : {}),
     };
   }
 
@@ -4431,7 +4433,14 @@ export class Session {
     );
 
     const promptText = options?.spokenInput ? wrapSpokenInput(text) : text;
-    const prompt = buildAgentPrompt(promptText, images, attachments);
+    const prompt = buildHumanAgentPrompt({
+      text: promptText,
+      images,
+      attachments,
+      clientId: this.clientId,
+      clientName: this.clientName,
+      originServerId: this.originServerId,
+    });
 
     try {
       await sendPromptToAgent({

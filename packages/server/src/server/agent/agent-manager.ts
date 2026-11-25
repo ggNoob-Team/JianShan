@@ -764,6 +764,7 @@ export class AgentManager {
   private readonly providerEnabled = new Map<AgentProvider, boolean>();
   private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
   private readonly agents = new Map<string, LiveManagedAgent>();
+  private readonly latestActorByAgent = new WeakMap<object, AgentActor>();
   private readonly timelineStore: InMemoryAgentTimelineStore;
   private readonly providerSubagents = new ProviderSubagentStore();
   private readonly agentsAwaitingInitialSnapshotPersist = new Set<string>();
@@ -1279,6 +1280,12 @@ export class AgentManager {
   getAgent(id: string): ManagedAgent | null {
     const agent = this.agents.get(id);
     return agent ? { ...agent } : null;
+  }
+
+  getLatestActor(id: string): AgentActor | null {
+    const agent = this.agents.get(id);
+    if (!agent) return null;
+    return this.latestActorByAgent.get(agent) ?? agent.createdBy ?? null;
   }
 
   async waitForAgentClose(agentId: string): Promise<void> {
@@ -4917,6 +4924,20 @@ export class AgentManager {
     return event;
   }
 
+  private recordAcceptedActor(
+    agent: ActiveManagedAgent,
+    outcome: "accepted" | "rejected",
+    actor: AgentActor | undefined,
+  ): void {
+    if (outcome !== "accepted" || !actor) return;
+    this.latestActorByAgent.set(agent, actor);
+    // Legacy agents have no creator. The first accepted named prompt supplies it without
+    // another ledger read; callers emit the resulting agent state so it is persisted.
+    if (actor.clientName && !agent.createdBy) {
+      agent.createdBy = actor;
+    }
+  }
+
   private recordSubmittedPrompt(
     agent: ActiveManagedAgent,
     prompt: AgentPromptInput,
@@ -4929,11 +4950,7 @@ export class AgentManager {
       actor?: AgentActor;
     },
   ): void {
-    // Legacy agents have no creator. The first accepted named prompt supplies it without
-    // another ledger read; callers emit the resulting agent state so it is persisted.
-    if (outcome === "accepted" && options?.actor?.clientName && !agent.createdBy) {
-      agent.createdBy = options.actor;
-    }
+    this.recordAcceptedActor(agent, outcome, options?.actor);
     const items = projectAgentMessages({
       type: "user_message",
       text: submittedPromptText(prompt),

@@ -707,7 +707,11 @@ test("records the client actor on submitted prompts", async () => {
       workspaceId: undefined,
     });
     agentId = agent.id;
-    const actor = { clientId: "client-harmony", clientName: "Harmony Emulator" };
+    const actor = {
+      clientId: "client-harmony",
+      clientName: "Harmony Emulator",
+      originServerId: "srv_windows",
+    };
     const run = manager.streamAgent(agent.id, "hello", {
       clientMessageId: "hello-client",
       actor,
@@ -719,6 +723,7 @@ test("records the client actor on submitted prompts", async () => {
     await manager.waitForAgentRunStart(agent.id);
 
     expect(manager.getAgent(agent.id)?.createdBy).toEqual(actor);
+    expect(manager.getLatestActor(agent.id)).toEqual(actor);
     expect(manager.getTimeline(agent.id)).toContainEqual(
       expect.objectContaining({
         type: "user_message",

@@ -1575,8 +1575,16 @@ function createToolCatalog(
     async () => {
       const directory = await hostResolver.directory();
       const caller = resolveCallerAgent();
-      const clientId = caller?.createdBy?.clientId;
-      const originServerId = caller?.labels?.["paseo.originServerId"];
+      const latestActor = caller ? agentManager.getLatestActor(caller.id) : null;
+      const clientId = latestActor?.clientId ?? caller?.createdBy?.clientId;
+      const labelOriginServerId = caller?.labels?.["paseo.originServerId"];
+      let originServerId = latestActor?.originServerId;
+      if (!latestActor) {
+        originServerId =
+          typeof labelOriginServerId === "string" && labelOriginServerId.trim()
+            ? labelOriginServerId.trim()
+            : undefined;
+      }
       const current = directory.hosts.find(
         (host) =>
           (originServerId && host.serverId === originServerId) ||

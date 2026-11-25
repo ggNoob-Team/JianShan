@@ -11,6 +11,7 @@ import {
   WorkspaceSetupProgressMessageSchema,
   AgentTimelineEntryPayloadSchema,
 } from "./messages.js";
+import { AgentActorSchema } from "./agent-actor.js";
 import { HostDirectorySchema } from "./hosts.js";
 
 test("hello origin and current host identity remain optional wire fields", () => {
@@ -43,6 +44,23 @@ test("hello origin and current host identity remain optional wire fields", () =>
     serverId: "srv_mac",
     registrationId: "hst_mac",
     label: "MacBook",
+  });
+});
+
+test("agent actor origin identity remains an optional wire field", () => {
+  expect(AgentActorSchema.parse({ clientId: "legacy-client" })).toEqual({
+    clientId: "legacy-client",
+  });
+  expect(
+    AgentActorSchema.parse({
+      clientId: "windows-client",
+      clientName: "Windows workstation",
+      originServerId: "srv_windows",
+    }),
+  ).toEqual({
+    clientId: "windows-client",
+    clientName: "Windows workstation",
+    originServerId: "srv_windows",
   });
 });
 
