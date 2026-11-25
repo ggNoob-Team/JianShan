@@ -105,7 +105,7 @@ describe("desktop packaging", () => {
     expect(config).toContain("!node_modules/@getpaseo/server/dist/server/web-ui/**");
   });
 
-  it("packages the standalone admin sidecar and its UI", () => {
+  it("packages the standalone admin sidecar with its UI unpacked from asar", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
     const serverPackage = readFileSync(join(packageRoot, "..", "server", "package.json"), "utf8");
     const runtimeTrace = readFileSync(
@@ -113,7 +113,10 @@ describe("desktop packaging", () => {
       "utf8",
     );
 
-    expect(config).not.toContain("node_modules/@getpaseo/server/dist/server/server/admin/ui");
+    // Electron's asar read stream stages files through Chromium temp files. The
+    // admin sidecar serves these assets over HTTP, so a staged file disappearing
+    // between stat and open would turn a console load into an ENOENT response.
+    expect(config).toContain("node_modules/@getpaseo/server/dist/server/server/admin/ui/**/*");
     expect(serverPackage).toContain(
       "fs.cpSync('src/server/admin/ui','dist/server/server/admin/ui'",
     );

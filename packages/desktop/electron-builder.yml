@@ -27,6 +27,9 @@ files:
 asarUnpack:
   - dist/daemon/node-entrypoint-runner.js
   - node_modules/@getpaseo/server/dist/server/terminal/shell-integration/**/*
+  # The admin sidecar serves these over HTTP. Reading them through asar stages
+  # Chromium temp files that can disappear before Express opens them.
+  - node_modules/@getpaseo/server/dist/server/server/admin/ui/**/*
 extraResources:
   # Preserve physical compiler inputs, including .d.ts files omitted from packaged node_modules.
   - from: ../server/dist/server/builtin-plugins

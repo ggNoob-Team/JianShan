@@ -9,6 +9,7 @@ const rootPackagePath = path.join(rootDir, "package.json");
 const rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8"));
 const rootVersion = rootPackage.version;
 const workspacePaths = Array.isArray(rootPackage.workspaces) ? rootPackage.workspaces : [];
+const checkOnly = process.argv.includes("--check");
 const sharedMetadata = {
   homepage: rootPackage.homepage,
   repository: rootPackage.repository,
@@ -79,10 +80,20 @@ for (const workspacePath of workspacePaths) {
     }
   }
 
-  if (changed) {
+  if (changed && !checkOnly) {
     writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+  }
+  if (changed) {
     touched.push(path.relative(rootDir, packagePath));
   }
+}
+
+if (checkOnly && touched.length > 0) {
+  console.error(`Workspace versions and internal deps are not synced to ${rootVersion}:`);
+  for (const file of touched) {
+    console.error(`- ${file}`);
+  }
+  process.exit(1);
 }
 
 if (touched.length === 0) {
