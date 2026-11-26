@@ -86,6 +86,17 @@ Open in system browser action for that case. Remote iframe history is
 cross-origin, so address-bar Back and Forward are unavailable on HarmonyOS. Use
 the system-browser setting when full history controls matter.
 
+## Shell bridges
+
+ArkWeb keeps only the last declarative `.javaScriptProxy()` on a Web component,
+so earlier bridges silently disappear from `window`. The shell registers every
+bridge from `onControllerAttached` with
+`controller.registerJavaScriptProxy`; the registration is in place before the
+entry document starts loading. This is what makes `paseoClipboard`,
+`paseoKeepScreenOn`, `paseoPhotoPicker`, and `paseoScreenCapture` all visible on
+the first page load. Add new bridges in `registerJavaScriptProxies` and keep the
+`onPageEnd` diagnostics in sync.
+
 ## Clipboard
 
 ArkWeb's clipboard API asks for a read permission the shell is never granted, so

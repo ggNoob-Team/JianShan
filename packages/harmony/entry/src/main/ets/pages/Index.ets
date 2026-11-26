@@ -93,9 +93,11 @@ class ScreenKeepAwakeBridge {
 @Component
 struct Index {
   private controller: web_webview.WebviewController = new web_webview.WebviewController();
+  private clipboard = new ClipboardBridge();
   private screenKeepAwake = new ScreenKeepAwakeBridge();
   private photoPicker = new PhotoPickerBridge();
   private screenCapture = new ScreenCaptureBridge(this.controller);
+  private proxiesRegistered = false;
   private resources: resourceManager.ResourceManager | null = null;
   /**
    * A unique document URL per launch. The bundle and its document are served from
@@ -163,15 +165,27 @@ struct Index {
    * hilog in its Log panel. See docs/harmonyos.md.
    */
   private logWebPlatformDiagnostics(): void {
-    const script = `JSON.stringify({
-      secure: window.isSecureContext,
-      idb: typeof indexedDB !== "undefined",
-      origin: location.origin,
-      ua: navigator.userAgent,
-      clip: typeof window.paseoClipboard?.writeText,
-      gallery: typeof window.paseoPhotoPicker?.pickImages,
-      galleryRead: typeof window.paseoPhotoPicker?.readImages,
-    })`;
+    const script = `(() => {
+      const gallery = window.paseoPhotoPicker;
+      const clip = window.paseoClipboard;
+      const capture = window.paseoScreenCapture;
+      return JSON.stringify({
+        secure: window.isSecureContext,
+        idb: typeof indexedDB !== "undefined",
+        origin: location.origin,
+        top: window.top === window,
+        ua: navigator.userAgent,
+        galleryType: typeof gallery,
+        galleryKeys: gallery ? Object.keys(gallery) : null,
+        gallery: typeof gallery?.pickImages,
+        galleryRead: typeof gallery?.readImages,
+        clipType: typeof clip,
+        clipKeys: clip ? Object.keys(clip) : null,
+        clip: typeof clip?.writeText,
+        captureType: typeof capture,
+        capture: typeof capture?.capturePage,
+      });
+    })()`;
     this.controller.runJavaScript(script, (error: BusinessError, result: string) => {
       if (error) {
         hilog.warn(LOG_DOMAIN, LOG_TAG, "diagnostics failed: %{public}s", `${error.message}`);
@@ -200,6 +214,37 @@ struct Index {
       });
   }
 
+  /**
+   * ArkWeb keeps only the last declarative javaScriptProxy on a Web component;
+   * registering through the controller is the supported way to expose several
+   * bridge objects. The registration is in place before the controller starts
+   * loading the entry document, so the first page already sees all of them.
+   */
+  private registerJavaScriptProxies(): void {
+    if (this.proxiesRegistered) {
+      return;
+    }
+    try {
+      this.controller.registerJavaScriptProxy(this.clipboard, "paseoClipboard", [], [
+        "readText",
+        "writeText",
+      ]);
+      this.controller.registerJavaScriptProxy(this.screenKeepAwake, "paseoKeepScreenOn", [], [
+        "setKeepScreenOn",
+      ]);
+      this.controller.registerJavaScriptProxy(this.photoPicker, "paseoPhotoPicker", [], [
+        "pickImages",
+        "readImages",
+      ]);
+      this.controller.registerJavaScriptProxy(this.screenCapture, "paseoScreenCapture", [], [
+        "capturePage",
+      ]);
+      this.proxiesRegistered = true;
+    } catch (error) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, "registerJavaScriptProxy failed: %{public}s", `${error}`);
+    }
+  }
+
   build() {
     Column() {
       Web({ src: this.entryUrl, controller: this.controller })
@@ -211,37 +256,8 @@ struct Index {
         .cacheMode(CacheMode.Default)
         // Copy buttons in the web app write here instead of through ArkWeb's
         // gated clipboard API. See ClipboardBridge.
-        .javaScriptProxy({
-          object: new ClipboardBridge(),
-          name: "paseoClipboard",
-          // Async-only registration: a method listed in methodList is treated as
-          // synchronous and never receives the page's callback.
-          methodList: [],
-          asyncMethodList: ["readText", "writeText"],
-          controller: this.controller,
-        })
-        .javaScriptProxy({
-          object: this.screenKeepAwake,
-          name: "paseoKeepScreenOn",
-          methodList: [],
-          asyncMethodList: ["setKeepScreenOn"],
-          controller: this.controller,
-        })
-        // Direct gallery picker for the composer. PhotoViewPicker needs no
-        // media-library permission and grants temporary access to its result.
-        .javaScriptProxy({
-          object: this.photoPicker,
-          name: "paseoPhotoPicker",
-          methodList: [],
-          asyncMethodList: ["pickImages", "readImages"],
-          controller: this.controller,
-        })
-        .javaScriptProxy({
-          object: this.screenCapture,
-          name: "paseoScreenCapture",
-          methodList: [],
-          asyncMethodList: ["capturePage"],
-          controller: this.controller,
+        .onControllerAttached(() => {
+          this.registerJavaScriptProxies();
         })
         // IndexedDB backs the replica row store on web (row-store.web.ts).
         .databaseAccess(true)
