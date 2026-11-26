@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/builtin-plugins",
-  "version": "0.17.0",
+  "version": "0.17.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@getpaseo/plugin": "0.17.0",
+    "@getpaseo/plugin": "*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

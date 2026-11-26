@@ -4,7 +4,11 @@ import { createE2ETestContext } from "./helpers/test-daemon.ts";
 import { waitForTerminalOutput } from "./helpers/terminal.ts";
 
 const ctx = await createE2ETestContext({ timeout: 30_000 });
-const sdk = createPaseoClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
+const sdk = createPaseoClient({
+  url: `${ctx.wsUrl}/ws`,
+  clientName: "测试角色",
+  reconnect: { enabled: false },
+});
 
 async function cli(args: string[]) {
   const result = await ctx.paseo([...args, "--json"]);

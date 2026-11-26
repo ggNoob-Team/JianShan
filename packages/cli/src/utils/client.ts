@@ -20,6 +20,7 @@ export interface ConnectOptions {
   target: DaemonTarget;
   timeout?: number;
   instance?: DaemonInstance;
+  clientName?: string;
 }
 export function resolveClientPaseoHome(
   target: DaemonTarget,
@@ -193,6 +194,7 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
   const credential = resolveDaemonCredential(host, home);
   const client = createHostClient(host, {
     clientId: await getOrCreateCliClientId(home),
+    clientName: options.clientName ?? "Paseo CLI",
     clientType: "cli",
     appVersion: resolveCliVersion(),
     ...(credential?.kind === "password" ? { password: credential.password } : {}),

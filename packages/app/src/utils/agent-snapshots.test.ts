@@ -40,6 +40,7 @@ function createSnapshot(
     labels: (input.labels ?? {}) as AgentSnapshotPayload["labels"],
     ...(input.controls ? { controls: input.controls } : {}),
     ...(input.options ? { options: input.options } : {}),
+    ...(input.sessionMetrics ? { sessionMetrics: input.sessionMetrics } : {}),
   };
 }
 

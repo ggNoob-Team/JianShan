@@ -199,9 +199,8 @@ try {
     ["worktree", "ls", "--cwd", "./repository", "--json"],
     ["worktree", "ls", "--host", `127.0.0.1:${daemon.port}`, "--cwd", ".", "--json"],
   ]) {
-    const explicit = args.includes("--cwd");
     const result = await runPaseoCli(daemon, args, {
-      cwd: explicit ? daemon.workDir : repo,
+      cwd: args.includes("./repository") ? daemon.workDir : repo,
       env: { FORCE_COLOR: undefined },
     });
     assert.strictEqual(result.exitCode, 0, result.stderr);
@@ -224,7 +223,7 @@ try {
     ],
   ]) {
     const result = await runPaseoCli(daemon, args, {
-      cwd: args.includes("--cwd") ? daemon.workDir : repo,
+      cwd: args.includes("./repository") ? daemon.workDir : repo,
       env: { FORCE_COLOR: undefined },
     });
     assert.notStrictEqual(result.exitCode, 0);

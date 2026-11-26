@@ -26,6 +26,16 @@ try {
     paseoHome,
   ]);
   assert.strictEqual(configured.exitCode, 0, configured.stderr);
+  const relayDisabled = await runLocalPaseo([
+    "daemon",
+    "config",
+    "set",
+    "daemon.relay.enabled",
+    "false",
+    "--home",
+    paseoHome,
+  ]);
+  assert.strictEqual(relayDisabled.exitCode, 0, relayDisabled.stderr);
 
   console.log("Test 1: `paseo` runs blocking onboarding without implicit relay pairing");
   const onboard = await $`PASEO_HOME=${paseoHome} PASEO_PAIRING_QR=0 npx paseo`.nothrow();

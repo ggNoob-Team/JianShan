@@ -124,6 +124,8 @@ try {
   // Test 2: non-interactive pairing keeps relay disabled by default
   {
     console.log("Test 2: daemon pair requires explicit relay consent");
+    const disabled = await daemonCommand(["config", "set", "daemon.relay.enabled", "false"]);
+    assert.strictEqual(disabled.exitCode, 0, disabled.stderr);
     const result = await daemonCommand(["pair"]);
     assert.strictEqual(result.exitCode, 1, "daemon pair should require relay consent");
     assert(

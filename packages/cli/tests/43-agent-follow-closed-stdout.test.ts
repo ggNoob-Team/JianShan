@@ -21,7 +21,7 @@ try {
   // An agent created without a prompt stays idle, so no provider is called.
   const client = await connectToDaemon({ target: { kind: "endpoint", host } });
   const agent = await client.createAgent({
-    provider: "claude",
+    provider: "codex",
     cwd: daemon.workDir,
     title: "closed stdout",
   });

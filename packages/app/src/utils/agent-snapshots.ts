@@ -64,6 +64,7 @@ function agentVisibilityFlags(agent: Pick<Agent, "background" | "internal">) {
   };
 }
 
+// oxlint-disable-next-line complexity -- this is one flat exhaustive payload mapping.
 export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
   return {
     id: agent.id,
@@ -88,6 +89,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     ...(agent.runtimeInfo ? { runtimeInfo: agent.runtimeInfo } : {}),
     ...(agent.usageScopeKey ? { usageScopeKey: agent.usageScopeKey } : {}),
     ...(agent.lastUsage ? { lastUsage: agent.lastUsage } : {}),
+    ...(agent.sessionMetrics ? { sessionMetrics: agent.sessionMetrics } : {}),
     ...(agent.lastError ? { lastError: agent.lastError } : {}),
     title: agent.title,
     labels: agent.labels,
@@ -138,6 +140,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     runtimeInfo: snapshot.runtimeInfo,
     usageScopeKey: snapshot.usageScopeKey,
     lastUsage: snapshot.lastUsage,
+    sessionMetrics: snapshot.sessionMetrics,
     lastError: snapshot.lastError ?? null,
     title: snapshot.title ?? null,
     cwd: snapshot.cwd,

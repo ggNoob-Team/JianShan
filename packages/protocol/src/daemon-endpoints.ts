@@ -72,12 +72,17 @@ export function parseRelayConnectionUri(input: string): ParsedRelayConnectionUri
   }
   const endpoint = normalizeHostPort(authority);
   const password = params.get("password") || undefined;
+  const security = params.get("security");
+  if (security !== undefined && security !== "protected") {
+    throw new Error("Relay connection URI has an unsupported security mode");
+  }
   return {
     offer: {
       v: 2,
       serverId,
       daemonPublicKeyB64: key,
       relay: { endpoint, useTls: params.get("ssl") === "true" },
+      ...(security === "protected" ? { minimumSecurityMode: "protected" as const } : {}),
     },
     ...(password ? { password } : {}),
   };

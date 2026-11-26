@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/desktop",
-  "version": "0.17.0",
+  "version": "0.17.5",
   "private": true,
   "description": "JianShan desktop app (Electron wrapper)",
   "homepage": "https://paseo.sh",
@@ -29,8 +29,8 @@
     "test:e2e:window-startup": "npm run build:main && node ./e2e/window-startup.e2e.mjs"
   },
   "dependencies": {
-    "@getpaseo/cli": "0.17.0",
-    "@getpaseo/server": "0.17.0",
+    "@getpaseo/cli": "*",
+    "@getpaseo/server": "*",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.6.2",
     "ws": "^8.14.2",

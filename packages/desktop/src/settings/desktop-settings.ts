@@ -6,8 +6,13 @@ import { z } from "zod";
 
 import type { AppReleaseChannel } from "../features/auto-updater.js";
 
+export type DesktopUpdateMode = "automatic" | "notify" | "off";
+
 export interface DesktopSettings {
   releaseChannel: AppReleaseChannel;
+  updates: {
+    mode: DesktopUpdateMode;
+  };
   notifications: {
     playSound: boolean;
   };
@@ -20,6 +25,7 @@ export interface DesktopSettings {
 
 interface DesktopSettingsPatch {
   releaseChannel?: AppReleaseChannel;
+  updates?: Partial<DesktopSettings["updates"]>;
   notifications?: Partial<DesktopSettings["notifications"]>;
   daemon?: Partial<DesktopSettings["daemon"]>;
 }
@@ -32,6 +38,9 @@ export interface DesktopSettingsStore {
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   releaseChannel: "stable",
+  updates: {
+    mode: "automatic",
+  },
   notifications: {
     playSound: true,
   },
@@ -45,6 +54,13 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
 const DESKTOP_SETTINGS_FILENAME = "desktop-settings.json";
 
 const ReleaseChannelSchema = z.enum(["stable", "beta"]);
+const UpdateModeSchema = z.enum(["automatic", "notify", "off"]);
+
+const UpdatesSchema = z
+  .looseObject({
+    mode: UpdateModeSchema.catch(DEFAULT_DESKTOP_SETTINGS.updates.mode),
+  })
+  .catch(() => ({ ...DEFAULT_DESKTOP_SETTINGS.updates }));
 
 const NotificationsSchema = z
   .looseObject({
@@ -63,6 +79,7 @@ const DaemonSchema = z
 const DesktopSettingsSchema = z
   .looseObject({
     releaseChannel: ReleaseChannelSchema.catch(DEFAULT_DESKTOP_SETTINGS.releaseChannel),
+    updates: UpdatesSchema,
     notifications: NotificationsSchema,
     daemon: DaemonSchema,
   })
@@ -98,6 +115,11 @@ function coerceReleaseChannel(value: unknown): AppReleaseChannel | null {
   return result.success ? result.data : null;
 }
 
+function coerceUpdateMode(value: unknown): DesktopUpdateMode | null {
+  const result = UpdateModeSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
+
 function coerceBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
@@ -109,6 +131,7 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 function buildDefaultSettings(): StoredDesktopSettings {
   return {
     releaseChannel: DEFAULT_DESKTOP_SETTINGS.releaseChannel,
+    updates: { ...DEFAULT_DESKTOP_SETTINGS.updates },
     notifications: { ...DEFAULT_DESKTOP_SETTINGS.notifications },
     daemon: { ...DEFAULT_DESKTOP_SETTINGS.daemon },
   };
@@ -128,6 +151,7 @@ function buildDefaultDocument(): PersistedDesktopSettingsDocument {
 function toDesktopSettings(stored: StoredDesktopSettings): DesktopSettings {
   return {
     releaseChannel: stored.releaseChannel,
+    updates: { mode: stored.updates.mode },
     notifications: { playSound: stored.notifications.playSound },
     daemon: {
       manageBuiltInDaemon: stored.daemon.manageBuiltInDaemon,
@@ -146,6 +170,13 @@ function coerceDesktopSettingsPatch(input: unknown): DesktopSettingsPatch {
   const releaseChannel = coerceReleaseChannel(input.releaseChannel);
   if (releaseChannel) {
     patch.releaseChannel = releaseChannel;
+  }
+
+  if (isRecord(input.updates)) {
+    const mode = coerceUpdateMode(input.updates.mode);
+    if (mode) {
+      patch.updates = { mode };
+    }
   }
 
   if (isRecord(input.notifications)) {
@@ -205,6 +236,7 @@ function mergeDesktopSettings(
   return {
     ...current,
     releaseChannel: patch.releaseChannel ?? current.releaseChannel,
+    updates: { ...current.updates, ...patch.updates },
     notifications: { ...current.notifications, ...patch.notifications },
     daemon: { ...current.daemon, ...patch.daemon },
   };
@@ -240,22 +272,26 @@ export function createDesktopSettingsStore({
 }): DesktopSettingsStore {
   const filePath = path.join(userDataPath, DESKTOP_SETTINGS_FILENAME);
   let cachedDocument: PersistedDesktopSettingsDocument | null = null;
-  let persistQueue: Promise<void> = Promise.resolve();
+  let operationQueue: Promise<void> = Promise.resolve();
 
-  async function persistDocument(document: PersistedDesktopSettingsDocument): Promise<void> {
-    const write = async () => {
-      await mkdir(userDataPath, { recursive: true });
-      const tempFilePath = `${filePath}.tmp.${process.pid}.${randomUUID()}`;
-      await writeFile(tempFilePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-      await rename(tempFilePath, filePath);
-      cachedDocument = document;
-    };
-    const queued = persistQueue.then(write, write);
-    persistQueue = queued.catch(() => undefined);
-    await queued;
+  function enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const result = operationQueue.then(operation, operation);
+    operationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
-  async function loadDocument(): Promise<PersistedDesktopSettingsDocument> {
+  async function writeDocument(document: PersistedDesktopSettingsDocument): Promise<void> {
+    await mkdir(userDataPath, { recursive: true });
+    const tempFilePath = `${filePath}.tmp.${process.pid}.${randomUUID()}`;
+    await writeFile(tempFilePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+    await rename(tempFilePath, filePath);
+    cachedDocument = document;
+  }
+
+  async function loadDocumentUnlocked(): Promise<PersistedDesktopSettingsDocument> {
     if (cachedDocument) {
       return cachedDocument;
     }
@@ -268,7 +304,7 @@ export function createDesktopSettingsStore({
         throw error;
       }
       const document = buildDefaultDocument();
-      await persistDocument(document);
+      await writeDocument(document);
       return document;
     }
     const document = coerceDocument(JSON.parse(raw));
@@ -276,58 +312,67 @@ export function createDesktopSettingsStore({
     return document;
   }
 
-  async function initializeLegacyRendererMigration(): Promise<PersistedDesktopSettingsDocument> {
+  async function initializeLegacyRendererMigrationUnlocked(): Promise<PersistedDesktopSettingsDocument> {
     try {
-      return await loadDocument();
+      return await loadDocumentUnlocked();
     } catch {
       const document = buildDefaultDocument();
-      await persistDocument(document);
+      await writeDocument(document);
       return document;
     }
   }
 
   return {
     async get(): Promise<DesktopSettings> {
-      const document = await loadDocument();
+      const document = await enqueueOperation(async () => {
+        if (cachedDocument) {
+          return cachedDocument;
+        }
+        return loadDocumentUnlocked();
+      });
       return toDesktopSettings(document.settings);
     },
 
     async patch(patch: unknown): Promise<DesktopSettings> {
-      const current = await loadDocument();
-      const coercedPatch = coerceDesktopSettingsPatch(patch);
-      const next = mergeDesktopSettings(current.settings, coercedPatch);
-      await persistDocument({
-        ...current,
-        settings: next,
-        migrations: {
-          ...current.migrations,
-          legacyRendererSettingsImported:
-            current.migrations.legacyRendererSettingsImported ||
-            hasLegacyRendererOwnedPatch(coercedPatch),
-        },
+      return enqueueOperation(async () => {
+        const current = await loadDocumentUnlocked();
+        const coercedPatch = coerceDesktopSettingsPatch(patch);
+        const next = mergeDesktopSettings(current.settings, coercedPatch);
+        await writeDocument({
+          ...current,
+          settings: next,
+          migrations: {
+            ...current.migrations,
+            legacyRendererSettingsImported:
+              current.migrations.legacyRendererSettingsImported ||
+              hasLegacyRendererOwnedPatch(coercedPatch),
+          },
+        });
+        return toDesktopSettings(next);
       });
-      return toDesktopSettings(next);
     },
 
     async migrateLegacyRendererSettings(legacySettings: unknown): Promise<DesktopSettings> {
-      const current = await initializeLegacyRendererMigration();
-      if (current.migrations.legacyRendererSettingsImported) {
-        return toDesktopSettings(current.settings);
-      }
+      return enqueueOperation(async () => {
+        const current = await initializeLegacyRendererMigrationUnlocked();
+        if (current.migrations.legacyRendererSettingsImported) {
+          return toDesktopSettings(current.settings);
+        }
 
-      const next = mergeDesktopSettings(
-        current.settings,
-        pickDesktopSettingsFromLegacyRendererSettings(legacySettings),
-      );
-      await persistDocument({
-        ...current,
-        settings: next,
-        migrations: {
-          ...current.migrations,
-          legacyRendererSettingsImported: true,
-        },
+        const next = mergeDesktopSettings(
+          current.settings,
+          pickDesktopSettingsFromLegacyRendererSettings(legacySettings),
+        );
+        await writeDocument({
+          ...current,
+          settings: next,
+          migrations: {
+            ...current.migrations,
+            legacyRendererSettingsImported: true,
+          },
+        });
+        return toDesktopSettings(next);
       });
-      return toDesktopSettings(next);
     },
   };
 }

@@ -61,7 +61,11 @@ try {
 console.log("=== Workspace Rename Command Tests Passed ===");
 
 async function verifyWorkspaceCallerContext() {
-  const sdk = createPaseoClient({ url: `${ctx.wsUrl}/ws`, reconnect: { enabled: false } });
+  const sdk = createPaseoClient({
+    url: `${ctx.wsUrl}/ws`,
+    clientName: "测试角色",
+    reconnect: { enabled: false },
+  });
   try {
     await sdk.connect();
     const parentWorkspace = await sdk.workspaces.create({
@@ -69,7 +73,7 @@ async function verifyWorkspaceCallerContext() {
       background: true,
     });
     // Creation without a prompt stays idle; this visibility test runs no provider turn.
-    const parent = await parentWorkspace.agents.create({ config: { provider: "claude/haiku" } });
+    const parent = await parentWorkspace.agents.create({ config: { provider: "codex/gpt-5.4" } });
     const cases = [
       { caller: parent.id, background: undefined, expected: true },
       { caller: parent.id, background: false, expected: false },

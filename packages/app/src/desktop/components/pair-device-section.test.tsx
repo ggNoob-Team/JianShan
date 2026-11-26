@@ -158,7 +158,7 @@ vi.mock("qrcode", () => ({
   toString: vi.fn(async () => "<svg />"),
 }));
 
-import { PairDeviceSection } from "./pair-device-section";
+import { PairDeviceSection } from "@/devices/pair-device-section";
 
 function createClient() {
   return {

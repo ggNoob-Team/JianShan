@@ -16,11 +16,14 @@ describe("paseo logs JSON output", () => {
       workDir: await mkdtemp(resolve(".artifacts/logs-json-work-")),
     });
     host = `127.0.0.1:${daemon.port}`;
-    const client = await connectToDaemon({ target: { kind: "endpoint", host } });
+    const client = await connectToDaemon({
+      target: { kind: "endpoint", host },
+      clientName: "测试角色",
+    });
     try {
       // Creating an idle agent needs no inference or external provider connection.
       const agent = await client.createAgent({
-        provider: "claude",
+        provider: "codex",
         cwd: daemon.workDir,
         title: "JSON logs",
       });
