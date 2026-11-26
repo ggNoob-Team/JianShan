@@ -1,3 +1,4 @@
+import { AppearanceText as Text } from "@/appearance/text";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useContainedControlSize } from "@/components/ui/control-size";
 import {
@@ -10,7 +11,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type {
   PressableProps,
   PressableStateCallbackType,
@@ -20,7 +21,7 @@ import type {
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
-  buttonIconSize,
+  controlIconSize,
   createControlGeometry,
   type ButtonControlSize,
 } from "@/components/ui/control-geometry";
@@ -204,6 +205,7 @@ export function Button({
   const isIconOnly = children == null && leftIcon != null;
   const sizeStyle = compactSize ? styles.sm : styles.md;
   const iconOnlyStyle = compactSize ? styles.iconOnlySm : styles.iconOnlyMd;
+  const iconSize = compactSize ? controlIconSize.sm : controlIconSize.md;
   const isGhostHovered = hovered && variant === "ghost";
 
   const handleHoverIn = useCallback(() => setHovered(true), []);
@@ -266,7 +268,7 @@ export function Button({
       <ThemedButtonIcon
         loading={loading}
         leftIcon={leftIcon}
-        iconSize={buttonIconSize[size]}
+        iconSize={iconSize}
         uniProps={resolveIconMapping()}
       />
       {children != null ? (

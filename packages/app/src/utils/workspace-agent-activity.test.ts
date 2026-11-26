@@ -7,7 +7,6 @@ function agent(input: {
   workspaceId?: string;
   status?: Agent["status"];
   turn?: Agent["turn"];
-  createdAt?: string;
   updatedAt: string;
   attentionTimestamp?: string | null;
   requiresAttention?: boolean;
@@ -15,7 +14,7 @@ function agent(input: {
   pendingPermissionCount?: number;
   archivedAt?: string | null;
   parentAgentId?: string | null;
-  createdBy?: Agent["createdBy"];
+  background?: boolean;
 }): Agent {
   return {
     serverId: "host-a",
@@ -32,7 +31,7 @@ function agent(input: {
             cancellationRequestId: null,
           }
         : { phase: "idle", cancellationRequestId: null }),
-    createdAt: new Date(input.createdAt ?? "2026-01-01T00:00:00.000Z"),
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date(input.updatedAt),
     lastUserMessageAt: null,
     lastActivityAt: new Date(input.updatedAt),
@@ -62,8 +61,8 @@ function agent(input: {
     attentionReason: input.attentionReason,
     attentionTimestamp: input.attentionTimestamp ? new Date(input.attentionTimestamp) : null,
     archivedAt: input.archivedAt ? new Date(input.archivedAt) : null,
-    createdBy: input.createdBy,
     parentAgentId: input.parentAgentId ?? null,
+    background: input.background ?? false,
     labels: {},
   };
 }
@@ -94,6 +93,8 @@ describe("workspace agent activity index", () => {
             workspaceId: "workspace-error",
             status: "error",
             turn: { phase: "idle", cancellationRequestId: null },
+            requiresAttention: true,
+            attentionReason: "error",
             updatedAt: "2026-01-01T00:00:00.000Z",
           }),
         ],
@@ -123,7 +124,6 @@ describe("workspace agent activity index", () => {
             workspaceId: "workspace-a",
             updatedAt: "2026-06-01T10:01:00.000Z",
             pendingPermissionCount: 1,
-            createdBy: { clientId: "client-harmony", clientName: "Harmony Emulator" },
           }),
         ],
         [
@@ -148,8 +148,6 @@ describe("workspace agent activity index", () => {
             agentId: "permission",
             status: "needs_input",
             enteredAt: new Date("2026-06-01T10:01:00.000Z"),
-            createdByName: "Harmony Emulator",
-            createdByVirtual: false,
           },
         ],
         [
@@ -158,44 +156,36 @@ describe("workspace agent activity index", () => {
             agentId: "attention",
             status: "attention",
             enteredAt: new Date("2026-06-01T10:02:00.000Z"),
-            createdByName: null,
-            createdByVirtual: false,
           },
         ],
       ]),
     );
   });
 
-  it("keeps the earliest named creator when a newer root agent has none", () => {
+  it("does not let a running background agent change root workspace activity", () => {
     const index = buildWorkspaceAgentActivityIndex(
       new Map([
         [
-          "creator",
-          agent({
-            id: "creator",
-            workspaceId: "workspace-a",
-            createdAt: "2026-06-01T09:00:00.000Z",
-            updatedAt: "2026-06-01T09:05:00.000Z",
-            archivedAt: "2026-06-01T09:10:00.000Z",
-            createdBy: { clientId: "client-harmony", clientName: "少爷" },
-          }),
+          "root",
+          agent({ id: "root", workspaceId: "workspace-a", updatedAt: "2026-06-01T10:00:00.000Z" }),
         ],
         [
-          "newer",
+          "classifier",
           agent({
-            id: "newer",
+            id: "classifier",
             workspaceId: "workspace-a",
-            createdAt: "2026-06-01T10:00:00.000Z",
+            status: "running",
             updatedAt: "2026-06-01T10:05:00.000Z",
+            background: true,
           }),
         ],
       ]),
     );
 
-    expect(index.get("workspace-a")).toMatchObject({
-      agentId: "newer",
-      createdByName: "少爷",
-      createdByVirtual: false,
+    expect(index.get("workspace-a")).toEqual({
+      agentId: "root",
+      status: "done",
+      enteredAt: new Date("2026-06-01T10:00:00.000Z"),
     });
   });
 
@@ -239,8 +229,6 @@ describe("workspace agent activity index", () => {
       agentId: "root",
       status: "running",
       enteredAt: new Date("2026-06-01T10:00:00.000Z"),
-      createdByName: null,
-      createdByVirtual: false,
     });
   });
 
@@ -276,8 +264,6 @@ describe("workspace agent activity index", () => {
             agentId: "parent",
             status: "done",
             enteredAt: new Date("2026-06-01T10:00:00.000Z"),
-            createdByName: null,
-            createdByVirtual: false,
           },
         ],
         [
@@ -286,8 +272,6 @@ describe("workspace agent activity index", () => {
             agentId: "child",
             status: "running",
             enteredAt: new Date("2026-06-01T10:03:00.000Z"),
-            createdByName: null,
-            createdByVirtual: false,
           },
         ],
       ]),
@@ -364,29 +348,6 @@ describe("workspace agent activity index", () => {
       agentId: "root",
       status: "needs_input",
       enteredAt: new Date("2026-06-01T10:05:00.000Z"),
-      createdByName: null,
-      createdByVirtual: false,
-    });
-  });
-
-  it("marks an unnamed root agent creator as virtual", () => {
-    const index = buildWorkspaceAgentActivityIndex(
-      new Map([
-        [
-          "legacy",
-          agent({
-            id: "legacy",
-            workspaceId: "workspace-a",
-            updatedAt: "2026-06-01T10:00:00.000Z",
-            createdBy: { clientId: "legacy-cli-client" },
-          }),
-        ],
-      ]),
-    );
-
-    expect(index.get("workspace-a")).toMatchObject({
-      createdByName: null,
-      createdByVirtual: true,
     });
   });
 });

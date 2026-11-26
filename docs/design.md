@@ -40,9 +40,11 @@ Weight has three tiers, applied by role:
 
 The rule, condensed: text that _names_ a surface or a group is `medium`. Text that lives _inside_ a surface or a group is `normal`. Top-of-screen titles are `<ScreenTitle>`, which is lighter still.
 
-Foreground is for the thing being acted on: row titles, section headings, the selected sidebar item. `foregroundMuted` is for context: hints, descriptions, secondary metadata, idle sidebar items, placeholders, status text.
+Foreground is for the thing being acted on: row titles, section headings, the selected sidebar item. `foregroundMuted` is for context: hints, descriptions, secondary metadata, idle sidebar items, placeholders, status text. The composer's empty placeholder is quieter; it uses `foregroundExtraMuted`.
 
-`foregroundExtraMuted` is reserved for passive chrome that must sit behind muted text, such as an always-visible window control. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
+`foregroundExtraMuted` is reserved for passive chrome that must sit behind muted text, such as an always-visible window control, and for the composer's empty placeholder. Use the solid token instead of lowering SVG opacity; per-path opacity makes overlapping icon strokes render unevenly. Interactive hover and pressed states return to `foreground`.
+
+A theme states places and identity; `packages/app/src/styles/derive-colors.ts` derives their relationships. Sidebar hover and selected fills step from the sidebar toward the foreground. For plugin themes, passive text on those states derives against the actual state surface; page tertiary text is a separate relationship. Explicit plugin semantic overrides take precedence over derived defaults. Built-in themes retain their chosen passive text. `packages/app/src/styles/theme-contrast.test.ts` checks the built-in and representative plugin palettes against contrast floors.
 
 Accent is the one CTA per surface. A `<Button variant="default">` filled with `accent` appears at most once on a page. Most pages have zero — settings is mostly toggles and text, the workspace pane is mostly content, the chat composer is the input itself.
 
@@ -106,6 +108,8 @@ Five primitives. The pick is determined by option count, the need to search, and
 
 `<AdaptiveModalSheet>` owns the presentation. Its content inset — the gutter that puts sheet content on the same rails as the sheet header — and compact bottom safe-area padding are the sheet's, not the caller's. A caller declares layout intent through `contentStyle` and never branches on form factor to add its own margins. If a sheet's first snap point is shorter than its header, content, and safe-area clearance, raise that snap point rather than moving the sheet container.
 
+The sheet header (`SheetHeaderView`) is the only sheet title row. A sheet that brings its own Gorhom modal still renders it. Back, Close and every action passed through `header.actions` are `SheetHeaderIconButton`, so all of them get the header island's chrome, as `CompactHeader` does: one frame, glyph, colour and hover. The first and last buttons hang into the row's padding, so their glyphs sit on the content rail.
+
 `confirmDialog` is for destructive yes/no and imperative confirmation. Promise-based: `await confirmDialog({ destructive: true, ... })`. Anything where a wrong click loses work.
 
 Three themes is `DropdownMenu`. Thirty hosts is `Combobox`. A label and a value is `AdaptiveModalSheet`. "Are you sure?" is `confirmDialog`.
@@ -114,7 +118,7 @@ Three themes is `DropdownMenu`. Thirty hosts is `Combobox`. A label and a value 
 
 ## 7. Density and rhythm
 
-Settings detail pages, the projects detail page, and any list+detail content sit inside a centered, max-width 720 column (`packages/app/src/screens/settings-screen.tsx`, `packages/app/src/screens/projects-screen.tsx`). Lines stay readable, the eye does not have to track wide horizontal distances. Form modals carry their own narrower content frame (`packages/app/src/components/add-host-modal.tsx`).
+Settings detail pages, the projects detail page, and any list+detail content sit inside a centered, max-width 720 column (`packages/app/src/screens/settings-screen.tsx`, `packages/app/src/screens/projects-screen.tsx`). Lines stay readable, the eye does not have to track wide horizontal distances. Form modals carry their own narrower content frame (`packages/app/src/hosts/add-host/internal/add-host-modal.tsx`).
 
 Workspace and chat surfaces use the full width — these are working surfaces, not reading surfaces. The composer carries `MAX_CONTENT_WIDTH` from `packages/app/src/constants/layout.ts` to keep lines readable while letting the workspace pane fill the rest.
 
@@ -138,7 +142,7 @@ Things align to their glyphs, not to their boxes. A row's leading icon, its titl
 
 Pick the rails from the content, then hold them. A settings card establishes a leading rail at the icon's left edge and a trailing rail at the last glyph's right edge; every row in that card uses the same two. A row whose icon is absent still starts its title on the leading rail. Indentation is a new rail, not an arbitrary offset.
 
-The pressable is bigger than the glyph, and that is fine. Hit areas grow outward from the aligned content — they never move it. A button that looks two pixels off because its padding is asymmetric is misaligned even though its box is correct.
+The pressable is bigger than the glyph, and that is fine. Hit areas grow outward from the aligned content — they never move it. A button that looks two pixels off because its padding is asymmetric is misaligned even though its box is correct. The composer toolbar is the worked example: its outermost ink, the attach `+` on the left and the trailing glyph or send/stop disc on the right, sits on the text column's edges, and touch-sized the end highlights overhang into the composer padding by each end control's ink inset (`composerToolbarOverhang`).
 
 Optical alignment beats arithmetic when a glyph disagrees with its bounding box. Icons with visual weight on one side, chevrons, and single-character labels usually need a small nudge to look centered. Trust the eye, then leave a comment saying the offset is optical.
 
@@ -150,7 +154,7 @@ One row off the rail makes the whole card look unconsidered.
 
 Compact-first. The small case is designed; the large case adds chrome around it.
 
-Use `md: 600` for both the compact/wide layout boundary and responsive density, in logical points on native and CSS pixels on web. Do not add a separate density breakpoint. Measured content constraints remain independent: composer controls use `COMPACT_CONTENT_WIDTH` (500), so a narrow pane can keep compact controls inside a wide window.
+Use `md: 600` for the compact/wide layout boundary, in logical points on native and CSS pixels on web. Do not add a separate density breakpoint; touch sizing comes from the control sizing gate in [Buttons](#4-buttons). Measured content constraints remain independent: composer controls use `COMPACT_CONTENT_WIDTH` (500), so a narrow pane can keep compact controls inside a wide window.
 
 The settings shell (`packages/app/src/screens/settings-screen.tsx`) and the projects screen (`packages/app/src/screens/projects-screen.tsx`) share the canonical list+detail navigation pattern:
 
@@ -166,6 +170,8 @@ On a narrow window using the wide layout, app navigation yields when the remaini
 Electron window controls are top-corner obstructions, not a compact-layout condition. Rendered surfaces declare which top corners they physically occupy; only those corners receive clearance. Full-window overlays redeclare both corners. A focused split pane owns both corners; if focus restoration temporarily exposes the full split tree, the split boundary reserves one top strip instead of assigning a control rectangle to an arbitrarily narrow leaf.
 
 Windows and Linux controls are fixed window chrome, outside scrolling header content. A tab rail that reaches them ends at their obstruction and shows the shared overflow fade. On macOS, the Explorer toggle occupies a fixed top-right window slot so opening and closing Explorer does not move the pointer target.
+
+Each window edge has one safe-area owner. `WindowLayoutProvider` publishes the bottom inset that every surface reads through `useSafeAreaInsets()`: on iOS 27.1 and later it is UIKit's bottom-bar clearance, which refines the rectangular home-indicator inset to the screen's corners, and elsewhere the system inset. Surfaces apply that value once and never stack their own spacing under it; `WindowLayoutSurface` owns the horizontal insets the same way.
 
 A new list+detail feature copies the settings shell. A new workspace-shaped feature copies the workspace shell. Inventing a third shape happens in design review, not in a PR.
 
@@ -259,7 +265,7 @@ New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link b
 - A "Settings" CTA on a detail page. Detail pages are settings; settings is reached from the sidebar, the host entry, or a row's kebab menu.
 - The word "checkout" in UI strings or identifiers. The term is "workspace".
 - New color tokens or hardcoded hex outside the palette. The identity color table is the documented exception (§13), not a license.
-- Placeholder text dimmed beyond `foregroundMuted`. No extra opacity, no italics, no ghost-text.
+- Placeholder text dimmed beyond `foregroundMuted`, except the composer's empty placeholder, which uses `foregroundExtraMuted`. No extra opacity, no italics, no ghost-text.
 - `onPointerEnter` and `onPointerLeave`. They do not fire on native iOS. Hover uses Pressable's `onHoverIn`/`onHoverOut` gated with `isHovered || isCompact || isNative`.
 - Raw DOM APIs without an `isWeb` guard.
 - Spacing values outside the scale. `padding: 20` and `gap: 10` are wrong.
@@ -278,7 +284,7 @@ New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link b
 | List+detail (compact stack, desktop sidebar+pane)   | `packages/app/src/screens/settings-screen.tsx`, `packages/app/src/screens/projects-screen.tsx`                                                                                                                                                                                                           |
 | Detail card+row                                     | `packages/app/src/screens/settings/host-page.tsx`, `packages/app/src/screens/settings/providers-section.tsx`                                                                                                                                                                                             |
 | Section grouping inside a card list                 | `packages/app/src/screens/settings/settings-section.tsx`                                                                                                                                                                                                                                                 |
-| Form modal (label + input fields, primary + cancel) | `packages/app/src/components/add-host-modal.tsx`, `packages/app/src/components/pair-link-modal.tsx`, `packages/app/src/components/project-picker-modal.tsx`                                                                                                                                              |
+| Form modal (label + input fields, primary + cancel) | `packages/app/src/hosts/add-host/internal/add-host-modal.tsx`, `packages/app/src/hosts/add-host/internal/pair-link-modal.tsx`, `packages/app/src/components/project-picker-modal.tsx`                                                                                                                    |
 | Destructive confirmation                            | `confirmDialog` invoked from `packages/app/src/screens/settings/host-page.tsx:541-547`                                                                                                                                                                                                                   |
 | Centered hero / first-run                           | `packages/app/src/components/welcome-screen.tsx`                                                                                                                                                                                                                                                         |
 | Sidebar list (workspaces, hosts)                    | `packages/app/src/components/sidebar-workspace-list.tsx`, `packages/app/src/components/left-sidebar.tsx`                                                                                                                                                                                                 |

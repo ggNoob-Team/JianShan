@@ -38,6 +38,8 @@ function createSnapshot(
     createdBy: input.createdBy,
     title: input.title ?? null,
     labels: (input.labels ?? {}) as AgentSnapshotPayload["labels"],
+    ...(input.controls ? { controls: input.controls } : {}),
+    ...(input.options ? { options: input.options } : {}),
   };
 }
 

@@ -6,7 +6,7 @@ export interface DaemonTransport {
   /** Bytes accepted by send() but not yet handed to the network, when observable. */
   getBufferedAmount?: () => number | null;
   close: (code?: number, reason?: string) => void;
-  onMessage: (handler: (data: unknown, isBinary: boolean) => void) => () => void;
+  onMessage: (handler: (data: unknown, isBinary: boolean) => void | Promise<void>) => () => void;
   onOpen: (handler: () => void) => () => void;
   onClose: (handler: (event?: unknown) => void) => () => void;
   onError: (handler: (event?: unknown) => void) => () => void;

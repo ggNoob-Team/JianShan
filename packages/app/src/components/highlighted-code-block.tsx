@@ -1,4 +1,3 @@
-import { copyToClipboard } from "@/utils/clipboard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
@@ -9,16 +8,15 @@ import {
   type ViewStyle,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Check, Copy, NotebookPen } from "lucide-react-native";
+import * as Clipboard from "expo-clipboard";
+import { Check, Copy } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { HighlightToken } from "@getpaseo/highlight";
 import { isNative, isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { highlightToKeyedLines, type KeyedLine } from "@/utils/highlight-cache";
-import { useNotesCaptureOptional } from "@/notes/capture-context";
 import {
   markdownCopyCodeBlockDataSet,
   markdownCopyDataSet,
@@ -48,6 +46,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   "objective-c": "m",
   markdown: "md",
   elixir: "ex",
+  terraform: "tf",
 };
 
 function fenceLanguageToExtension(info: string | null | undefined): string | null {
@@ -87,12 +86,10 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   );
 
   const isCompact = useIsCompactFormFactor();
-  const hasFinePointer = useHasFinePointer();
   const [isHovered, setIsHovered] = useState(false);
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
-  // Mouse users reveal the fence actions on hover; touch users always see them.
-  const controlsVisible = isHovered || isNative || isCompact || !hasFinePointer;
+  const controlsVisible = isHovered || isNative || isCompact;
   // Copy the code without its trailing blank lines. A fence body ends in a newline,
   // and ends in more than one when the author left a blank line before the closing
   // fence; pasting any of them into a terminal runs the last line.
@@ -115,7 +112,6 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
         </Text>
       )}
       <CopyButton getCode={getCode} visible={controlsVisible} />
-      <CodeBlockNotesButton code={code} visible={controlsVisible} />
     </View>
   );
 });
@@ -195,7 +191,7 @@ const CopyButton = React.memo(function CopyButton({ getCode, visible }: CopyButt
   const handlePress = useCallback(async () => {
     const content = getCode();
     if (!content) return;
-    await copyToClipboard(content);
+    await Clipboard.setStringAsync(content);
     setCopied(true);
     if (resetRef.current) clearTimeout(resetRef.current);
     resetRef.current = setTimeout(() => {
@@ -236,55 +232,6 @@ const CopyButton = React.memo(function CopyButton({ getCode, visible }: CopyButt
   );
 });
 
-/**
- * Code fences keep their own "add to notes" affordance: a fence is the block
- * most likely to be worth keeping, and unlike prose it has no per-message
- * action of its own. Renders nothing outside an agent chat.
- */
-const CodeBlockNotesButton = React.memo(function CodeBlockNotesButton({
-  code,
-  visible,
-}: {
-  code: string;
-  visible: boolean;
-}) {
-  const { t } = useTranslation();
-  const capture = useNotesCaptureOptional();
-  const handlePress = useCallback(() => {
-    if (!capture) return;
-    const content = stripTerminalFenceNewline(code);
-    if (!content.trim()) return;
-    capture.addText(content);
-  }, [capture, code]);
-
-  if (!capture) return null;
-
-  const visibilityStyle = visible
-    ? copyButtonStyles.containerVisible
-    : copyButtonStyles.containerHidden;
-  return (
-    <Pressable
-      onPress={handlePress}
-      style={[copyButtonStyles.container, copyButtonStyles.notesContainer, visibilityStyle]}
-      pointerEvents={visible ? "auto" : "none"}
-      accessibilityRole="button"
-      accessibilityLabel={t("notes.addEntryAction")}
-      hitSlop={8}
-      dataSet={markdownCopyDataSet.ignore}
-      testID="code-block-add-to-notes"
-    >
-      {({ hovered }) => (
-        <NotebookPen
-          size={14}
-          color={
-            hovered ? copyButtonStyles.iconHoveredColor.color : copyButtonStyles.iconColor.color
-          }
-        />
-      )}
-    </Pressable>
-  );
-});
-
 const copyButtonStyles = StyleSheet.create((theme) => ({
   container: {
     position: "absolute",
@@ -297,10 +244,6 @@ const copyButtonStyles = StyleSheet.create((theme) => ({
   },
   containerHidden: {
     opacity: 0,
-  },
-  notesContainer: {
-    // Sits to the left of the copy button, on the same inset rail.
-    right: theme.spacing[2] + 22,
   },
   iconColor: {
     color: theme.colors.foregroundMuted,

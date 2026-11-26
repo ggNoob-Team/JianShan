@@ -21,22 +21,15 @@ import type { EditingTextInputHandle } from "@/components/ui/text-input";
 import {
   createControlGeometry,
   resolveControlInteractionStyles,
-  type FieldControlSize,
+  type ControlSize,
 } from "@/components/ui/control-geometry";
 import { useContainedControlSize } from "@/components/ui/control-size";
 
-const FIELD_CHROME = {
-  xs: "chromeSm",
-  sm: "chromeSm",
-  md: "chromeMd",
-  lg: "chromeMd",
-} as const satisfies Record<FieldControlSize, string>;
-const FIELD_TEXT = {
-  xs: "inputSm",
-  sm: "inputSm",
-  md: "inputMd",
-  lg: "inputMd",
-} as const satisfies Record<FieldControlSize, string>;
+const FIELD_CHROME = { sm: "chromeSm", md: "chromeMd" } as const satisfies Record<
+  ControlSize,
+  string
+>;
+const FIELD_TEXT = { sm: "inputSm", md: "inputMd" } as const satisfies Record<ControlSize, string>;
 
 interface FieldProps {
   label: string;
@@ -81,7 +74,7 @@ export function Field({ label, children, trailing, hint, error, testID }: FieldP
 }
 
 type FormTextInputProps = AdaptiveTextInputProps & {
-  size?: FieldControlSize;
+  size?: ControlSize;
 };
 
 type FlatFormTextInputStyle = ViewStyle & TextStyle;

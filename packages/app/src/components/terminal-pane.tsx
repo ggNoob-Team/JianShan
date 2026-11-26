@@ -98,6 +98,7 @@ import {
 } from "./terminal-resize-debouncer";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
+import { useKeyboardFocusSurface } from "@/keyboard";
 import {
   applyTerminalRendererReadyChange,
   resolveTerminalStreamTarget,
@@ -487,6 +488,8 @@ export function TerminalPane({
       requestTerminalFocus();
     }
   }, [isMobile, isPaneFocused, isWorkspaceFocused, requestTerminalFocus, scopeKey, terminalId]);
+
+  useKeyboardFocusSurface("terminal", isTerminalPresented && isPaneFocused && terminalId != null);
 
   useEffect(() => {
     const canRequest = canRequestFocusClaim({

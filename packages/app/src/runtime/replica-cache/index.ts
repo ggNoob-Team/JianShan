@@ -1,9 +1,9 @@
 import { findMountedWindowStart } from "@/agent-stream/history-window";
 import { z } from "zod";
 import {
-  AgentActorSchema,
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
+  ForgeWebSchema,
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
@@ -21,6 +21,7 @@ import {
   type AgentToolCallData,
   type StreamItem,
 } from "@/types/stream";
+import type { UnsettledTurn } from "@/timeline/turn-liveness";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
 import {
@@ -68,6 +69,8 @@ export interface CachedTimeline {
   items: StreamItem[];
   range: AgentTimelineCursorState | null;
   hasOlder: boolean;
+  /** Set when these messages were captured while a turn was open and not yet caught up. */
+  unsettledTurn?: UnsettledTurn;
 }
 
 const PERSIST_DELAY_MS = 1_000;
@@ -119,8 +122,6 @@ const StoredTimelineItemSchema = z.discriminatedUnion("kind", [
     kind: z.literal("user_message"),
     clientMessageId: z.string().optional(),
     messageId: z.string().optional(),
-    // COMPAT(user-message-actor): absent on caches written before actor metadata.
-    actor: AgentActorSchema.optional(),
     text: z.string(),
   }),
   z.strictObject({
@@ -235,6 +236,7 @@ const StoredAgentSnapshotSchema = z.strictObject({
   updatedAt: IsoDateSchema,
   lastUserMessageAt: IsoDateSchema.nullable(),
   status: AgentStatusSchema,
+  backgroundWork: z.object({ count: z.number().int().nonnegative() }).optional(),
   activeTurn: z
     .strictObject({
       turnId: z.string(),
@@ -250,12 +252,12 @@ const StoredAgentSnapshotSchema = z.strictObject({
   lastError: z.string().optional(),
   title: z.string().nullable(),
   labels: z.record(z.string(), z.string()),
+  // Optional: clients without background_agents never received a background agent to cache.
+  background: z.boolean().optional(),
   requiresAttention: z.boolean().optional(),
   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
   attentionTimestamp: IsoDateSchema.nullable().optional(),
   archivedAt: IsoDateSchema.nullable().optional(),
-  // COMPAT(agent-created-by): absent on caches written before creator metadata.
-  createdBy: AgentActorSchema.optional(),
 });
 
 const StoredAgentSchema = z.strictObject({
@@ -302,6 +304,7 @@ const WorkspaceGitRuntimeSchema = z
   .optional();
 
 const StoredWorkspaceSchema = z.strictObject({
+  parentWorkspaceId: z.string().optional(),
   // Require both keys: a cursor without these values would preserve the wrong sort on reconnect.
   createdAt: IsoDateSchema.nullable(),
   lastUserMessageAt: IsoDateSchema.nullable(),
@@ -326,14 +329,14 @@ const StoredWorkspaceSchema = z.strictObject({
   labels: z.array(z.string()).optional(),
   status: z.enum(["needs_input", "failed", "running", "attention", "done"]),
   statusEnteredAt: IsoDateSchema.nullable(),
-  // Optional so entries written before the Recent list existed still parse.
-  activityAt: IsoDateSchema.nullable().optional().default(null),
+  activityAt: z.null(),
   archivingAt: z.string().nullable(),
   diffStat: z.strictObject({ additions: z.number(), deletions: z.number() }).nullable(),
   scripts: z.array(WorkspaceScriptSchema),
   gitRuntime: WorkspaceGitRuntimeSchema,
   githubRuntime: WorkspaceGitHubRuntimePayloadSchema,
   forge: z.string().optional(),
+  forgeWeb: ForgeWebSchema.optional(),
 });
 
 const StoredProjectSchema = z.strictObject({
@@ -358,6 +361,9 @@ const StoredTimelineSchema = z.strictObject({
     })
     .nullable(),
   hasOlder: z.boolean(),
+  unsettledTurn: z
+    .strictObject({ turnId: z.string().nullable(), startedAt: IsoDateSchema.nullable() })
+    .optional(),
 });
 
 type StoredAgent = z.infer<typeof StoredAgentSchema>;
@@ -414,6 +420,16 @@ function deserializeTimeline(stored: StoredTimeline | null): CachedTimeline | nu
     items: stored.items.map(deserializeTimelineItem),
     range: stored.range,
     hasOlder: stored.hasOlder,
+    ...(stored.unsettledTurn
+      ? {
+          unsettledTurn: {
+            turnId: stored.unsettledTurn.turnId,
+            startedAt: stored.unsettledTurn.startedAt
+              ? new Date(stored.unsettledTurn.startedAt)
+              : null,
+          },
+        }
+      : {}),
   };
 }
 
@@ -454,7 +470,6 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
-        ...(item.actor ? { actor: item.actor } : {}),
         text: item.text,
       };
     case "assistant_message":
@@ -508,9 +523,11 @@ function serializeTimelineItem(item: StreamItem): StoredTimelineItem | null {
         version: item.version,
         data: item.data,
       };
-    case "turn_activity":
+    // A folded turn's summary row is presentation, not timeline.
+    case "turn_summary":
       return null;
   }
+  return null;
 }
 
 function deserializeTimelineItem(item: StoredTimelineItem): StreamItem {
@@ -547,7 +564,6 @@ function deserializeBuiltinTimelineItem(
         kind: item.kind,
         ...(item.clientMessageId ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.messageId ? { messageId: item.messageId } : {}),
-        ...(item.actor ? { actor: item.actor } : {}),
         text: item.text,
       };
     case "assistant_message":
@@ -622,10 +638,29 @@ function serializeAgentTurn(agent: Agent): NonNullable<StoredAgent["turn"]> {
   };
 }
 
-function optionalCreatedByFields(
-  createdBy: Agent["createdBy"],
-): Pick<NonNullable<StoredAgent["snapshot"]>, "createdBy"> {
-  return createdBy ? { createdBy } : {};
+function serializeAgentCapabilities(
+  capabilities: Agent["capabilities"],
+): StoredAgent["snapshot"]["capabilities"] {
+  return {
+    supportsStreaming: capabilities.supportsStreaming,
+    supportsSessionPersistence: capabilities.supportsSessionPersistence,
+    ...(capabilities.supportsSessionListing !== undefined
+      ? { supportsSessionListing: capabilities.supportsSessionListing }
+      : {}),
+    supportsDynamicModes: capabilities.supportsDynamicModes,
+    supportsMcpServers: capabilities.supportsMcpServers,
+    supportsReasoningStream: capabilities.supportsReasoningStream,
+    supportsToolInvocations: capabilities.supportsToolInvocations,
+    ...(capabilities.supportsRewindConversation !== undefined
+      ? { supportsRewindConversation: capabilities.supportsRewindConversation }
+      : {}),
+    ...(capabilities.supportsRewindFiles !== undefined
+      ? { supportsRewindFiles: capabilities.supportsRewindFiles }
+      : {}),
+    ...(capabilities.supportsRewindBoth !== undefined
+      ? { supportsRewindBoth: capabilities.supportsRewindBoth }
+      : {}),
+  };
 }
 
 function serializeAgent(agent: Agent): StoredAgent {
@@ -648,26 +683,7 @@ function serializeAgent(agent: Agent): StoredAgent {
           },
         }
       : {}),
-    capabilities: {
-      supportsStreaming: agent.capabilities.supportsStreaming,
-      supportsSessionPersistence: agent.capabilities.supportsSessionPersistence,
-      ...(agent.capabilities.supportsSessionListing !== undefined
-        ? { supportsSessionListing: agent.capabilities.supportsSessionListing }
-        : {}),
-      supportsDynamicModes: agent.capabilities.supportsDynamicModes,
-      supportsMcpServers: agent.capabilities.supportsMcpServers,
-      supportsReasoningStream: agent.capabilities.supportsReasoningStream,
-      supportsToolInvocations: agent.capabilities.supportsToolInvocations,
-      ...(agent.capabilities.supportsRewindConversation !== undefined
-        ? { supportsRewindConversation: agent.capabilities.supportsRewindConversation }
-        : {}),
-      ...(agent.capabilities.supportsRewindFiles !== undefined
-        ? { supportsRewindFiles: agent.capabilities.supportsRewindFiles }
-        : {}),
-      ...(agent.capabilities.supportsRewindBoth !== undefined
-        ? { supportsRewindBoth: agent.capabilities.supportsRewindBoth }
-        : {}),
-    },
+    capabilities: serializeAgentCapabilities(agent.capabilities),
     currentModeId: agent.currentModeId,
     availableModes: [],
     pendingPermissions: [],
@@ -675,11 +691,12 @@ function serializeAgent(agent: Agent): StoredAgent {
     ...(agent.lastError ? { lastError: agent.lastError } : {}),
     title: agent.title,
     labels: agent.labels,
+    ...(agent.background ? { background: true } : {}),
     requiresAttention: agent.requiresAttention ?? false,
+    backgroundWork: agent.backgroundWork,
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
-    ...optionalCreatedByFields(agent.createdBy),
   };
   return {
     snapshot,
@@ -715,6 +732,7 @@ function restoreWorkspace(stored: StoredWorkspace): WorkspaceDescriptor {
 
 function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
   return {
+    parentWorkspaceId: workspace.parentWorkspaceId,
     createdAt: workspace.createdAt?.toISOString() ?? null,
     lastUserMessageAt: workspace.lastUserMessageAt?.toISOString() ?? null,
     id: workspace.id,
@@ -734,7 +752,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     labels: workspace.labels,
     status: workspace.status,
     statusEnteredAt: workspace.statusEnteredAt?.toISOString() ?? null,
-    activityAt: workspace.activityAt?.toISOString() ?? null,
+    activityAt: null,
     archivingAt: workspace.archivingAt,
     diffStat: workspace.diffStat,
     scripts: workspace.scripts.map((script) => ({
@@ -753,6 +771,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
     gitRuntime: workspace.gitRuntime,
     githubRuntime: workspace.githubRuntime,
     forge: workspace.forge,
+    forgeWeb: workspace.forgeWeb,
   };
 }
 
@@ -813,6 +832,14 @@ function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
       ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq }
       : null,
     hasOlder: canPersistCoverage ? timeline.hasOlder : false,
+    ...(timeline.unsettledTurn
+      ? {
+          unsettledTurn: {
+            turnId: timeline.unsettledTurn.turnId,
+            startedAt: timeline.unsettledTurn.startedAt?.toISOString() ?? null,
+          },
+        }
+      : {}),
   };
 }
 

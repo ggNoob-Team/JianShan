@@ -24,7 +24,6 @@ import {
 import { AgentProfilesSection } from "@/agent-profiles";
 import { AgentSkillsSection } from "@/agent-skills";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
-import { PairLinkModal } from "@/components/pair-link-modal";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { Alert as InlineAlert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,7 @@ import { useDaemonStatus } from "@/desktop/hooks/use-daemon-status";
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { useIsLocalDaemon, useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import {
   getHostRuntimeStore,
   isHostRuntimeConnected,
@@ -106,9 +105,6 @@ const destructiveColorMapping = (theme: Theme) => ({ color: theme.colors.destruc
 const moveUpIcon = <ThemedArrowUp size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
 const moveDownIcon = <ThemedArrowDown size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
 const editProfileIcon = <ThemedProfilePencil size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
-const editHostConnectionIcon = (
-  <ThemedProfilePencil size={ICON_SIZE.sm} uniProps={mutedColorMapping} />
-);
 const removeProfileIcon = <ThemedTrash2 size={ICON_SIZE.sm} uniProps={destructiveColorMapping} />;
 const addProfileIcon = <ThemedPlus size={ICON_SIZE.sm} uniProps={mutedColorMapping} />;
 
@@ -373,19 +369,10 @@ export function HostSettingsPage({
 }) {
   const host = useHostProfile(serverId);
   const isLocalDaemon = useIsLocalDaemon(serverId);
-  const [isUpdateHostVisible, setIsUpdateHostVisible] = useState(false);
-  const openUpdateHost = useCallback(() => setIsUpdateHostVisible(true), []);
-  const closeUpdateHost = useCallback(() => setIsUpdateHostVisible(false), []);
 
   if (!host) {
     return <HostNotFound />;
   }
-
-  const canUpdateHost =
-    !isLocalDaemon &&
-    host.connections.some(
-      (connection) => connection.type === "directTcp" || connection.type === "relay",
-    );
 
   return (
     <View>
@@ -395,106 +382,10 @@ export function HostSettingsPage({
       <HostAppearanceSection host={host} />
 
       {isLocalDaemon ? <LocalDaemonSection /> : null}
-      {!isLocalDaemon ? <RemoteLocalHostAccessCard host={host} /> : null}
-
-      {canUpdateHost ? <UpdateHostCard onPress={openUpdateHost} /> : null}
 
       {!isLocalDaemon ? <UpdateDaemonCard key={host.serverId} host={host} /> : null}
 
       <RemoveHostSection host={host} isLocalDaemon={isLocalDaemon} onRemoved={onHostRemoved} />
-
-      <PairLinkModal
-        visible={isUpdateHostVisible}
-        targetServerId={host.serverId}
-        onClose={closeUpdateHost}
-      />
-    </View>
-  );
-}
-
-function RemoteLocalHostAccessCard({ host }: { host: HostProfile }) {
-  const { t } = useTranslation();
-  const localServerId = useLocalDaemonServerId();
-  const remoteConnected = useHostRuntimeIsConnected(host.serverId);
-  const localConnected = useHostRuntimeIsConnected(localServerId ?? "");
-  const { setRemoteLocalHostAccess } = useHostMutations();
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const enabled =
-    host.remoteLocalHost?.enabled === true && host.remoteLocalHost.localServerId === localServerId;
-
-  const handleValueChange = useCallback(
-    (next: boolean) => {
-      setIsSaving(true);
-      setError(null);
-      void setRemoteLocalHostAccess(host.serverId, next)
-        .catch((cause) => {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        })
-        .finally(() => setIsSaving(false));
-    },
-    [host.serverId, setRemoteLocalHostAccess],
-  );
-
-  if (!localServerId || localServerId === host.serverId) return null;
-
-  return (
-    <SettingsSection title={t("settings.host.remoteLocalHost.title")}>
-      <View style={settingsStyles.card} testID="host-page-remote-local-host-card">
-        <View style={settingsStyles.row}>
-          <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.host.remoteLocalHost.toggle")}</Text>
-            <Text style={settingsStyles.rowHint}>{t("settings.host.remoteLocalHost.hint")}</Text>
-            {!remoteConnected || !localConnected ? (
-              <Text style={settingsStyles.rowHint}>
-                {t("settings.host.remoteLocalHost.offline")}
-              </Text>
-            ) : null}
-          </View>
-          <Switch
-            value={enabled}
-            disabled={isSaving || !remoteConnected || !localConnected}
-            onValueChange={handleValueChange}
-            accessibilityLabel={t("settings.host.remoteLocalHost.accessibilityLabel")}
-            testID="host-page-remote-local-host-switch"
-          />
-        </View>
-        {error ? (
-          <View style={settingsStyles.row}>
-            <InlineAlert
-              size="sm"
-              variant="error"
-              title={t("settings.host.remoteLocalHost.failed")}
-              description={error}
-              testID="host-page-remote-local-host-error"
-            />
-          </View>
-        ) : null}
-      </View>
-    </SettingsSection>
-  );
-}
-
-function UpdateHostCard({ onPress }: { onPress: () => void }) {
-  const { t } = useTranslation();
-
-  return (
-    <View style={[settingsStyles.card, styles.updateHostCard]} testID="host-page-update-host-card">
-      <View style={settingsStyles.row}>
-        <View style={settingsStyles.rowContent}>
-          <Text style={settingsStyles.rowTitle}>{t("settings.host.connectionUpdate.title")}</Text>
-          <Text style={settingsStyles.rowHint}>{t("settings.host.connectionUpdate.hint")}</Text>
-        </View>
-        <Button
-          variant="outline"
-          size="sm"
-          leftIcon={editHostConnectionIcon}
-          onPress={onPress}
-          testID="host-page-update-host-button"
-        >
-          {t("settings.host.connectionUpdate.button")}
-        </Button>
-      </View>
     </View>
   );
 }
@@ -1035,7 +926,7 @@ function AutoArchiveMergedWorkspacesCard({ serverId }: { serverId: string }) {
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>Archive merged PR workspaces</Text>
           <Text style={settingsStyles.rowHint}>
-            Automatically archive clean JianShan workspaces after their pull request is merged
+            Automatically archive clean Paseo workspaces after their pull request is merged
           </Text>
         </View>
         <Switch
@@ -1801,13 +1692,6 @@ const terminalProfileStyles = StyleSheet.create((theme) => ({
 
 const styles = StyleSheet.create((theme) => ({
   cardAlert: {
-    marginHorizontal: theme.spacing[4],
-    marginBottom: theme.spacing[4],
-  },
-  updateHostCard: {
-    marginBottom: theme.spacing[3],
-  },
-  updateFailure: {
     marginHorizontal: theme.spacing[4],
     marginBottom: theme.spacing[4],
   },

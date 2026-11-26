@@ -109,7 +109,7 @@ export function ProjectNotesDialog({
       actions: (
         <SheetHeaderIconButton
           icon={RotateCw}
-          accessibilityLabel={isRefreshing ? t("notes.refreshing") : t("notes.refresh")}
+          label={isRefreshing ? t("notes.refreshing") : t("notes.refresh")}
           onPress={handleRefresh}
           busy={isRefreshing}
           testID="project-notes-refresh"

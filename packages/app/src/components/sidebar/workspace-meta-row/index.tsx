@@ -1,6 +1,7 @@
+import { PressHighlight as Pressable } from "@/components/ui/press-highlight";
 import { Fragment, useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
+import { Text, View, type GestureResponderEvent } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ExternalLink, Folder, GitBranch, Globe } from "lucide-react-native";
 import {
@@ -14,9 +15,13 @@ import type { PrHint } from "@/git/pr-hint";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { useSidebarMetaPreferences } from "@/components/sidebar/display-preferences/model";
-import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import type { Theme } from "@/styles/theme";
+import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { PullRequestStateIcon } from "@/git/pull-request-state-icon";
+import {
+  PluginWorkspaceRowBadgeItems,
+  usePluginWorkspaceRowBadgeItems,
+} from "@/plugins/workspace-row-badge-items";
 import { CheckIndicator } from "./check-indicator";
 import type { CheckSummary, CheckSummaryState } from "./check-summary";
 import { selectMetaRowItems, type MetaRowItem } from "./meta-items";
@@ -60,52 +65,68 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  * state has its own colors — a label is a name a person chose, so it carries its own identity
  * color on a tint instead (see `WorkspaceLabelChip`). It sits last so the reported facts are
  * read first, and it stays the same height as the rest of the line.
+ *
+ * Plugin items follow everything the row knows itself. A plugin renders its slot as it likes:
+ * the row adds no separator, since only the plugin knows whether it has anything to say.
  */
 export function WorkspaceMetaRow({
   currentBranch,
   projectName,
   hostBadge,
-  statusEnteredAt = null,
-  createdByName = null,
   prHint,
   serviceSummary,
   labels = EMPTY_LABELS,
-  compact = false,
+  workspace = null,
+  backdrop,
 }: {
   currentBranch: string | null;
   projectName: string | null;
   hostBadge: HostBadgeModel | null;
-  statusEnteredAt?: Date | null;
-  createdByName?: string | null;
   prHint: PrHint | null;
   serviceSummary: WorkspaceServiceSummary | null;
   labels?: readonly WorkspaceLabelDefinition[];
-  compact?: boolean;
+  /** The real workspace behind the row; previews leave it out and get no plugin items. */
+  workspace?: { serverId: string; workspaceId: string } | null;
+  backdrop: SidebarSurfaceBackdrop;
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
   const items = selectMetaRowItems({
     currentBranch,
     projectName,
     hasHostBadge: hostBadge !== null,
-    statusEnteredAt,
-    createdByName,
+    statusEnteredAt: null,
+    createdByName: null,
     prHint,
     serviceSummary,
     labels,
     visible: rowItems,
     checksDisplay,
   });
+  const pluginItems = usePluginWorkspaceRowBadgeItems(workspace?.serverId ?? null);
 
-  if (items.length === 0) return null;
+  if (items.length === 0 && (!workspace || pluginItems.length === 0)) return null;
 
   return (
-    <View style={[styles.row, compact && styles.rowCompact]}>
+    <View style={styles.row}>
       {items.map((item, index) => (
         <Fragment key={item.kind}>
-          {index > 0 ? <Text style={styles.separator}>·</Text> : null}
+          {index > 0 ? (
+            <Text
+              style={[
+                styles.separator,
+                backdrop === "surfaceSidebarHover" && styles.separatorHovered,
+                backdrop === "surfaceSidebarSelected" && styles.separatorSelected,
+              ]}
+            >
+              ·
+            </Text>
+          ) : null}
           <MetaItemNode item={item} hostBadge={hostBadge} leading={index === 0} />
         </Fragment>
       ))}
+      {workspace ? (
+        <PluginWorkspaceRowBadgeItems targets={pluginItems} workspaceId={workspace.workspaceId} />
+      ) : null}
     </View>
   );
 }
@@ -129,12 +150,6 @@ function MetaItemNode({
   if (item.kind === "host") {
     return hostBadge ? <HostBadge badge={hostBadge} /> : null;
   }
-  if (item.kind === "timestamp") {
-    return <WorkspaceTimestamp enteredAt={item.enteredAt} />;
-  }
-  if (item.kind === "creator") {
-    return <WorkspaceCreator name={item.name} />;
-  }
   if (item.kind === "changeRequest") {
     return <PullRequestItem hint={item.hint} />;
   }
@@ -144,27 +159,8 @@ function MetaItemNode({
   if (item.kind === "labels") {
     return <LabelsItem labels={item.labels} leading={leading} />;
   }
-  return <ServiceItem summary={item.summary} />;
-}
-
-// Keep the minute tick in this leaf so updating the label doesn't re-render the workspace row.
-function WorkspaceTimestamp({ enteredAt }: { enteredAt: Date }) {
-  const label = useCompactTimeAgo(enteredAt);
-  return (
-    <Text style={styles.timestamp} numberOfLines={1} testID="sidebar-workspace-timestamp">
-      {label}
-    </Text>
-  );
-}
-
-function WorkspaceCreator({ name }: { name: string }) {
-  return (
-    <View style={styles.creatorItem} testID="sidebar-workspace-creator">
-      <Text style={styles.creatorText} numberOfLines={1}>
-        {name}
-      </Text>
-    </View>
-  );
+  if (item.kind === "services") return <ServiceItem summary={item.summary} />;
+  return null;
 }
 
 function IdentityItem({ kind, name }: { kind: "branch" | "project"; name: string }) {
@@ -351,9 +347,6 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1.5],
     minWidth: 0,
   },
-  rowCompact: {
-    gap: theme.spacing[1],
-  },
   item: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,26 +370,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 16,
     flexShrink: 1,
   },
-  timestamp: {
-    color: theme.colors.foregroundExtraMuted,
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.normal,
-    lineHeight: 16,
-    flexShrink: 0,
-  },
-  creatorItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  creatorText: {
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 16,
-    flexShrink: 1,
-  },
   itemPressed: {
     opacity: 0.82,
   },
@@ -406,6 +379,8 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 16,
     flexShrink: 0,
   },
+  separatorHovered: { color: theme.colors.foregroundSidebarHover },
+  separatorSelected: { color: theme.colors.foregroundSidebarSelected },
   // Tighter than the line's own gap so a run of chips reads as one item — see `LabelsItem`.
   // Shrinks at the same weight as the service name: both are arbitrary text somebody chose, so
   // a crowded line takes from the two of them in proportion rather than emptying one of them.

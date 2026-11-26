@@ -1,8 +1,9 @@
+import { AppearanceText as Text } from "@/appearance/text";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { View } from "react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   SYNTAX_THEME_OPTIONS,
   type SyntaxThemeId,
@@ -13,10 +14,7 @@ import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { ThemePicker } from "@/appearance/theme-picker";
 import { Button } from "@/components/ui/button";
-import {
-  EditingTextInput as TextInput,
-  type EditingTextInputHandle,
-} from "@/components/ui/text-input";
+import { EditingTextInput, type EditingTextInputHandle } from "@/components/ui/text-input";
 import {
   MAX_CODE_FONT_SIZE,
   MAX_CONTENT_FONT_SIZE,
@@ -34,8 +32,13 @@ import {
 import { DEFAULT_MONO_FONT_STACK, DEFAULT_UI_FONT_STACK } from "@/styles/theme";
 import { isNative } from "@/constants/platform";
 import { settingsStyles } from "@/styles/settings";
-import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, usePanelStore } from "@/stores/panel-store";
 import { AppearancePreview } from "./appearance-preview";
+
+// Subscribe the input leaf to numeric theme changes without resetting its editing state.
+const TextInput = withUnistyles(EditingTextInput, (theme) => {
+  void theme.fontSize;
+  return {};
+});
 
 // Platform default stacks can be the bare native tokens ("normal"/"monospace");
 // those read as a bug, so show a human label in the placeholder instead.
@@ -125,7 +128,7 @@ interface FontSizeRowProps {
   draft: string;
   withBorder?: boolean;
   onChangeDraft: (value: string) => void;
-  onCommit: () => void;
+  onCommit: () => string;
 }
 
 function FontSizeRow({
@@ -137,6 +140,12 @@ function FontSizeRow({
   onChangeDraft,
   onCommit,
 }: FontSizeRowProps) {
+  const inputRef = useRef<EditingTextInputHandle>(null);
+  const handleCommit = useCallback(() => {
+    const committed = onCommit();
+    inputRef.current?.replaceText(committed);
+  }, [onCommit]);
+
   return (
     <View style={withBorder ? styles.rowWithBorder : settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
@@ -145,10 +154,11 @@ function FontSizeRow({
       </View>
       <View style={styles.sizeField}>
         <TextInput
+          ref={inputRef}
           initialValue={draft}
           onChangeText={onChangeDraft}
-          onBlur={onCommit}
-          onSubmitEditing={onCommit}
+          onBlur={handleCommit}
+          onSubmitEditing={handleCommit}
           keyboardType="number-pad"
           inputMode="numeric"
           selectTextOnFocus
@@ -221,74 +231,6 @@ function ContentWidthRow({ value, onChange }: ContentWidthRowProps) {
           selectTextOnFocus
           style={styles.widthInput}
           accessibilityLabel={t("settings.appearance.layout.contentWidthAccessibility")}
-        />
-        <Text style={styles.unit}>px</Text>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Sidebar width: the same value the desktop grip writes, as a numeric field
-// ---------------------------------------------------------------------------
-
-interface SidebarWidthRowProps {
-  value: number;
-  onChange: (value: number) => void;
-}
-
-function SidebarWidthRow({ value, onChange }: SidebarWidthRowProps) {
-  const { t } = useTranslation();
-  const width = clampSidebarWidth(Math.round(value));
-  const input = useRef<EditingTextInputHandle>(null);
-
-  useEffect(() => {
-    input.current?.replaceText(String(width));
-  }, [width]);
-
-  const commit = useCallback(() => {
-    const draft = input.current?.getText()?.trim() ?? "";
-    const parsed = draft.length > 0 ? Number(draft) : NaN;
-    const next = Number.isFinite(parsed) ? clampSidebarWidth(Math.round(parsed)) : width;
-    input.current?.replaceText(String(next));
-    if (next !== width) {
-      onChange(next);
-    }
-  }, [onChange, width]);
-
-  const reset = useCallback(() => {
-    onChange(DEFAULT_SIDEBAR_WIDTH);
-  }, [onChange]);
-
-  return (
-    <View style={settingsStyles.row}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.appearance.layout.sidebarWidth")}</Text>
-        <Text style={settingsStyles.rowHint}>
-          {t("settings.appearance.layout.sidebarWidthHint")}
-        </Text>
-      </View>
-      <View style={styles.sizeField}>
-        {width === DEFAULT_SIDEBAR_WIDTH ? null : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={reset}
-            accessibilityLabel={t("settings.appearance.layout.sidebarWidthResetAccessibility")}
-          >
-            {t("settings.appearance.layout.reset")}
-          </Button>
-        )}
-        <TextInput
-          ref={input}
-          initialValue={String(width)}
-          onBlur={commit}
-          onSubmitEditing={commit}
-          keyboardType="number-pad"
-          inputMode="numeric"
-          selectTextOnFocus
-          style={styles.widthInput}
-          accessibilityLabel={t("settings.appearance.layout.sidebarWidthAccessibility")}
         />
         <Text style={styles.unit}>px</Text>
       </View>
@@ -370,8 +312,6 @@ function SyntaxRow({ value, onChange }: SyntaxRowProps) {
 export function AppearanceSection() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
-  const sidebarWidth = usePanelStore((state) => state.sidebarWidth);
-  const setSidebarWidth = usePanelStore((state) => state.setSidebarWidth);
   const showInterfaceFontFamilyRow = !isNative;
   const uiFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_UI_FONT_STACK);
   const monoFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_MONO_FONT_STACK);
@@ -461,6 +401,7 @@ export function AppearanceSection() {
     if (next !== settings.uiBaseFontSize) {
       void updateSettings({ uiBaseFontSize: next });
     }
+    return String(next);
   }, [settings.uiBaseFontSize, uiBaseSizeDraft, updateSettings]);
 
   const commitCodeSize = useCallback(() => {
@@ -473,6 +414,7 @@ export function AppearanceSection() {
     if (next !== settings.codeFontSize) {
       void updateSettings({ codeFontSize: next });
     }
+    return String(next);
   }, [codeSizeDraft, settings.codeFontSize, updateSettings]);
 
   const commitContentSize = useCallback(() => {
@@ -485,6 +427,7 @@ export function AppearanceSection() {
     if (next !== settings.contentFontSize) {
       void updateSettings({ contentFontSize: next });
     }
+    return String(next);
   }, [contentSizeDraft, settings.contentFontSize, updateSettings]);
 
   // Live-while-typing: the in-progress drafts drive the preview without
@@ -561,13 +504,10 @@ export function AppearanceSection() {
       </SettingsSection>
       <SettingsSection title={t("settings.appearance.layout.title")}>
         <View style={settingsStyles.card}>
-          <SidebarWidthRow value={sidebarWidth} onChange={setSidebarWidth} />
-          <View style={settingsStyles.rowBorder}>
-            <ContentWidthRow
-              value={settings.contentMaxWidth}
-              onChange={handleContentMaxWidthChange}
-            />
-          </View>
+          <ContentWidthRow
+            value={settings.contentMaxWidth}
+            onChange={handleContentMaxWidthChange}
+          />
         </View>
       </SettingsSection>
       <SettingsSection title={t("settings.appearance.syntax.title")}>

@@ -2,6 +2,7 @@
   "name": "@getpaseo/client",
   "version": "0.14.3",
   "description": "Paseo client SDK package",
+  "license": "Apache-2.0",
   "files": [
     "dist",
     "!dist/**/*.map",
@@ -44,7 +45,8 @@
     "prepack": "npm run build:clean",
     "typecheck": "tsgo --noEmit",
     "typecheck:examples": "tsgo -p tsconfig.examples.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "measure:diff-materialization": "tsx scripts/measure-diff-materialization.ts"
   },
   "dependencies": {
     "@getpaseo/protocol": "0.14.3",

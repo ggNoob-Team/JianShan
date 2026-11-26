@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { withPreviewCsp } from "./html-preview-csp";
 
@@ -23,66 +23,22 @@ const iframeStyle = {
   backgroundColor: "white",
 } as const;
 
-const COMMAND_BRIDGE = `<script>(() => {
-  window.addEventListener("message", (event) => {
-    if (event.source !== window.parent) return;
-    const data = event.data;
-    if (!data || data.type !== "paseo-html-preview-command" || typeof data.source !== "string") return;
-    try { (0, eval)(data.source); } catch (_) {}
-  });
-})();</script>`;
-
-export interface FileHtmlPreviewCommand {
-  id: number;
-  source: string;
-}
-
-function withCommandBridge(html: string): string {
-  return html.includes("</body>")
-    ? html.replace("</body>", `${COMMAND_BRIDGE}</body>`)
-    : html + COMMAND_BRIDGE;
-}
-
-export function FileHtmlPreview({
-  html,
-  testID,
-  command,
-  commandBridge = false,
-}: {
-  html: string;
-  testID?: string;
-  command?: FileHtmlPreviewCommand | null;
-  commandBridge?: boolean;
-}) {
+export function FileHtmlPreview({ html, testID }: { html: string; testID?: string }) {
   const { t } = useTranslation();
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [ready, setReady] = useState(false);
-  const document = useMemo(
-    () => withPreviewCsp(commandBridge ? withCommandBridge(html) : html),
-    [commandBridge, html],
+  // A document URL lets the browser resolve fragment links within the preview.
+  // srcDoc would inherit the app URL and navigate the frame back into Paseo.
+  const source = useMemo(
+    () => `data:text/html;charset=utf-8,${encodeURIComponent(withPreviewCsp(html))}`,
+    [html],
   );
-  useEffect(() => {
-    setReady(false);
-  }, [document]);
-
-  const handleLoad = useCallback(() => setReady(true), []);
-  useEffect(() => {
-    if (!ready || !command) return;
-    iframeRef.current?.contentWindow?.postMessage(
-      { type: "paseo-html-preview-command", id: command.id, source: command.source },
-      "*",
-    );
-  }, [command, ready]);
   return (
     <iframe
-      ref={iframeRef}
       data-testid={testID}
       title={t("panels.file.filePanels.builtin.html")}
-      srcDoc={document}
+      src={source}
       sandbox={SANDBOX}
       referrerPolicy="no-referrer"
       style={iframeStyle}
-      onLoad={handleLoad}
     />
   );
 }

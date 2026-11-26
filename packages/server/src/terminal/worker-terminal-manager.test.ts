@@ -62,6 +62,7 @@ import {
   readTerminalWorkerRecord,
   terminalWorkerDirectory,
   terminalWorkerRecordPath,
+  writeTerminalCleanupRecord,
   type TerminalWorkerRecord,
 } from "./terminal-worker-record.js";
 import { TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV } from "./terminal-worker-protocol.js";
@@ -440,26 +441,24 @@ it("creates a terminal through the worker and streams output", async () => {
     }),
   );
   const messages: string[] = [];
-  let readinessEvents = 0;
+  let snapshotReady = false;
   const unsubscribe = session.subscribe((message) => {
     if (message.type === "output") {
       messages.push(message.data);
     }
     if (message.type === "snapshotReady") {
-      readinessEvents += 1;
+      snapshotReady = true;
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  expect(readinessEvents).toBe(1);
+  // Subscription and initial PTY output each announce readiness; their order depends on startup.
+  await waitForCondition(() => snapshotReady, 10000);
 
   session.send({ type: "input", data: "hello\r" });
 
   await waitForCondition(() => messages.join("").includes("worker-output:hello"), 10000);
-  await new Promise((resolve) => setTimeout(resolve, 100));
   unsubscribe();
 
   expect(messages.join("")).toContain("worker-output:hello");
-  expect(readinessEvents).toBe(1);
 });
 
 it("delivers rapid small writes complete and in order through worker coalescing", async () => {
@@ -812,7 +811,7 @@ async function recordedTerminalPids(paseoHome: string): Promise<Map<string, numb
 }
 
 it.each([false, true])(
-  "never adopts a live worker's terminals after a kill cleanup it could not finish, even once the worker rewrites its record (held reader: %s)",
+  "never adopts a closing worker's terminals even once it rewrites its record (held reader: %s)",
   async (holdReader) => {
     const paseoHome = createTemporaryHome();
     const cwd = mkdtempSync(join(tmpdir(), "worker-terminal-manager-unfinished-kill-"));
@@ -844,17 +843,22 @@ it.each([false, true])(
     const remainingPid = pids.get(remaining.id)!;
     const [record] = await workerRecords(paseoHome);
 
-    // A kill cleanup whose process table read fails signals nothing and leaves the worker live.
+    // Seed a retained cleanup through the same record interface the reaper writes. Windows
+    // does not read program birth times, so a process-table failure cannot create this state.
     const inspector = createTerminalWorkerProcessInspector();
-    await expect(
-      reapTerminalWorkers({
-        paseoHome,
-        inspector: {
-          ...inspector,
-          listProcesses: () => Promise.reject(new Error("ps timed out")),
-        },
-      }),
-    ).rejects.toBeInstanceOf(TerminalCleanupNotConfirmedError);
+    await writeTerminalCleanupRecord(paseoHome, {
+      ...record!,
+      closing: {
+        unresolved: [
+          {
+            pid: record!.pid,
+            role: "worker",
+            reason: "still alive",
+            detail: "shutdown was not confirmed",
+          },
+        ],
+      },
+    });
     expect((await readUnconfirmedTerminalCleanup(paseoHome)).length).toBeGreaterThan(0);
 
     // Keep an ordinary reader open until the worker delivers the terminal exit.
@@ -867,7 +871,18 @@ it.each([false, true])(
       writeFileSync(exitRequestPath, "");
       await waitForCondition(() => first.getTerminal(ending.id) === undefined, 10000);
       expect(existsSync(exitObservedPath)).toBe(true);
-      expect(isProcessAlive(endingPid)).toBe(false);
+      const originalEnding = record!.terminals.find((entry) => entry.id === ending.id)!;
+      // Exit delivery does not reserve the PID. Wait for the original process to
+      // disappear, allowing Windows to reuse its PID just as in the restart check below.
+      await expect
+        .poll(
+          async () =>
+            !isProcessAlive(endingPid) ||
+            classifyTerminalProgramProcess(originalEnding, await inspector.inspect(endingPid))
+              .status === "unrelated",
+          { timeout: 10000 },
+        )
+        .toBe(true);
     } finally {
       if (recordFd !== null) closeSync(recordFd);
     }
@@ -1623,29 +1638,41 @@ it.each([1, 4])(
   async (version) => {
     const paseoHome = createTemporaryHome();
     const old = await leaveWorkerWithTerminal(paseoHome, version);
+    const [record] = await workerRecords(paseoHome);
+    const program = record!.terminals.find((entry) => entry.id === old.terminalId)!;
+    const inspector = createTerminalWorkerProcessInspector();
 
     manager = await startRealWorkerManager({ paseoHome });
 
-    await waitForCondition(
-      () => !isProcessAlive(old.workerPid) && !isProcessAlive(old.programPid),
-      10000,
-    );
+    expect(await readUnconfirmedTerminalCleanup(paseoHome)).toEqual([]);
+    // Startup launches a replacement worker after cleanup. Either old PID may already
+    // belong to another process, so verify that the recorded birth identities are gone.
+    await waitForCondition(() => !isProcessAlive(record!.pid), 10000);
+    await expect
+      .poll(
+        async () =>
+          !isProcessAlive(program.pid) ||
+          classifyTerminalProgramProcess(program, await inspector.inspect(program.pid)).status ===
+            "unrelated",
+        { timeout: 10000 },
+      )
+      .toBe(true);
     expect(manager.getTerminal(old.terminalId)).toBeUndefined();
     const workers = await workerRecords(paseoHome);
     expect(workers).toHaveLength(1);
-    expect(workers[0]!.protocolVersion).toBe(5);
+    expect(workers[0]!.protocolVersion).toBe(6);
   },
 );
 
 it("leaves a worker from a newer Paseo running, reports it incompatible, and closes it on a kill stop", async () => {
   const paseoHome = createTemporaryHome();
-  const newer = await leaveWorkerWithTerminal(paseoHome, 6);
+  const newer = await leaveWorkerWithTerminal(paseoHome, 7);
 
   manager = await startRealWorkerManager({ paseoHome });
 
   const unavailable = manager.getUnavailableError?.();
   expect(unavailable).toBeInstanceOf(TerminalWorkerIncompatibleError);
-  expect(unavailable?.message).toContain("worker protocol 6");
+  expect(unavailable?.message).toContain("worker protocol 7");
   await expect(manager.getTerminals(newer.cwd)).rejects.toBeInstanceOf(
     TerminalWorkerIncompatibleError,
   );
@@ -1657,8 +1684,10 @@ it("leaves a worker from a newer Paseo running, reports it incompatible, and clo
 
   await manager.closeTerminals();
 
-  expect(isProcessAlive(newer.workerPid)).toBe(false);
   expect(isProcessAlive(newer.programPid)).toBe(false);
+  // Cleanup counts the worker gone once its socket refuses connections, which happens before
+  // its process exits.
+  await waitForCondition(() => !isProcessAlive(newer.workerPid), 5000);
   expect(await workerRecords(paseoHome)).toEqual([]);
 });
 
@@ -1763,7 +1792,6 @@ it("replays bounded ANSI chunks independently of live output and reconstructs th
       rows: 8,
       cols: 120,
       ...nodeTerminalCommand(`
-      for (let i = 0; i < 800; i++) process.stdout.write("\\x1b[31m" + String(i).padStart(4, "0") + ":" + "x".repeat(100) + "\\x1b[0m\\r\\n");
       require("node:readline").createInterface({ input: process.stdin }).on("line", line => {
         if (line !== "before") { process.stdout.write("LIVE-AFTER-REPLAY\\r\\n"); return; }
         process.stdout.write("PRE-CUT");
@@ -1773,6 +1801,9 @@ it("replays bounded ANSI chunks independently of live output and reconstructs th
           process.stdout.write("\\r\\n");
         }, 5);
       });
+      // The last history row is the parent's readiness signal. Install input
+      // handling first so observing that row means the fixture can answer.
+      for (let i = 0; i < 800; i++) process.stdout.write("\\x1b[31m" + String(i).padStart(4, "0") + ":" + "x".repeat(100) + "\\x1b[0m\\r\\n");
       setInterval(() => {}, 1000);
     `),
     }),

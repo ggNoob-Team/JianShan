@@ -90,10 +90,14 @@ export function resolveWorkspaceCreationOwner(input: {
       ...(input.callerAgent ? { virtual: true } : {}),
     };
   }
-  if (
-    (input.clientType === "cli" || input.clientType === "mcp") &&
-    isDreamWorkspaceName(input.workspaceName)
-  ) {
+  if (input.clientType === "mcp") {
+    return {
+      clientId: sourceActor.clientId,
+      clientName: VIRTUAL_ACTOR_ROLE_NAME,
+      virtual: true,
+    };
+  }
+  if (input.clientType === "cli" && isDreamWorkspaceName(input.workspaceName)) {
     return {
       clientId: sourceActor.clientId,
       clientName: VIRTUAL_ACTOR_ROLE_NAME,
