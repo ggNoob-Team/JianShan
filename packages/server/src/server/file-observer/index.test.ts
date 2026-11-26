@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, sep } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
+import { createWatcherLivenessCanary } from "../watcher-liveness-canary.js";
 import {
   createFileObserver,
   type FileChange,
@@ -165,11 +166,16 @@ test("survives atomic replacement and remains observable", async () => {
   const root = await createRoot();
   const target = join(root, "target.txt");
   await writeFile(target, "before");
+  const canary = createWatcherLivenessCanary(root);
   const events: FileChange[] = [];
   const subscription = await subscribeToFileChanges(root, (error, batch) => {
     expect(error).toBeNull();
-    events.push(...batch);
+    events.push(...canary.filterEvents(batch));
   });
+
+  // macOS starts delivering native events asynchronously after subscription.
+  await canary.verify();
+  events.length = 0;
 
   const replacement = join(root, "replacement.txt");
   await writeFile(replacement, "after");
@@ -193,10 +199,11 @@ test("classifies a removed file as deleted", async () => {
   });
 
   await rm(target);
-  // Native recursive delivery can be coalesced before the backend's deletion audit.
-  // Assert eventual classification without imposing Vitest's one-second default.
+  // macOS FSEvents can replay the write above as a create after the subscription starts,
+  // so the delete is the latest event for the path, not the first. Native recursive delivery
+  // can also be coalesced before the backend's deletion audit, hence the longer timeout.
   await expect
-    .poll(() => events.find((event) => event.path === target)?.type, { timeout: 10_000 })
+    .poll(() => events.findLast((event) => event.path === target)?.type, { timeout: 10_000 })
     .toBe("delete");
   await subscription.unsubscribe();
 });

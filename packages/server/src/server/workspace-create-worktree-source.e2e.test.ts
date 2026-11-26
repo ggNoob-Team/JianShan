@@ -45,6 +45,7 @@ test("workspace.create worktree source forwards action=checkout + refName into t
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -66,6 +67,44 @@ test("workspace.create worktree source forwards action=checkout + refName into t
     // slug instead of checking out the named branch. The created worktree being
     // on feature/existing-branch is the observable proof both fields forwarded.
     expect(result.workspace?.gitRuntime?.currentBranch).toBe("feature/existing-branch");
+  } finally {
+    await client.close().catch(() => undefined);
+    await daemon.close();
+    await rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+}, 180000);
+
+test("checkout.worktrees.list returns git worktrees Paseo did not create", async () => {
+  const daemon = await createTestPaseoDaemon();
+  const { repoDir, tempRoot } = createGitRepoWithBranch();
+  const manualPath = path.join(tempRoot, "manual");
+  execFileSync("git", ["worktree", "add", "-b", "feature/manual", manualPath], {
+    cwd: repoDir,
+    stdio: "pipe",
+  });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.1.82",
+  });
+
+  try {
+    await client.connect();
+    const created = await client.createWorkspace({
+      source: { kind: "worktree", cwd: repoDir, action: "branch-off", branchName: "feature/paseo" },
+    });
+    expect(created.error).toBeNull();
+
+    const worktrees = await client.listCheckoutWorktrees(repoDir);
+
+    expect(worktrees.map(({ branchName, containsCwd }) => ({ branchName, containsCwd }))).toEqual(
+      expect.arrayContaining([
+        { branchName: "main", containsCwd: true },
+        { branchName: "feature/manual", containsCwd: false },
+        { branchName: "feature/paseo", containsCwd: false },
+      ]),
+    );
+    expect(worktrees).toHaveLength(3);
   } finally {
     await client.close().catch(() => undefined);
     await daemon.close();
@@ -122,6 +161,7 @@ if (process.argv[2] === "serve") {
       stdio: "pipe",
     });
     const client = new DaemonClient({
+      clientName: "测试角色",
       url: `ws://127.0.0.1:${daemon.port}/ws`,
       appVersion: "0.1.82",
     });
@@ -201,6 +241,7 @@ test("existing branch changes remain visible after archive and restore", async (
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.11.2",
   });
@@ -243,6 +284,7 @@ test("workspace.create keeps a branch-off name separate from its worktree slug",
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -275,6 +317,7 @@ test("workspace.create accepts a Git-valid branch-off name outside Paseo slug sy
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -309,6 +352,7 @@ test("workspace.create always creates a new worktree when the slug is already oc
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -351,6 +395,7 @@ test("workspace.create suffixes past an occupied detached worktree", async () =>
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -396,6 +441,7 @@ test("workspace.create suffixes an occupied checkout branch", async () => {
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
   const client = new DaemonClient({
+    clientName: "测试角色",
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
   });
@@ -469,7 +515,11 @@ test("restore preserves upstream comparison and update but rejects a missing loc
 async function createRestorableWorkspace(baseRef: string) {
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.8.0",
+  });
   onTestFinished(async () => {
     await client.close().catch(() => undefined);
     await daemon.close();
@@ -657,6 +707,7 @@ const timer = setInterval(() => {
       const client = new SocketDaemonClient({
         url: `ws://127.0.0.1:${daemon.port}/ws`,
         clientId,
+        clientName: "测试角色",
         reconnect: { baseDelayMs: 10, maxDelayMs: 10 },
         webSocketFactory: (url) => {
           const socket = new WebSocket(url);
@@ -906,7 +957,10 @@ const timer = setInterval(() => {
 test("agent creation rejects legacy worktree intent without provisioning or executing setup", async () => {
   const daemon = await createTestPaseoDaemon();
   const { repoDir, tempRoot } = createGitRepoWithBranch();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await expect(

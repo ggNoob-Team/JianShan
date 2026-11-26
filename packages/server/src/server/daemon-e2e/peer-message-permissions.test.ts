@@ -48,7 +48,10 @@ async function createQuestionHarness() {
     staticDir: path.join(root, "static"),
     cleanup: false,
   });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    clientName: "测试角色",
+  });
   try {
     await client.connect();
     await client.fetchAgents({ subscribe: {} });
@@ -95,7 +98,7 @@ test("an agent-sourced steer leaves the question pending and answerable", async 
     await client.sendAgentMessage(recipient.id, "Peer status check", {
       sourceAgentId: sender.id,
     });
-    // The public wait includes admitted message delivery before reporting permission status.
+    // Permission checkpoints are reported while the peer message waits for turn end.
     const waiting = await client.waitForFinish(recipient.id);
     expect(waiting.status).toBe("permission");
     expect(waiting.final?.pendingPermissions).toMatchObject([

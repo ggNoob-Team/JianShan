@@ -211,6 +211,16 @@ function trackTerminal(session: TerminalSession): TerminalSession {
   return session;
 }
 
+// Processes of workers a test killed. On Windows a killed worker's terminal programs end only
+// once its console closes, a moment later, and a temporary dir that is still a live program's
+// cwd cannot be removed. afterEach waits for them before it removes the dirs.
+const crashedWorkerProcesses: number[] = [];
+
+function crashWorker(record: TerminalWorkerRecord): void {
+  crashedWorkerProcesses.push(record.pid, ...record.terminals.map((terminal) => terminal.pid));
+  process.kill(record.pid, "SIGKILL");
+}
+
 async function removeTemporaryDir(dir: string): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -239,6 +249,8 @@ afterEach(async () => {
   );
   await manager?.closeTerminals();
   manager = null;
+  const crashed = crashedWorkerProcesses.splice(0);
+  await waitForCondition(() => !crashed.some(isProcessAlive), 10000);
   while (temporaryDirs.length > 0) {
     const dir = temporaryDirs.pop();
     if (dir) {
@@ -267,7 +279,7 @@ it("retires a killed worker's sessions and shares one replacement across concurr
   );
   const exits: unknown[] = [];
   terminal.onExit((info) => exits.push(info));
-  process.kill(file.record.pid, "SIGKILL");
+  crashWorker(file.record);
   await waitForCondition(() => manager!.getTerminal(terminal.id) === undefined, 10000);
   expect(changes).toContainEqual([]);
   expect(exits).toHaveLength(1);
@@ -349,7 +361,7 @@ it.each(["detach", "closeTerminals"] as const)(
       ...nodeTerminalCommand("setInterval(() => {}, 1000)"),
     });
     const [record] = await workerRecords(paseoHome);
-    process.kill(record!.pid, "SIGKILL");
+    crashWorker(record!);
     await manager[operation]();
     await expect(
       manager.createTerminal({ workspaceId: "ws-stop-recovery", cwd: paseoHome }),
@@ -371,7 +383,7 @@ it.each(["detach", "closeTerminals"] as const)(
       ...nodeTerminalCommand("setInterval(() => {}, 1000)"),
     });
     const [record] = await workerRecords(paseoHome);
-    process.kill(record!.pid, "SIGKILL");
+    crashWorker(record!);
     await waitForCondition(() => !manager!.getTerminal(terminal.id), 10000);
     const creating = manager.createTerminal({ workspaceId: "ws-launch-race", cwd: paseoHome });
     const rejected = expect(creating).rejects.toBeInstanceOf(NoTerminalWorkerAvailableError);
@@ -410,7 +422,7 @@ it.each(["current", "draining"] as const)(
     const healthyId = target === "current" ? drainingId : added.id;
     const healthy = manager.getTerminal(healthyId);
     expect(healthy).toBeDefined();
-    process.kill(target === "current" ? current.pid : draining.pid, "SIGKILL");
+    crashWorker(target === "current" ? current : draining);
     await waitForCondition(() => !manager!.getTerminal(deadId), 10000);
     expect(manager.getTerminal(healthyId)).toBe(healthy);
     expect(await readReplay(manager, healthyId)).not.toBeNull();
@@ -2690,33 +2702,21 @@ it.each([false, true])(
   45000,
 );
 
-// Both Windows reports in #8766: the worker's process identity query (PowerShell there, `ps` here)
-// fails, the worker exits before writing its record, and the daemon used to exit with it.
-it.skipIf(isPlatform("win32"))(
-  "starts without a worker when the worker cannot read its own identity, and launches one once it can",
-  async () => {
-    const paseoHome = createTemporaryHome();
-    const binDir = mkdtempSync(join(tmpdir(), "worker-terminal-manager-no-ps-"));
-    temporaryDirs.push(binDir);
-    writeFileSync(join(binDir, "ps"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
-    const originalPath = process.env.PATH;
-    process.env.PATH = `${binDir}${delimiter}${originalPath ?? ""}`;
-    try {
-      manager = await startRealWorkerManager({ paseoHome });
-      expect(await workerRecords(paseoHome)).toEqual([]);
-      await expect(
-        manager.createTerminal({ workspaceId: "ws-no-identity", cwd: paseoHome }),
-      ).rejects.toThrow(TerminalWorkerLaunchError);
-      expect(await workerRecords(paseoHome)).toEqual([]);
-    } finally {
-      process.env.PATH = originalPath;
-    }
+it("starts without a worker when the worker cannot start, and launches one once it can", async () => {
+  const paseoHome = createTemporaryHome();
+  const previous = process.env[TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV];
+  process.env[TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV] = "not-a-version";
+  try {
+    manager = await startRealWorkerManager({ paseoHome });
+    expect(await workerRecords(paseoHome)).toEqual([]);
+    await expect(
+      manager.createTerminal({ workspaceId: "ws-no-worker", cwd: paseoHome }),
+    ).rejects.toThrow(TerminalWorkerLaunchError);
+  } finally {
+    if (previous === undefined) delete process.env[TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV];
+    else process.env[TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV] = previous;
+  }
 
-    const terminal = trackTerminal(
-      await manager.createTerminal({ workspaceId: "ws-no-identity", cwd: paseoHome }),
-    );
-    expect(terminal.id).toBeTruthy();
-    expect((await workerRecords(paseoHome)).map((record) => record.pid)).toHaveLength(1);
-  },
-  30000,
-);
+  trackTerminal(await manager.createTerminal({ workspaceId: "ws-no-worker", cwd: paseoHome }));
+  expect(await workerRecords(paseoHome)).toHaveLength(1);
+}, 30000);

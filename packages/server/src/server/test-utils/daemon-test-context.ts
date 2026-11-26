@@ -41,6 +41,7 @@ export async function createDaemonTestContext(
   });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
+    clientName: "测试角色",
   });
   await client.connect();
   await client.fetchAgents({ subscribe: {} });

@@ -57,6 +57,13 @@ export function derivePendingPermissionKey(
   return `${agentId}:${fallbackId}`;
 }
 
+function agentVisibilityFlags(agent: Pick<Agent, "background" | "internal">) {
+  return {
+    ...(agent.background ? { background: true } : {}),
+    ...(agent.internal ? { internal: true } : {}),
+  };
+}
+
 export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
   return {
     id: agent.id,
@@ -85,11 +92,12 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     title: agent.title,
     labels: agent.labels,
     ...(agent.metadata ? { metadata: agent.metadata } : {}),
+    ...(agent.background ? { background: true } : {}),
     requiresAttention: agent.requiresAttention ?? false,
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
-    ...(agent.internal ? { internal: true } : {}),
+    ...agentVisibilityFlags(agent),
     ...(agent.createdBy ? { createdBy: agent.createdBy } : {}),
   };
 }
@@ -142,6 +150,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     attentionReason: snapshot.attentionReason ?? null,
     attentionTimestamp,
     archivedAt,
+    background: snapshot.background === true,
     internal: snapshot.internal,
     createdBy: snapshot.createdBy,
     parentAgentId,

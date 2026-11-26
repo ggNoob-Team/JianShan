@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -14,6 +22,7 @@ import {
   PaseoConfigRawSchema,
   getWorktreeSetupCommands,
   getWorktreeTeardownCommands,
+  getWorktreeTeardownTimeoutMs,
 } from "./worktree.js";
 import {
   readPaseoConfigForEdit,
@@ -295,6 +304,34 @@ describe("paseo config file substrate", () => {
     expect(await getWorktreeTeardownCommands(tempDir)).toEqual(["npm run clean", "npm run reset"]);
   });
 
+  it("reads the teardown time limit and defaults to one minute", async () => {
+    expect(await getWorktreeTeardownTimeoutMs(tempDir)).toBe(60_000);
+
+    for (const teardownTimeoutMs of [1, 300_000, 2_147_483_647]) {
+      writeFileSync(
+        join(tempDir, "paseo.json"),
+        JSON.stringify({ worktree: { teardownTimeoutMs } }),
+      );
+      expect(await getWorktreeTeardownTimeoutMs(tempDir)).toBe(teardownTimeoutMs);
+    }
+  });
+
+  it.each([0, -1000, 1500.5, 2_147_483_648, "90000", null, true, { ms: 90_000 }])(
+    "falls back to the default teardown time limit for %j and keeps the commands",
+    async (teardownTimeoutMs) => {
+      const config = { worktree: { teardown: "npm run clean", teardownTimeoutMs } };
+      writeFileSync(join(tempDir, "paseo.json"), JSON.stringify(config));
+
+      expect(await getWorktreeTeardownTimeoutMs(tempDir)).toBe(60_000);
+      expect(await getWorktreeTeardownCommands(tempDir)).toEqual(["npm run clean"]);
+      expect(await readPaseoConfigForEdit(tempDir)).toEqual({
+        ok: true,
+        config,
+        revision: await statPaseoConfigPath(tempDir),
+      });
+    },
+  );
+
   it("writes pretty JSON with a trailing newline when revision matches", async () => {
     writeFileSync(join(tempDir, "paseo.json"), JSON.stringify({ worktree: { setup: "old" } }));
     const expectedRevision = await statPaseoConfigPath(tempDir);
@@ -322,6 +359,8 @@ describe("paseo config file substrate", () => {
       writeFileSync(join(tempDir, "paseo.json"), JSON.stringify({ worktree: { setup: "old" } }));
       const expectedRevision = await statPaseoConfigPath(tempDir);
       writeFileSync(join(tempDir, "paseo.json"), JSON.stringify({ worktree: { setup: "new" } }));
+      const newerTime = new Date((expectedRevision?.mtimeMs ?? Date.now()) + 2_000);
+      utimesSync(join(tempDir, "paseo.json"), newerTime, newerTime);
       const currentRevision = await statPaseoConfigPath(tempDir);
 
       const result = await writePaseoConfigForEdit({

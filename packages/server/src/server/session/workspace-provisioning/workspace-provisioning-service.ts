@@ -23,6 +23,7 @@ import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.j
 import { deriveProjectKey } from "../../project-key.js";
 import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../../../utils/path.js";
 import type { UntrustedWorkspaceSource } from "../../workspace-automation-gate.js";
+import { readPaseoWorktreeMetadata } from "../../../utils/worktree-metadata.js";
 
 export interface ResolveOrCreateWorkspaceIdInput {
   createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
@@ -53,6 +54,7 @@ export interface CreateWorktreeWorkspaceInput {
   worktreeRoot: string;
   branch: string | null;
   baseBranch: string | null;
+  worktreeManagerPluginId?: string | null;
   title: string | null;
   metadata?: Record<string, JsonValue>;
   expectsInitialAgent?: boolean;
@@ -253,16 +255,25 @@ export function createWorkspaceProvisioningService(deps: {
     };
   }
 
-  async function resolveBackground(context?: {
-    background?: boolean;
-    callerWorkspaceId?: string;
-  }): Promise<boolean> {
-    return (
-      await resolveCreationMetadata({
-        background: context?.background,
-        callerWorkspaceId: context?.callerWorkspaceId,
-      })
-    ).background;
+  async function resolveCheckoutWorkspaceInheritance(
+    checkout: ProjectCheckoutLitePayload,
+    normalizedCwd: string,
+  ): Promise<{
+    baseMetadata: Awaited<ReturnType<typeof readPaseoWorktreeMetadata>> | null;
+    inheritedUntrustedSource: UntrustedWorkspaceSource | undefined;
+  }> {
+    const baseMetadata =
+      checkout.isGit && checkout.isPaseoOwnedWorktree
+        ? await readPaseoWorktreeMetadata(checkout.worktreeRoot ?? normalizedCwd)
+        : null;
+    const checkoutRoot = checkout.worktreeRoot ?? normalizedCwd;
+    const matchesCheckout = createRealpathAwarePathMatcher(checkoutRoot);
+    const inheritedUntrustedSource = (await workspaceRegistry.listAll()).find(
+      (candidate) =>
+        Boolean(candidate.untrustedSource) &&
+        matchesCheckout(candidate.worktreeRoot ?? candidate.cwd),
+    )?.untrustedSource;
+    return { baseMetadata, inheritedUntrustedSource };
   }
 
   async function createWorkspaceForDirectory(
@@ -284,22 +295,35 @@ export function createWorkspaceProvisioningService(deps: {
       ? await refreshProjectKind(await requireActiveProject(projectId), normalizedCwd, checkout)
       : // COMPAT(workspaceCreateMissingProjectId): added in v0.1.107, remove after 2027-01-15.
         await findOrCreateProjectForDirectory(normalizedCwd);
-    const timestamp = new Date().toISOString();
-    const workspace = createPersistedWorkspaceRecord({
-      workspaceId: context?.workspaceId ?? generateWorkspaceId(),
-      projectId: project.projectId,
-      ...initialWorkspacePlacement({ source: "checkout", cwd: normalizedCwd, checkout }),
-      title: title?.trim() || null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      background: await resolveBackground(context),
-      ...(context?.createdBy ? { createdBy: context.createdBy } : {}),
-    });
-    await workspaceRegistry.upsert(workspace, {
-      expectsInitialAgent: context?.expectsInitialAgent,
-    });
-    emitWorkspaceCreated(workspace);
-    return workspace;
+    const create = async () => {
+      const { baseMetadata, inheritedUntrustedSource } = await resolveCheckoutWorkspaceInheritance(
+        checkout,
+        normalizedCwd,
+      );
+      const timestamp = new Date().toISOString();
+      const workspace = createPersistedWorkspaceRecord({
+        workspaceId: context?.workspaceId ?? generateWorkspaceId(),
+        projectId: project.projectId,
+        ...initialWorkspacePlacement({ source: "checkout", cwd: normalizedCwd, checkout }),
+        baseBranch: baseMetadata?.baseRef ?? baseMetadata?.baseRefName ?? null,
+        worktreeManagerPluginId: baseMetadata?.worktreeManagerPluginId ?? null,
+        title: title?.trim() || null,
+        metadata: context?.metadata,
+        ...(inheritedUntrustedSource ? { untrustedSource: inheritedUntrustedSource } : {}),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        ...(context?.createdBy ? { createdBy: context.createdBy } : {}),
+        ...(await resolveCreationMetadata(context)),
+      });
+      await workspaceRegistry.upsert(workspace, {
+        expectsInitialAgent: context?.expectsInitialAgent,
+      });
+      emitWorkspaceCreated(workspace);
+      return workspace;
+    };
+    return deps.withCheckoutLock && checkout.isGit && checkout.isPaseoOwnedWorktree
+      ? deps.withCheckoutLock(checkout.worktreeRoot ?? normalizedCwd, create)
+      : create();
   }
 
   async function createWorkspaceForWorktree(
@@ -326,6 +350,7 @@ export function createWorkspaceProvisioningService(deps: {
         baseBranch: input.baseBranch,
         mainRepoRoot: repoRoot,
       }),
+      worktreeManagerPluginId: input.worktreeManagerPluginId ?? null,
       title: input.title,
       metadata: input.metadata,
       createdAt: timestamp,

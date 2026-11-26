@@ -13,7 +13,11 @@ import { createPaseoApi } from "@getpaseo/client";
 test("a plugin transforms workspace creation once across receipt replays and observes its committed lifecycle", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-lifecycle-"));
   const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.8.0",
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -80,7 +84,11 @@ export default function contribute(server) {
 test("addHook transforms workspace creation once across receipt replays and observes its committed lifecycle", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-lifecycle-"));
   const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.8.0",
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -150,7 +158,11 @@ export default function contribute(server) {
 test("plugins observe turns, answer permissions, and observe archive without blocking the agent", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-turn-hooks-"));
   const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.8.0",
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -251,7 +263,10 @@ export default function contribute(server) {
 test("metadata set at creation reaches the hooks, a before hook can add to it, and snapshots carry it", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-metadata-hooks-"));
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -333,7 +348,10 @@ export default function contribute(server) {
 test("hooks tell a background agent from a normal one", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-background-hooks-"));
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -439,7 +457,10 @@ export default function contribute(server) {
 `,
     );
     const first = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
-    const firstClient = new DaemonClient({ url: `ws://127.0.0.1:${first.port}/ws` });
+    const firstClient = new DaemonClient({
+      clientName: "测试角色",
+      url: `ws://127.0.0.1:${first.port}/ws`,
+    });
     const firstApi = createPaseoApi(firstClient);
     let agentId: string;
     let workspaceId: string;
@@ -477,7 +498,10 @@ export default function contribute(server) {
     }
 
     const second = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
-    const secondClient = new DaemonClient({ url: `ws://127.0.0.1:${second.port}/ws` });
+    const secondClient = new DaemonClient({
+      clientName: "测试角色",
+      url: `ws://127.0.0.1:${second.port}/ws`,
+    });
     try {
       await secondClient.connect();
       const agent = await secondClient.fetchAgent({ agentId });
@@ -527,29 +551,46 @@ test("agent creation hooks change the provider and environment before the sessio
   });
   server.addHook("agent.open.before", async ({ request }) => {
     console.log(JSON.stringify({ hook: "agent.open.before", request }));
-    return { ...request, env: { ...request.env, HOOK_OPEN: "opened" } };
+    return { ...request, appendSystemPrompt: [...(request.appendSystemPrompt ?? []), "Plugin instructions"], env: { ...request.env, HOOK_OPEN: "opened" } };
   });
   server.addHook("agent.create.after", async (event) => {
     console.log(JSON.stringify({ hook: "agent.create.after", event }));
   });`,
     reportOpen: true,
   });
+  const extraPlugin = path.join(directory, "extra-plugin");
+  await mkdir(extraPlugin);
+  await writeFile(
+    path.join(extraPlugin, "paseo-plugin.json"),
+    JSON.stringify({ id: "a-prompt", requirements: { paseo: ">=0.8.0" } }),
+  );
+  const writePrompt = (prompt: string) =>
+    writeFile(
+      path.join(extraPlugin, "index.server.ts"),
+      `export default function contribute(server) { server.addHook("agent.open.before", async ({ request }) => ({ ...request, appendSystemPrompt: [...(request.appendSystemPrompt ?? []), ${JSON.stringify(prompt)}] })); return () => {}; }`,
+    );
+  await writePrompt("First plugin");
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await client.fetchAgents({ subscribe: {} });
     await client.patchDaemonConfig({ pluginsEnabled: true });
     await client.installDirectoryPlugin(pluginDirectory);
+    await client.installDirectoryPlugin(extraPlugin);
     const agent = await client.createAgent({
       provider: "claude",
       cwd: directory,
       title: "Hook test",
+      systemPrompt: "Saved instructions",
     });
     expect(agent.provider).toBe(PROVIDER_ID);
     expect(await daemon.daemon.agentStorage.get(agent.id)).toMatchObject({
       provider: PROVIDER_ID,
-      config: { model: "shutdown-model" },
+      config: { model: "shutdown-model", systemPrompt: "Saved instructions" },
     });
     await expect
       .poll(async () => {
@@ -569,13 +610,32 @@ test("agent creation hooks change the provider and environment before the sessio
         },
         {
           hook: "provider.open",
-          config: { env: { HOOK_CREATE: "created", HOOK_OPEN: "opened" } },
+          config: {
+            env: { HOOK_CREATE: "created", HOOK_OPEN: "opened" },
+            systemPrompt: "Saved instructions\n\nFirst plugin\n\nPlugin instructions",
+          },
         },
         {
           hook: "agent.create.after",
           event: { agent: { id: agent.id, provider: PROVIDER_ID } },
         },
       ]);
+    await writePrompt("Changed plugin");
+    await client.reloadPlugin("a-prompt");
+    await daemon.daemon.agentManager.reloadAgentSession(agent.id);
+    await client.disablePlugin("a-prompt");
+    await daemon.daemon.agentManager.reloadAgentSession(agent.id);
+    const opens = (await client.getPluginLogs("shutdown-provider-plugin"))
+      .filter((entry) => entry.message.startsWith('{"hook":"provider.open"'))
+      .map((entry) => JSON.parse(entry.message).config.systemPrompt);
+    expect(opens).toEqual([
+      "Saved instructions\n\nFirst plugin\n\nPlugin instructions",
+      "Saved instructions\n\nChanged plugin\n\nPlugin instructions",
+      "Saved instructions\n\nPlugin instructions",
+    ]);
+    expect((await daemon.daemon.agentStorage.get(agent.id))?.config?.systemPrompt).toBe(
+      "Saved instructions",
+    );
     await client.archiveAgent(agent.id);
   } finally {
     await client.close();
@@ -587,7 +647,11 @@ test("agent creation hooks change the provider and environment before the sessio
 test("invalid output from an untyped plugin rejects creation before later callbacks run", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-invalid-hook-"));
   const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.8.0",
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -755,7 +819,11 @@ test("a clean daemon shutdown leaves a completed plugin-provider agent without a
     },
   });
 
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.9.1" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.9.1",
+  });
   await client.connect();
   await client.fetchAgents({ subscribe: {} });
 
@@ -797,7 +865,11 @@ test("reloading a plugin leaves a completed plugin-provider agent without an err
       "shutdown-provider-plugin": { source: "directory", path: pluginDirectory, enabled: true },
     },
   });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.9.1" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.9.1",
+  });
   onTestFinished(async () => {
     await client.close();
     await daemon.close();
@@ -848,7 +920,11 @@ test("a provider that never acknowledges session.close does not hold the daemon 
     },
   });
 
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.9.1" });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+    appVersion: "0.9.1",
+  });
   await client.connect();
   await client.fetchAgents({ subscribe: {} });
 
@@ -911,7 +987,10 @@ test("reloading a plugin does not send on a closed IPC channel", async () => {
   } = await createSlowClosingProviderPlugin();
   const cwd = await mkdtemp(path.join(tmpdir(), "paseo-reload-teardown-"));
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await client.patchDaemonConfig({ pluginsEnabled: true });
@@ -947,7 +1026,10 @@ test("reloading a plugin does not send on a closed IPC channel", async () => {
 test("waiting hook failures reject the operation while notification failures are logged and later handlers run", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "paseo-hook-failures-"));
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await writeFile(
       path.join(directory, "paseo-plugin.json"),
@@ -1086,7 +1168,10 @@ test.each([false, true])(
       paseoHomeRoot: path.join(root, "state"),
       cleanup: false,
     });
-    let client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+    let client = new DaemonClient({
+      clientName: "测试角色",
+      url: `ws://127.0.0.1:${daemon.port}/ws`,
+    });
     try {
       await client.connect();
       await client.patchDaemonConfig({ pluginsEnabled: true });
@@ -1188,7 +1273,10 @@ test.each([false, true])(
           "shutdown-provider-plugin": { source: "directory", path: pluginDirectory, enabled: true },
         },
       });
-      client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+      client = new DaemonClient({
+        clientName: "测试角色",
+        url: `ws://127.0.0.1:${daemon.port}/ws`,
+      });
       await client.connect();
       await client.restoreWorkspace(created.workspace!.id);
       expect(await readFile(path.join(cwd, "from-plugin-base.txt"), "utf8")).toBe("base");
@@ -1275,7 +1363,10 @@ test("worktree before hook rejects unsafe destinations with plugin attribution b
   });`,
   });
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await client.patchDaemonConfig({ pluginsEnabled: true });
@@ -1338,7 +1429,10 @@ test("the placement example creates a sibling worktree, opens its first agent th
     reportOpen: true,
   });
   const daemon = await createTestPaseoDaemon();
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await client.patchDaemonConfig({ pluginsEnabled: true });
@@ -1438,7 +1532,10 @@ test("worktree includes reach the first agent without copying tracked or unignor
   });`,
   });
   const daemon = await createTestPaseoDaemon({ builtinPlugins: new BuiltinPluginLoader() });
-  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+  const client = new DaemonClient({
+    clientName: "测试角色",
+    url: `ws://127.0.0.1:${daemon.port}/ws`,
+  });
   try {
     await client.connect();
     await client.patchDaemonConfig({ pluginsEnabled: true });

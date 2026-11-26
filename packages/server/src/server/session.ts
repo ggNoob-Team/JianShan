@@ -31,7 +31,10 @@ import { isAbsolute } from "node:path";
 import { CreationService, type CreatedAgent } from "./creation/index.js";
 import type { CreationSnapshot, AgentCreateRequest } from "@getpaseo/protocol/messages";
 import type { MessageReceipts } from "./message-receipts/index.js";
-import type { AgentBackgroundWorkItem } from "./agent/background-work/index.js";
+import {
+  isDaemonBackgroundWorkItem,
+  type AgentBackgroundWorkItem,
+} from "./agent/background-work/index.js";
 import equal from "fast-deep-equal";
 import { WorkspaceSetupObservation } from "./workspace-setup-observation.js";
 import { SessionDelivery, type OwnedSubscription } from "./session/owned-subscriptions/index.js";
@@ -121,6 +124,7 @@ import {
   assertWorkspaceAutomationAllowedForWorkspace,
   clearWorkspaceAutomationBlock,
   formatWorkspaceAutomationBlockedMessage,
+  isCheckoutUntrusted,
 } from "./workspace-automation-gate.js";
 import {
   WorkspaceLabelError,
@@ -262,7 +266,12 @@ import {
   matchesAgentUpdatesFilter,
   type AgentUpdatesService,
 } from "./session/agent-updates/agent-updates-service.js";
-import { expandTilde } from "../utils/path.js";
+import {
+  createRealpathAwarePathMatcher,
+  expandTilde,
+  isRealpathInsideRoot,
+  normalizePathForIdentity,
+} from "../utils/path.js";
 import {
   searchDirectoryEntries,
   WORKSPACE_SEARCH_HIDDEN_DIRECTORIES,
@@ -304,7 +313,11 @@ import {
   handleWorkspaceSetupStatusRequest as handleWorkspaceSetupStatusRequestMessage,
   handleWorkspaceSetupRunRequest as handleWorkspaceSetupRunRequestMessage,
 } from "./worktree-session.js";
-import { archiveByScope, type ActiveWorkspaceRef } from "./workspace-archive-service.js";
+import {
+  archiveByScope,
+  resolveWorkspaceBackingPath,
+  type ActiveWorkspaceRef,
+} from "./workspace-archive-service.js";
 import {
   WorkspaceArchiveOperations,
   type WorkspaceArchiveUndoInput,
@@ -560,6 +573,10 @@ export interface SessionOptions {
     wait: import("./plugins/lifecycle/index.js").PluginLifecycle["wait"];
     before: import("./plugins/lifecycle/index.js").PluginLifecycle["before"];
     emit: import("./plugins/lifecycle/index.js").PluginLifecycle["emit"];
+    hasWorktreeManager: import("./plugins/runtime.js").PluginWorktreeManagerRuntime["hasWorktreeManager"];
+    createWorktree: import("./plugins/runtime.js").PluginWorktreeManagerRuntime["createWorktree"];
+    removeWorktree: import("./plugins/runtime.js").PluginWorktreeManagerRuntime["removeWorktree"];
+    restoreWorktree: import("./plugins/runtime.js").PluginWorktreeManagerRuntime["restoreWorktree"];
     listPlugins(): Promise<import("@getpaseo/protocol/messages").PluginListItem[]>;
     getLogs(pluginId: string): import("@getpaseo/protocol/messages").PluginLogEntry[];
     installDirectory(input: {
@@ -1090,11 +1107,33 @@ export class Session {
     this.workspaceRecovery = createWorkspaceRecoveryService({
       paseoHome: this.paseoHome,
       worktreesRoot: this.worktreesRoot,
+      worktreeManagers: this.pluginRuntime,
       getWorkspace: (workspaceId) => this.workspaceRegistry.get(workspaceId),
       getProject: (projectId) => this.projectRegistry.get(projectId),
       isDirectory: (path) => this.filesystem.isDirectory(path),
       unarchiveWorkspace: async (workspace) => {
         await this.workspaceProvisioning.ensureWorkspaceRecordUnarchived(workspace);
+      },
+      isCheckoutUntrusted: (checkoutPath) =>
+        isCheckoutUntrusted(this.workspaceRegistry, checkoutPath),
+      syncCheckoutWorktreeManager: async ({
+        worktreeRoot,
+        worktreeManagerPluginId,
+        excludeWorkspaceId,
+      }) => {
+        const matchesCheckout = createRealpathAwarePathMatcher(worktreeRoot);
+        const workspaces = await this.workspaceRegistry.listAll();
+        const timestamp = new Date().toISOString();
+        for (const candidate of workspaces) {
+          if (candidate.workspaceId === excludeWorkspaceId) continue;
+          if (!matchesCheckout(candidate.worktreeRoot ?? candidate.cwd)) continue;
+          if ((candidate.worktreeManagerPluginId ?? null) === worktreeManagerPluginId) continue;
+          const { worktreeManagerPluginId: _previous, ...withoutManager } = candidate;
+          const updated: PersistedWorkspaceRecord = worktreeManagerPluginId
+            ? { ...withoutManager, worktreeManagerPluginId, updatedAt: timestamp }
+            : { ...withoutManager, updatedAt: timestamp };
+          await this.workspaceRegistry.upsert(updated);
+        }
       },
     });
     this.diffSession = new DiffSession(checkoutDiffManager.streams, this.sessionLogger);
@@ -1307,9 +1346,15 @@ export class Session {
         ),
       logger: this.sessionLogger,
     });
+    this.workspaceArchiveOperations = resolveWorkspaceArchiveOperations(workspaceArchiveOperations);
     this.createAgentLifecycleDispatch = new CreateAgentLifecycleDispatch({
       paseoHome: this.paseoHome,
       worktreesRoot: this.worktreesRoot,
+      worktreeManagers: this.pluginRuntime,
+      workspaceArchiveOperations: this.workspaceArchiveOperations,
+      getWorkspace: (workspaceId) => this.workspaceRegistry.get(workspaceId),
+      isCheckoutUntrusted: (checkoutPath) =>
+        isCheckoutUntrusted(this.workspaceRegistry, checkoutPath),
       agentManager: this.agentManager,
       agentStorage: this.agentStorage,
       github: this.github,
@@ -1348,7 +1393,6 @@ export class Session {
       },
     );
     this.workspaceSetupRuntime = resolveWorkspaceSetupRuntime(workspaceSetupRuntime);
-    this.workspaceArchiveOperations = resolveWorkspaceArchiveOperations(workspaceArchiveOperations);
     this.getDaemonTcpPort = getDaemonTcpPort ?? null;
     this.getDaemonTcpHost = getDaemonTcpHost ?? null;
     this.serviceProxyPublicBaseUrl = serviceProxyPublicBaseUrl ?? null;
@@ -1513,6 +1557,8 @@ export class Session {
             type: "browser.host.register.request" as const,
             requestId: uuidv4(),
             hostKind: host.data.hostKind,
+            label: host.data.label,
+            instanceId: host.data.instanceId,
             supportedCommands: host.data.supportedCommands,
           };
           void this.delivery
@@ -2289,7 +2335,12 @@ export class Session {
         }
 
         if (event.type === "background_work") {
-          this.forwardBackgroundWork(event);
+          void this.forwardBackgroundWork(event.agentId).catch((error) =>
+            this.sessionLogger.error(
+              { err: error, agentId: event.agentId },
+              "Failed to emit background work update",
+            ),
+          );
           return;
         }
 
@@ -2372,16 +2423,34 @@ export class Session {
     this.forwardProviderSubagentUpdate(event);
   }
 
-  private forwardBackgroundWork(
-    event: Extract<AgentManagerEvent, { type: "background_work" }>,
-  ): void {
-    const agent = this.agentManager.getAgent(event.agentId);
-    if (agent?.internal) return;
+  private async forwardBackgroundWork(agentId: string): Promise<void> {
+    const target = await this.resolveBackgroundWorkAgent(agentId);
+    if ("error" in target) return;
+    const { agent, record } = target;
+    // The inventory may have changed while resolving a dormant agent.
+    const items = this.agentManager.getAgentBackgroundWorkSummary(agentId)
+      ? this.agentManager.listAgentBackgroundWork(agentId)
+      : [];
     this.emit({
       type: "agent.background_work.update",
-      payload: { agentId: event.agentId, items: event.items },
+      payload: { agentId, items: this.projectBackgroundWorkItems(items) },
     });
-    if (agent) void this.agentUpdates.forwardLiveAgent(agent);
+    if (agent) await this.agentUpdates.forwardLiveAgent(agent);
+    else if (record) await this.agentUpdates.forwardStoredAgent(record);
+  }
+
+  private projectBackgroundWorkItems(items: AgentBackgroundWorkItem[]): AgentBackgroundWorkItem[] {
+    if (
+      this.authorization.allowsPermission("automation.manage") &&
+      this.authorization.allowsInbound({ type: "agent.background_work.stop.request" })
+    ) {
+      return items;
+    }
+    return items.map((item) => {
+      if (!isDaemonBackgroundWorkItem(item)) return item;
+      const { canStop: _canStop, stopToken: _stopToken, ...visible } = item;
+      return visible;
+    });
   }
 
   private emitProviderSubagentWorkspaceUpdate(event: ProviderSubagentManagerEvent): void {
@@ -2416,10 +2485,12 @@ export class Session {
   }
 
   private async enrichAgentPayload(payload: AgentSnapshotPayload): Promise<AgentSnapshotPayload> {
-    payload.backgroundWork = this.agentManager.getAgentBackgroundWorkSummary(payload.id);
     const storedRecord = await this.agentStorage.get(payload.id);
     payload.title = storedRecord?.title ?? null;
     payload.archivedAt = storedRecord?.archivedAt ?? null;
+    if (!payload.internal && !storedRecord?.internal && !payload.archivedAt) {
+      payload.backgroundWork = this.agentManager.getAgentBackgroundWorkSummary(payload.id);
+    }
     return payload;
   }
 
@@ -2431,8 +2502,11 @@ export class Session {
     record: StoredAgentRecord,
     registeredProviderIds = new Set(this.providerSnapshotManager.listRegisteredProviderIds()),
   ): AgentSnapshotPayload {
-    return buildStoredAgentPayload(record, registeredProviderIds, (provider, own) =>
-      this.agentManager.effectiveOptionsFor(provider, own),
+    return buildStoredAgentPayload(
+      record,
+      registeredProviderIds,
+      (provider, own) => this.agentManager.effectiveOptionsFor(provider, own),
+      this.agentManager.getAgentBackgroundWorkSummary(record.id),
     );
   }
 
@@ -2649,6 +2723,8 @@ export class Session {
       unregister = this.browserToolsBroker.registerClient({
         id: owner.id,
         hostKind: request.hostKind,
+        label: request.label,
+        instanceId: request.instanceId,
         supportedCommands: request.supportedCommands,
         sendBrowserAutomationRequest: (message) => owner.emit(message),
       });
@@ -2702,12 +2778,39 @@ export class Session {
     });
   }
 
+  private async subscribeProviderUpdates(
+    request: Extract<
+      SessionInboundMessage,
+      { type: "provider.installation.update.subscribe.request" }
+    >,
+  ): Promise<void> {
+    if (!this.delivery.isModern(this.delivery.currentSource))
+      throw new Error("Provider update observation requires owned subscriptions");
+    const installations = this.providerSnapshotManager.installations;
+    let stop: (() => void) | undefined;
+    const owner = this.delivery.begin("provider-update", undefined, () => stop?.());
+    // Register and read in one synchronous turn so no progress falls between them.
+    stop = installations.observeUpdates(request.provider, (event) => owner.emit(event));
+    this.emit({
+      type: "provider.installation.update.subscribe.response",
+      payload: {
+        requestId: request.requestId,
+        subscriptionId: owner.responseId,
+        provider: request.provider,
+        update: installations.getUpdate(request.provider),
+        error: null,
+      },
+    });
+  }
+
   private dispatchSubscriptionMessage(
     msg: SessionInboundMessage,
     source?: object,
   ): Promise<void> | undefined {
     if (msg.type === "workspace.setup.subscribe.request") return this.subscribeWorkspaceSetup(msg);
     if (msg.type === "browser.host.register.request") return this.registerBrowserHost(msg);
+    if (msg.type === "provider.installation.update.subscribe.request")
+      return this.subscribeProviderUpdates(msg);
     if (msg.type === "browser.automation.execute.response") {
       if (source)
         this.browserToolsBroker?.receiveResponse(
@@ -3533,6 +3636,8 @@ export class Session {
         return this.checkoutSession.handleStatusRequest(msg);
       case "checkout.commits.list.request":
         return this.checkoutSession.handleCommitsListRequest(msg);
+      case "checkout.worktrees.list.request":
+        return this.checkoutSession.handleWorktreesListRequest(msg);
       case "checkout.commits.file_diff.request":
         return this.checkoutSession.handleCommitFileDiffRequest(msg, this.delivery.requestSignal);
       case "validate_branch_request":
@@ -3931,6 +4036,12 @@ export class Session {
         return this.providerCatalogSession.handleRefreshProvidersSnapshotRequest(msg);
       case "provider_diagnostic_request":
         return this.providerCatalogSession.handleProviderDiagnosticRequest(msg);
+      case "provider.installation.inspect.request":
+        return this.providerCatalogSession.handleInspectProviderInstallationRequest(msg);
+      case "provider.installation.check_updates.request":
+        return this.providerCatalogSession.handleCheckProviderUpdatesRequest(msg);
+      case "provider.installation.update.request":
+        return this.providerCatalogSession.handleUpdateProviderRequest(msg);
       case "provider.usage.list.request":
         return this.usageSession.handleLegacyList(msg);
       case "usage.list_reports.request":
@@ -5396,6 +5507,7 @@ export class Session {
             ...resolvedIntent.intent.labels,
             ...(this.originServerId ? { "paseo.originServerId": this.originServerId } : {}),
           },
+          metadata: msg.metadata,
           env,
           provisionalTitle,
           firstAgentContext,
@@ -6002,7 +6114,7 @@ export class Session {
           : null;
 
       if (agent?.session?.listCommands) {
-        const commands = await agent.session.listCommands();
+        const commands = dedupeSlashCommands(await agent.session.listCommands());
         this.emit({
           type: "list_commands_response",
           payload: {
@@ -6026,7 +6138,9 @@ export class Session {
             : {}),
         };
 
-        const commands = await this.agentManager.listDraftCommands(sessionConfig);
+        const commands = dedupeSlashCommands(
+          await this.agentManager.listDraftCommands(sessionConfig),
+        );
         this.emit({
           type: "list_commands_response",
           payload: {
@@ -6179,11 +6293,14 @@ export class Session {
       {
         paseoHome: this.paseoHome,
         paseoWorktreesBaseRoot: this.worktreesRoot,
+        worktreeManagers: this.pluginRuntime,
+        workspaceArchiveOperations: this.workspaceArchiveOperations,
         github: this.github,
         workspaceGitService: this.workspaceGitService,
         agentManager: this.agentManager,
         agentStorage: this.agentStorage,
         findWorkspaceIdForCwd: (cwd) => this.findWorkspaceIdForCwd(cwd),
+        getWorkspace: (workspaceId) => this.workspaceRegistry.get(workspaceId),
         listActiveWorkspaces: () => this.listActiveWorkspaceRefs(),
         archiveWorkspaceRecord: (workspaceId, archivedAt) =>
           this.archiveWorkspaceRecord(workspaceId, archivedAt),
@@ -6195,6 +6312,8 @@ export class Session {
         clearWorkspaceArchiving: (workspaceIds) => this.clearWorkspaceArchiving(workspaceIds),
         killTerminalsForWorkspace: (workspaceId) =>
           this.terminalController.killTerminalsForWorkspace(workspaceId),
+        isCheckoutUntrusted: (checkoutPath) =>
+          isCheckoutUntrusted(this.workspaceRegistry, checkoutPath),
         sessionLogger: this.sessionLogger,
       },
       msg,
@@ -6618,6 +6737,7 @@ export class Session {
       title: workspace.title,
       pinnedAt: workspace.pinnedAt,
       ...(workspace.labels && workspace.labels.length > 0 ? { labels: workspace.labels } : {}),
+      metadata: workspace.metadata,
       createdBy: resolveWorkspaceCreatedBy({
         workspace,
         agents: this.agentManager.listAgents(),
@@ -6906,9 +7026,60 @@ export class Session {
     };
   }
 
+  private async withWorkspaceCheckout<T>(workspaceId: string, run: () => Promise<T>): Promise<T> {
+    const workspace = await this.workspaceRegistry.get(workspaceId);
+    if (!workspace) {
+      return run();
+    }
+    const checkoutPath = await resolveWorkspaceBackingPath(workspace, {
+      paseoHome: this.paseoHome,
+      paseoWorktreesBaseRoot: this.worktreesRoot,
+    });
+    return this.workspaceArchiveOperations.withCheckout(checkoutPath, run);
+  }
+
+  private async withCheckoutForDirectory<T>(cwd: string, run: () => Promise<T>): Promise<T> {
+    const normalizedCwd = resolve(cwd);
+    const matchesCwd = createRealpathAwarePathMatcher(normalizedCwd);
+    const workspaces = await this.workspaceRegistry.listAll();
+    let matchingWorkspace = workspaces.find((workspace) => matchesCwd(workspace.cwd));
+    if (!matchingWorkspace) {
+      let bestDepth = -1;
+      for (const workspace of workspaces) {
+        if (
+          workspace.worktreeRoot !== null &&
+          isRealpathInsideRoot(workspace.worktreeRoot, normalizedCwd)
+        ) {
+          const depth = normalizePathForIdentity(workspace.worktreeRoot).length;
+          if (depth > bestDepth) {
+            bestDepth = depth;
+            matchingWorkspace = workspace;
+          }
+        }
+      }
+    }
+    let checkoutPath = normalizedCwd;
+    if (matchingWorkspace) {
+      checkoutPath = await resolveWorkspaceBackingPath(matchingWorkspace, {
+        paseoHome: this.paseoHome,
+        paseoWorktreesBaseRoot: this.worktreesRoot,
+      });
+    } else {
+      const checkout = await this.workspaceGitService.getCheckout(normalizedCwd);
+      if (checkout.isGit && checkout.worktreeRoot) {
+        checkoutPath = resolve(checkout.worktreeRoot);
+      }
+    }
+    return this.workspaceArchiveOperations.withCheckout(checkoutPath, run);
+  }
+
   private async restoreWorkspaceAndEmit(workspaceId: string): Promise<void> {
-    await this.workspaceRecovery.restore(workspaceId);
-    await this.publishRecoveredWorkspace(workspaceId);
+    await this.workspaceArchiveOperations.restore(workspaceId, () =>
+      this.withWorkspaceCheckout(workspaceId, async () => {
+        await this.workspaceRecovery.restore(workspaceId);
+        await this.publishRecoveredWorkspace(workspaceId);
+      }),
+    );
   }
 
   private async publishRecoveredWorkspace(workspaceId: string): Promise<void> {
@@ -6955,6 +7126,7 @@ export class Session {
   ): Promise<CreatePaseoWorktreeResult> {
     const result = await createPaseoWorktree(input, {
       lifecycle: this.pluginRuntime,
+      worktreeManagers: this.pluginRuntime,
       github: this.github,
       ...(options?.resolveDefaultBranch
         ? { resolveDefaultBranch: options.resolveDefaultBranch }
@@ -6985,6 +7157,8 @@ export class Session {
         worktreeRoot: workspace.worktreeRoot,
         isPaseoOwnedWorktree: workspace.isPaseoOwnedWorktree,
         mainRepoRoot: workspace.mainRepoRoot,
+        worktreeManagerPluginId: workspace.worktreeManagerPluginId,
+        untrustedSource: workspace.untrustedSource,
       }));
   }
 
@@ -7978,6 +8152,17 @@ export class Session {
     return caller.workspaceId;
   }
 
+  private async workspaceBackgroundIntent(
+    background: boolean | undefined,
+    callerAgentId: string | undefined,
+  ): Promise<{ background?: boolean; callerWorkspaceId?: string }> {
+    const caller = await this.resolveCreationCaller(callerAgentId);
+    return {
+      background: inheritWorkspaceBackground(background, caller),
+      callerWorkspaceId: caller?.workspaceId,
+    };
+  }
+
   private async createRequestedWorkspace(
     request: Extract<SessionInboundMessage, { type: "workspace.create.request" }>,
     workspaceId?: string,
@@ -8010,25 +8195,33 @@ export class Session {
     }
 
     const cwd = expandTilde(request.source.path);
-    const directoryExists = await this.filesystem.isDirectory(cwd).catch(() => false);
-    if (!directoryExists) {
-      throw new SessionRequestError("directory_not_found", `Directory not found: ${cwd}`);
-    }
-
     const explicitTitle = request.title?.trim() || null;
     const promptTitle = resolveFirstAgentPromptTitle(request.firstAgentContext);
-    const workspace = await this.workspaceProvisioning.createWorkspaceForDirectory(
-      cwd,
-      explicitTitle ?? promptTitle,
-      request.source.projectId,
-      {
-        expectsInitialAgent: Boolean(request.firstAgentContext),
-        workspaceId,
-        background: request.background,
-        callerWorkspaceId: this.getCallerWorkspaceId(request.callerAgentId),
-        createdBy: this.workspaceCreationOwner(request.callerAgentId, explicitTitle ?? promptTitle),
-      },
+    const backgroundIntent = await this.workspaceBackgroundIntent(
+      request.background,
+      request.callerAgentId,
     );
+    const workspace = await this.withCheckoutForDirectory(cwd, async () => {
+      const directoryExists = await this.filesystem.isDirectory(cwd).catch(() => false);
+      if (!directoryExists) {
+        throw new SessionRequestError("directory_not_found", `Directory not found: ${cwd}`);
+      }
+      return this.workspaceProvisioning.createWorkspaceForDirectory(
+        cwd,
+        explicitTitle ?? promptTitle,
+        request.source.projectId,
+        {
+          expectsInitialAgent: Boolean(request.firstAgentContext),
+          workspaceId,
+          metadata: request.metadata,
+          ...backgroundIntent,
+          createdBy: this.workspaceCreationOwner(
+            request.callerAgentId,
+            explicitTitle ?? promptTitle,
+          ),
+        },
+      );
+    });
     await this.syncWorkspaceGitObserverForWorkspace(workspace);
     const descriptor = await this.describeWorkspaceRecord(workspace);
     await this.emitCreatedWorkspaceUpdate(
@@ -8114,34 +8307,41 @@ export class Session {
   ): Promise<void> {
     const requestedCwd = request.cwd;
     const cwd = expandTilde(requestedCwd);
-    const directoryExists = await this.filesystem.isDirectory(cwd).catch(() => false);
-    if (!directoryExists) {
-      this.sessionLogger.info(
-        { requestedCwd, resolvedCwd: cwd, reason: "directory_not_found" },
-        "Open project rejected",
-      );
-      this.emit({
-        type: "open_project_response",
-        payload: {
-          requestId: request.requestId,
-          workspace: null,
-          error: `Directory not found: ${cwd}`,
-          errorCode: "directory_not_found",
-        },
-      });
-      return;
-    }
 
     try {
-      const projectsBefore = new Map<string, PersistedProjectRecord>();
-      for (const project of await this.projectRegistry.list()) {
-        projectsBefore.set(project.projectId, project);
+      const opened = await this.withCheckoutForDirectory(cwd, async () => {
+        const directoryExists = await this.filesystem.isDirectory(cwd).catch(() => false);
+        if (!directoryExists) {
+          return null;
+        }
+        const projectsBefore = new Map<string, PersistedProjectRecord>();
+        for (const project of await this.projectRegistry.list()) {
+          projectsBefore.set(project.projectId, project);
+        }
+        const workspacesBefore = new Map<string, PersistedWorkspaceRecord>();
+        for (const workspaceRecord of await this.workspaceRegistry.listActive()) {
+          workspacesBefore.set(workspaceRecord.workspaceId, workspaceRecord);
+        }
+        const workspace = await this.workspaceProvisioning.findOrCreateWorkspaceForDirectory(cwd);
+        return { workspace, projectsBefore, workspacesBefore };
+      });
+      if (!opened) {
+        this.sessionLogger.info(
+          { requestedCwd, resolvedCwd: cwd, reason: "directory_not_found" },
+          "Open project rejected",
+        );
+        this.emit({
+          type: "open_project_response",
+          payload: {
+            requestId: request.requestId,
+            workspace: null,
+            error: `Directory not found: ${cwd}`,
+            errorCode: "directory_not_found",
+          },
+        });
+        return;
       }
-      const workspacesBefore = new Map<string, PersistedWorkspaceRecord>();
-      for (const workspaceRecord of await this.workspaceRegistry.listActive()) {
-        workspacesBefore.set(workspaceRecord.workspaceId, workspaceRecord);
-      }
-      const workspace = await this.workspaceProvisioning.findOrCreateWorkspaceForDirectory(cwd);
+      const { workspace, projectsBefore, workspacesBefore } = opened;
       const project = await this.projectRegistry.get(workspace.projectId);
       await this.syncWorkspaceGitObserverForWorkspace(workspace);
       const descriptor = await this.describeWorkspaceRecord(workspace);
@@ -8713,6 +8913,8 @@ export class Session {
             {
               paseoHome: this.paseoHome,
               paseoWorktreesBaseRoot: this.worktreesRoot,
+              worktreeManagers: this.pluginRuntime,
+              workspaceArchiveOperations: this.workspaceArchiveOperations,
               github: this.github,
               workspaceGitService: this.workspaceGitService,
               agentManager: this.agentManager,
@@ -8729,6 +8931,8 @@ export class Session {
               clearWorkspaceArchiving: (workspaceIds) => this.clearWorkspaceArchiving(workspaceIds),
               assertWorkspaceAutomationAllowed: (workspaceId) =>
                 assertWorkspaceAutomationAllowedForWorkspace(this.workspaceRegistry, workspaceId),
+              isCheckoutUntrusted: (checkoutPath) =>
+                isCheckoutUntrusted(this.workspaceRegistry, checkoutPath),
               killTerminalsForWorkspace: (workspaceId) =>
                 this.terminalController.killTerminalsForWorkspace(workspaceId),
               stopWorkspaceSetup: (workspaceId) => this.workspaceSetupRuntime.stop(workspaceId),
@@ -8791,7 +8995,9 @@ export class Session {
   ): Promise<void> {
     try {
       await this.workspaceArchiveOperations.undo(request.workspaceId, (input) =>
-        this.restoreArchivedWorkspaceAndAgents(request.workspaceId, input),
+        this.withWorkspaceCheckout(request.workspaceId, () =>
+          this.restoreArchivedWorkspaceAndAgents(request.workspaceId, input),
+        ),
       );
       this.emit({
         type: "workspace.archive.undo.response",
@@ -9526,10 +9732,13 @@ export class Session {
   ): Promise<void> {
     let error: string | null = null;
     try {
+      const target = await this.resolveBackgroundWorkAgent(msg.agentId);
+      if ("error" in target) throw new Error(target.error);
       await this.agentManager.stopAgentBackgroundWork({
         agentId: msg.agentId,
         itemId: msg.itemId,
         stopToken: msg.stopToken,
+        canManageAutomation: this.authorization.allowsPermission("automation.manage"),
       });
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
@@ -9571,23 +9780,27 @@ export class Session {
     }
   }
 
-  // Background work lives only in memory, so an agent that is not loaded has none.
-  // Answering from storage keeps a read from resuming a dormant agent.
   private async readAgentBackgroundWork(agentId: string): Promise<AgentBackgroundWorkItem[]> {
-    if (this.agentManager.getAgent(agentId)) {
-      if (!this.agentManager.getAgentBackgroundWorkSummary(agentId)) {
-        throw new Error("Background work inventory is unavailable");
-      }
-      return this.agentManager.listAgentBackgroundWork(agentId);
+    const target = await this.resolveBackgroundWorkAgent(agentId);
+    if ("error" in target) throw new Error(target.error);
+    if (!this.agentManager.getAgentBackgroundWorkSummary(agentId)) {
+      throw new Error("Background work inventory is unavailable");
     }
+    return this.projectBackgroundWorkItems(this.agentManager.listAgentBackgroundWork(agentId));
+  }
+
+  private async resolveBackgroundWorkAgent(
+    agentId: string,
+  ): Promise<{ agent: ManagedAgent | null; record: StoredAgentRecord | null } | { error: string }> {
     const record = await this.agentStorage.get(agentId);
-    if (!record || record.internal) {
-      throw new Error(`Unknown agent '${agentId}'`);
+    const agent = this.agentManager.getAgent(agentId);
+    if ((!agent && !record) || agent?.internal || record?.internal) {
+      return { error: `Unknown agent '${agentId}'` };
     }
-    if (record.archivedAt) {
-      throw new Error(`Agent is archived: ${agentId}`);
+    if (record?.archivedAt) {
+      return { error: `Agent is archived: ${agentId}` };
     }
-    throw new Error("Background work inventory is unavailable");
+    return { agent, record };
   }
 
   private async handleProviderSubagentTimelineRequest(
@@ -9835,6 +10048,7 @@ export class Session {
           await waitForAgentRunStartWithTimeout(
             this.agentManager,
             agentId,
+            result.started,
             this.delivery.requestSignal,
           );
         }
@@ -10369,6 +10583,9 @@ function legacyWantsEvent(
     case "notes.project.updated":
     case "archify.generation.updated":
       return false;
+    // Old apps parse outbound messages strictly and do not know this type.
+    case "agent.background_work.update":
+      return false;
     default:
       return true;
   }
@@ -10394,6 +10611,17 @@ function createHostSession(options: SessionOptions, session: Session): Connected
 
 function hostSource(options: SessionOptions): string {
   return options.sourceId ?? "owner";
+}
+
+function dedupeSlashCommands<T extends { name: string }>(commands: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const command of commands) {
+    if (seen.has(command.name)) continue;
+    seen.add(command.name);
+    unique.push(command);
+  }
+  return unique;
 }
 
 function normalizeSessionClientName(clientName: string | undefined): string | null {
