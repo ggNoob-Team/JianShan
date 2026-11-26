@@ -3373,7 +3373,6 @@ function extractSocketRequestMetadata(request: unknown): SocketRequestMetadata {
     typeof record.headers?.["user-agent"] === "string" ? record.headers["user-agent"] : undefined;
   const remoteAddress =
     typeof record.socket?.remoteAddress === "string" ? record.socket.remoteAddress : undefined;
-
   return {
     ...(typeof record.socket?.localAddress === "string" &&
     typeof record.socket.localPort === "number"
