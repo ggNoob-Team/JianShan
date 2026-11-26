@@ -1100,6 +1100,7 @@ interface WaitHandle<T> {
 interface WaitOptions {
   skipQueue?: boolean;
   requestId?: string;
+  requestType?: SessionInboundMessage["type"];
 }
 
 interface CorrelatedResponseIdentity {
@@ -2583,7 +2584,7 @@ export class DaemonClient {
         return { kind: "ok", value };
       },
       timeout,
-      { ...params.options, requestId: params.requestId },
+      { ...params.options, requestId: params.requestId, requestType: params.message.type },
     );
 
     // The response deadline still applies while the transport waits for drain.
@@ -2959,11 +2960,7 @@ export class DaemonClient {
         this.scheduleNextLivenessHeartbeat();
         return;
       }
-      this.ensurePingProbe({ timeoutMs: LIVENESS_HEARTBEAT_TIMEOUT_MS, role: "heartbeat" })
-        .promise.catch(() => {})
-        .finally(() => {
-          this.scheduleNextLivenessHeartbeat();
-        });
+      this.tickLivenessHeartbeat();
     }, LIVENESS_HEARTBEAT_INTERVAL_MS);
   }
 
@@ -2992,6 +2989,10 @@ export class DaemonClient {
     this.stopLivenessHeartbeat();
     const transport = this.transport;
     if (this.connectionState.status !== "connected" || !transport) return;
+    if (this.activeFileUploads > 0) {
+      this.scheduleNextLivenessHeartbeat();
+      return;
+    }
     const probe = this.ensurePingProbe({
       timeoutMs:
         check === "foreground" ? FOREGROUND_LIVENESS_TIMEOUT_MS : LIVENESS_HEARTBEAT_TIMEOUT_MS,
@@ -9065,7 +9066,9 @@ export class DaemonClient {
   ): WaitHandle<T> {
     // Capture stack trace at call site, not inside setTimeout
     const timeoutError = new DaemonConnectionError(
-      `Timeout waiting for message (${timeout}ms)`,
+      options?.requestType
+        ? `No response to ${options.requestType} after ${timeout}ms`
+        : `Timeout waiting for message (${timeout}ms)`,
       "DAEMON_REQUEST_TIMEOUT",
     );
 

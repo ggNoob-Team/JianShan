@@ -2215,6 +2215,36 @@ describe("Codex app-server provider", () => {
     appServer.assertNoErrors();
   });
 
+  test("lets idle cleanup release a session opened only to read its history", async () => {
+    let spawns = 0;
+    const appServer = createFakeCodexAppServer({
+      "thread/resume": () =>
+        Promise.reject(new Error(archivedThreadErrorMessage("archived-thread-id"))),
+      "thread/read": () => ({ thread: { turns: [] } }),
+    });
+    const provider = new CodexAppServerAgentClient(createTestLogger(), undefined, {
+      appServerProcess: createFakeCodexAppServerProcess(() => {
+        spawns += 1;
+        return appServer.child;
+      }),
+    });
+    const internals = castInternals<{
+      goalsEnabledPromise: Promise<boolean> | null;
+      autoReviewEnabledPromise: Promise<boolean> | null;
+    }>(provider);
+    internals.goalsEnabledPromise = Promise.resolve(false);
+    internals.autoReviewEnabledPromise = Promise.resolve(false);
+
+    const session = await provider.resumeSession(archivedThreadHandle(), undefined, undefined, {
+      purpose: "history",
+    });
+
+    expect(await session.canStopRuntime!()).toBe(true);
+    expect(spawns).toBe(1);
+    await session.close();
+    appServer.assertNoErrors();
+  });
+
   test("unarchives Codex when an active Paseo agent resumes an archived thread", async () => {
     const threadRequests: string[] = [];
     let resumeAttempts = 0;
@@ -2245,7 +2275,6 @@ describe("Codex app-server provider", () => {
     const session = await provider.resumeSession(archivedThreadHandle());
 
     expect(threadRequests).toEqual([
-      "thread/read",
       "thread/loaded/list",
       "thread/resume",
       "thread/unarchive",
@@ -3030,7 +3059,6 @@ describe("Codex app-server provider", () => {
     expect(threadRequests).toEqual([
       "model/list",
       "config/read",
-      "thread/read",
       "thread/loaded/list",
       "thread/resume",
     ]);
@@ -5457,50 +5485,6 @@ describe("Codex app-server provider", () => {
         },
       },
     ]);
-  });
-
-  test("reads full persisted history before resuming a bounded thread", async () => {
-    let resumed = false;
-    const appServer = createFakeCodexAppServer({
-      "thread/resume": () => {
-        resumed = true;
-        return { thread: { id: "saved-thread" } };
-      },
-      "thread/read": () => ({
-        thread: {
-          turns: resumed
-            ? [{ items: [{ type: "agentMessage", id: "recent", text: "Recent" }] }]
-            : [
-                { items: [{ type: "agentMessage", id: "old", text: "Old" }] },
-                { items: [{ type: "agentMessage", id: "recent", text: "Recent" }] },
-              ],
-        },
-      }),
-    });
-    const session = new CodexAppServerAgentSession(
-      createConfig({ cwd: "/workspace/project" }),
-      { sessionId: "saved-thread" },
-      createTestLogger(),
-      async () => appServer.child,
-    );
-
-    try {
-      await session.connect();
-      const history: AgentStreamEvent[] = [];
-      for await (const event of session.streamHistory()) history.push(event);
-      const texts = history.flatMap((event) =>
-        event.type === "timeline" && event.item.type === "assistant_message"
-          ? [event.item.text]
-          : [],
-      );
-      const methods = appServer.requests().map((request) => String(request.method));
-
-      expect(texts).toEqual(["Old", "Recent"]);
-      expect(methods.indexOf("thread/read")).toBeLessThan(methods.indexOf("thread/resume"));
-      appServer.assertNoErrors();
-    } finally {
-      await session.close();
-    }
   });
 
   test("retains native turn ids from persisted user messages", async () => {

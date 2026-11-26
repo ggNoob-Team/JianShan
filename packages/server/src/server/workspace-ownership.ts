@@ -73,7 +73,8 @@ export function resolveWorkspaceCreatedBy(input: {
 /**
  * Ownership for a workspace created by this request. An existing role name wins.
  * Only an unnamed CLI/MCP request for a dream-prefixed workspace may use the
- * reserved virtual role; every other unnamed request is rejected.
+ * reserved virtual role. A Hub session is a trusted system client and keeps its
+ * audit identity without inventing a human role.
  */
 export function resolveWorkspaceCreationOwner(input: {
   actor: AgentActor;
@@ -90,18 +91,21 @@ export function resolveWorkspaceCreationOwner(input: {
       ...(input.callerAgent ? { virtual: true } : {}),
     };
   }
-  if (input.clientType === "mcp") {
+  if (
+    (input.clientType === "cli" || input.clientType === "mcp") &&
+    isDreamWorkspaceName(input.workspaceName)
+  ) {
     return {
       clientId: sourceActor.clientId,
       clientName: VIRTUAL_ACTOR_ROLE_NAME,
       virtual: true,
     };
   }
-  if (input.clientType === "cli" && isDreamWorkspaceName(input.workspaceName)) {
+  if (input.clientType === "hub") {
     return {
       clientId: sourceActor.clientId,
-      clientName: VIRTUAL_ACTOR_ROLE_NAME,
-      virtual: true,
+      ...(sourceActor.originServerId ? { originServerId: sourceActor.originServerId } : {}),
+      ...(input.callerAgent ? { virtual: true } : {}),
     };
   }
   throw new Error("请联系管理员分配角色");

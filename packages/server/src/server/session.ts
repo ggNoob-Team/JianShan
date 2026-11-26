@@ -9824,6 +9824,7 @@ export class Session {
           agentId,
           prompt,
           messageId: msg.messageId,
+          beforeDispatch,
           activeTurnBehavior: msg.activeTurnBehavior ?? "interrupt",
           sessionMode: msg.sessionMode,
           clearPendingPermissions: true,

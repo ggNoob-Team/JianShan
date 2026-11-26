@@ -79,6 +79,7 @@ import type { GeneratedWorkspaceName } from "../worktree-branch-name-generator.j
 import type { ForgeService } from "../../services/forge-service.js";
 import { areEquivalentPaths } from "../../utils/path.js";
 import { createTerminalManager, type TerminalManager } from "../../terminal/terminal-manager.js";
+import { startWorkerTerminalManager } from "../../terminal/worker-terminal-manager.js";
 import { createLocalJobService } from "../local-jobs/local-job-service.js";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { PASEO_TOOL_NAMES } from "@getpaseo/protocol/paseo-tool-presentation/index";
@@ -267,6 +268,7 @@ function buildAgentManagerSpies() {
     archiveAgent: vi.fn().mockResolvedValue({ archivedAt: new Date().toISOString() }),
     notifyAgentState: vi.fn(),
     getAgent: vi.fn(),
+    getAgentBackgroundWorkSummary: vi.fn().mockReturnValue(undefined),
     listAgents: vi.fn().mockReturnValue([]),
     getTimeline: vi.fn().mockReturnValue([]),
     resumeAgentFromPersistence: vi.fn(),
@@ -881,7 +883,7 @@ async function createAgentMcpServer(
   options: Parameters<typeof createAgentMcpServerWithDependencies>[0],
   subscriptionStore?: FinishSubscriptionStore,
 ) {
-  const messages = createTestAgentMessages(options);
+  const messages = options.agentMessages?.() ?? createTestAgentMessages(options);
   const records = new Map<string, FinishSubscription>();
   const subscriptions = createFinishSubscriptions({
     store: subscriptionStore ?? {
@@ -982,6 +984,7 @@ describe("list_hosts MCP tool", () => {
         clientName: "Windows workstation",
         originServerId: "srv_windows",
       }),
+      getPluginTools: () => [],
     } as unknown as AgentManager;
     const host = (serverId: string, label: string): HostSummary => ({
       registrationId: "reg_" + serverId,
@@ -1286,8 +1289,16 @@ describe("send_file_to_agent MCP tool", () => {
           sentMessages.push({ agentId, text, options });
           return { deliveryStatus: "queued" as const };
         },
-        async waitForFinish() {
-          waitAttempts += 1;
+        observeTimeline() {
+          return {
+            subscriptionId: null,
+            ready: Promise.resolve({}),
+            subscribe: () => () => {},
+            release: async () => {},
+          };
+        },
+        async waitForFinish(_agentId: string, timeoutMs: number) {
+          if (timeoutMs === 0) waitAttempts += 1;
           return {
             status: "idle" as const,
             final: {
@@ -6894,6 +6905,36 @@ describe("agent snapshot MCP serialization", () => {
     expect(structured.agents[0]).not.toHaveProperty("runtimeInfo");
     expect(structured.agents[0]).not.toHaveProperty("persistence");
     expect(structured.agents[0]).not.toHaveProperty("pendingPermissions");
+  });
+
+  it("reports an idle agent's background work from get_agent_status and list_agents", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const agent = createManagedAgent({ id: "agent-with-shell", cwd: REPO_CWD });
+    spies.agentManager.getAgent.mockReturnValue(agent);
+    spies.agentManager.listAgents.mockReturnValue([agent]);
+    spies.agentManager.getAgentBackgroundWorkSummary.mockReturnValue({ count: 1 });
+
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      logger,
+    });
+    const status = await registeredTool(server, "get_agent_status").handler({
+      agentId: "agent-with-shell",
+    });
+    const list = await registeredTool(server, "list_agents").handler({});
+
+    expect(status.structuredContent).toEqual({
+      status: "idle",
+      snapshot: expect.objectContaining({ status: "idle", backgroundWork: { count: 1 } }),
+    });
+    expect(list.structuredContent).toEqual({
+      agents: [expect.objectContaining({ status: "idle", backgroundWork: { count: 1 } })],
+    });
+    expect(spies.agentManager.getAgentBackgroundWorkSummary).toHaveBeenCalledWith(
+      "agent-with-shell",
+    );
   });
 
   it("returns archived agent snapshots from storage for get_agent_status", async () => {

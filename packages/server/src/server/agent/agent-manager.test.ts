@@ -3615,6 +3615,101 @@ test("cancelAgentRun succeeds when the provider queues completion before rejecti
   }
 });
 
+test.each([
+  { binding: "foreground", agentId: "00000000-0000-4000-8000-000000000307" },
+  { binding: "autonomous", agentId: "00000000-0000-4000-8000-000000000308" },
+] as const)(
+  "cancelAgentRun settles a $binding run bound to an already finalized turn",
+  async ({ binding, agentId }) => {
+    const fixture = await createControlledInterruptFixture({
+      name: `interrupt-finalized-${binding}`,
+      agentId,
+      turnId: "finalized-turn",
+      interrupt: async () => {},
+    });
+
+    try {
+      await fixture.startForegroundRun();
+      await expect(fixture.manager.cancelAgentRun(fixture.agentId)).resolves.toEqual({
+        status: "settled",
+      });
+
+      if (binding === "foreground") {
+        await fixture.startForegroundRun();
+      } else {
+        const running = waitForAgentLifecycle(fixture.manager, fixture.agentId, "running");
+        fixture.session.pushEvent({
+          type: "turn_started",
+          provider: "codex",
+          turnId: "finalized-turn",
+        });
+        await running;
+      }
+
+      const cancellation = await Promise.race([
+        fixture.manager.cancelAgentRun(fixture.agentId),
+        new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 3_000)),
+      ]);
+      expect(cancellation).toEqual({ status: "settled" });
+      expect(fixture.manager.getAgent(fixture.agentId)).toMatchObject({
+        lifecycle: "idle",
+        activeForegroundTurnId: null,
+      });
+
+      await expect(fixture.manager.cancelAgentRun(fixture.agentId)).resolves.toEqual({
+        status: "not_running",
+      });
+      await fixture.startForegroundRun();
+      expect(fixture.manager.getAgent(fixture.agentId)).toMatchObject({
+        lifecycle: "running",
+        activeForegroundTurnId: "finalized-turn",
+      });
+    } finally {
+      await fixture.cleanup();
+    }
+  },
+  10_000,
+);
+
+test("the provider's terminal for a run bound to an already finalized turn settles the run", async () => {
+  const fixture = await createControlledInterruptFixture({
+    name: "interrupt-finalized-provider-terminal",
+    agentId: "00000000-0000-4000-8000-000000000309",
+    turnId: "finalized-provider-terminal-turn",
+    interrupt: async () => {},
+  });
+
+  try {
+    await fixture.startForegroundRun();
+    await expect(fixture.manager.cancelAgentRun(fixture.agentId)).resolves.toEqual({
+      status: "settled",
+    });
+
+    await fixture.startForegroundRun();
+    const idle = waitForAgentLifecycle(fixture.manager, fixture.agentId, "idle");
+    fixture.session.pushEvent({
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "finalized-provider-terminal-turn",
+    });
+    const settlement = await Promise.race([
+      idle.then(() => "idle" as const),
+      new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 1_000)),
+    ]);
+
+    expect(settlement).toBe("idle");
+    expect(fixture.manager.getAgent(fixture.agentId)).toMatchObject({
+      lifecycle: "idle",
+      activeForegroundTurnId: null,
+    });
+    await expect(fixture.manager.cancelAgentRun(fixture.agentId)).resolves.toEqual({
+      status: "not_running",
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+}, 10_000);
+
 test("listProviderAvailability uses registered client keys, including custom providers", async () => {
   const customClient: AgentClient = {
     provider: "zai",
@@ -13717,6 +13812,33 @@ test("the last assistant message is the newest turn's reply, not joined to the p
       expect(manager.getTimeline(agent.id).at(-1)).toMatchObject({ messageId: "message-2" }),
     );
     expect(await manager.getLastAssistantMessage(agent.id)).toBe("New status.");
+  } finally {
+    await manager.closeAgent(agent.id);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("the last assistant message read from rebuilt history is the newest reply, not joined to the one before it", async () => {
+  // Rows replayed from provider history have no turn id. A reply the agent starts on its own,
+  // such as Claude waking after a background subagent, follows the previous reply with no user
+  // message between them; only their message ids tell them apart.
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-history-last-reply-"));
+  const codex = fakeCodexEmitting({
+    historyItems: [
+      { type: "user_message", text: "Start a background task.", messageId: "user-1" },
+      { type: "assistant_message", text: "Started it, ", messageId: "message-1" },
+      { type: "assistant_message", text: "I will report back.", messageId: "message-1" },
+      { type: "assistant_message", text: "The task finished.", messageId: "message-2" },
+    ],
+  });
+  const manager = new AgentManager({ clients: { codex }, logger });
+  const agent = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  try {
+    await manager.hydrateTimelineFromProvider(agent.id, { force: true });
+
+    expect(await manager.getLastAssistantMessage(agent.id)).toBe("The task finished.");
   } finally {
     await manager.closeAgent(agent.id);
     rmSync(workdir, { recursive: true, force: true });
