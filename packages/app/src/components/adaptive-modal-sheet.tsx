@@ -79,6 +79,11 @@ const ABSOLUTE_FILL_STYLE = { ...StyleSheet.absoluteFill };
 const NATIVE_DIALOG_SNAP_POINTS = ["100%"];
 
 const styles = StyleSheet.create((theme) => ({
+  floatingClose: {
+    position: "absolute",
+    top: theme.spacing[4],
+    right: theme.spacing[4],
+  },
   nativeDialogSurface: {
     flex: 1,
   },
@@ -100,7 +105,7 @@ const styles = StyleSheet.create((theme) => ({
     maxHeight: "85%",
     flexShrink: 1,
     minHeight: 0,
-    backgroundColor: theme.colors.surface1,
+    backgroundColor: theme.colors.surface0,
     borderRadius: theme.borderRadius.xl,
     borderWidth: 1,
     borderColor: theme.colors.surface2,
@@ -234,6 +239,28 @@ const styles = StyleSheet.create((theme) => ({
 }));
 
 const WEB_EXIT_DURATION_MS = 160;
+const WEB_ENTER_DURATION_MS = 160;
+const WEB_ENTER_ANIMATION_NAME = "paseo-modal-enter";
+
+// The desktop card fades in; the dim lands at once, so the screen behind is never seen undimmed
+// while the dialog arrives. A CSS animation runs from the card's first paint, so a dialog that opens
+// on its own, like first-run setup, never pops in. Closing fades the whole overlay. With reduced
+// motion the keyframes are never defined, so the card appears at once.
+function ensureWebEnterKeyframes() {
+  if (!isWeb || typeof document === "undefined") return;
+  if (document.getElementById(WEB_ENTER_ANIMATION_NAME)) return;
+  const style = document.createElement("style");
+  style.id = WEB_ENTER_ANIMATION_NAME;
+  style.textContent = `@media (prefers-reduced-motion: no-preference) { @keyframes ${WEB_ENTER_ANIMATION_NAME} { from { opacity: 0; } to { opacity: 1; } } }`;
+  document.head.appendChild(style);
+}
+ensureWebEnterKeyframes();
+// The CSS animation props are not part of ViewStyle without the generated expo-env.d.ts.
+const WEB_ENTER_STYLE = {
+  animationName: WEB_ENTER_ANIMATION_NAME,
+  animationDuration: `${WEB_ENTER_DURATION_MS}ms`,
+  animationTimingFunction: "ease-out",
+} as unknown as ViewStyle;
 
 /** The compact sheet's surface: Gorhom's `backgroundComponent` for every bottom sheet. */
 export function SheetBackground({ style }: BottomSheetBackgroundProps) {
@@ -511,8 +538,27 @@ export function InlineHeaderView({ header }: { header: SheetHeader }) {
   );
 }
 
+/**
+ * The sheet's action row: a top border, the sheet's side inset, and children spread across it.
+ * The sheet draws it for `footer`; a body that splits into panes renders it at the bottom of one.
+ */
+export function SheetFooter({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  return <View style={[styles.footer, style]}>{children}</View>;
+}
+
 export interface AdaptiveModalSheetProps {
-  header: SheetHeader;
+  /**
+   * The title row with the close button. Leave it out when the body draws its own chrome, such as
+   * a full-height side rail: the desktop card then floats the close button over its top-right
+   * corner, and the compact sheet closes from its handle.
+   */
+  header?: SheetHeader;
   visible: boolean;
   onClose: () => void;
   onDismiss?: () => void;
@@ -552,7 +598,7 @@ function CompactSheetBody({
   contentStyle,
   children,
 }: {
-  header: SheetHeader;
+  header?: SheetHeader;
   onClose: () => void;
   testID?: string;
   footer: ReactNode;
@@ -582,7 +628,7 @@ function CompactSheetBody({
   );
   return (
     <SheetVisibleFrame footer={footerView}>
-      <SheetHeaderView header={header} onClose={onClose} testID={testID} />
+      {header ? <SheetHeaderView header={header} onClose={onClose} testID={testID} /> : null}
       <View style={[styles.compactStaticContent, bodyStyle]}>
         {scrollable ? (
           <ScrollView
@@ -630,7 +676,7 @@ export function AdaptiveModalSheet({
   const isKeyboardVisible = useKeyboardVisibility(visible);
   const resolvedSnapPoints = useMemo(() => snapPoints ?? ["65%", "90%"], [snapPoints]);
   const footerView = useMemo(
-    () => (footer ? <View style={[styles.footer, footerContainerStyle]}>{footer}</View> : null),
+    () => (footer ? <SheetFooter style={footerContainerStyle}>{footer}</SheetFooter> : null),
     [footer, footerContainerStyle],
   );
   useEffect(() => {
@@ -659,6 +705,7 @@ export function AdaptiveModalSheet({
       styles.desktopCard,
       desktopHeight != null && { height: desktopHeight },
       desktopMaxWidth != null && { maxWidth: desktopMaxWidth },
+      isWeb && WEB_ENTER_STYLE,
     ],
     [desktopMaxWidth, desktopHeight],
   );
@@ -748,7 +795,7 @@ export function AdaptiveModalSheet({
     desktopHeight == null ? styles.desktopStaticContent : styles.compactStaticContent;
   const cardInner = (
     <OverlayLayerProvider layer={modalLayer}>
-      <SheetHeaderView header={header} onClose={onClose} />
+      {header ? <SheetHeaderView header={header} onClose={onClose} /> : null}
       <View style={[scrollable ? styles.desktopScrollContainer : desktopStaticStyle, bodyStyle]}>
         {scrollable ? (
           <ScrollView
@@ -764,6 +811,15 @@ export function AdaptiveModalSheet({
         )}
       </View>
       {footerView}
+      {header ? null : (
+        <View style={styles.floatingClose}>
+          <SheetHeaderIconButton
+            icon={X}
+            accessibilityLabel={t("common.actions.close")}
+            onPress={onClose}
+          />
+        </View>
+      )}
     </OverlayLayerProvider>
   );
 

@@ -3098,7 +3098,7 @@ export const ar: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "مهارات التنسيق",
         title: "مهارات التنسيق",
-        description: "قم بتعليم عملائك كيفية التنسيق من خلال CLI",
+        description: "علّم وكلاءك كيفية استخدام أدوات Paseo",
         updateAvailable: "التحديث متاح",
         updateTitle: "تحديث مهارات JianShan ؟",
         updateFallback: "مزامنة المهارات المجمعة لجهازك.",
@@ -3118,9 +3118,6 @@ export const ar: TranslationResources = {
         uninstallFailed: "غير قادر على إلغاء تثبيت مهارات التنسيق.",
         saveSelectionFailed: "غير قادر على حفظ اختيار مهارات التنسيق.",
         actions: {
-          install: "ثَبَّتَ",
-          installing: "جارٍ التثبيت...",
-          installed: "تم التثبيت",
           update: "تحديث",
           working: "عمل...",
           remove: "إزالة",

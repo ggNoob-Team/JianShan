@@ -3083,7 +3083,7 @@ export const ko: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "오케스트레이션 스킬",
         title: "오케스트레이션 스킬",
-        description: "CLI를 통해 에이전트가 오케스트레이션하도록 가르칩니다",
+        description: "에이전트에게 Paseo 도구 사용법을 알려 줍니다",
         updateAvailable: "업데이트 사용 가능",
         updateTitle: "JianShan 스킬을 업데이트할까요?",
         updateFallback: "번들된 스킬을 내 컴퓨터에 동기화합니다.",
@@ -3104,9 +3104,6 @@ export const ko: TranslationResources = {
         uninstallFailed: "오케스트레이션 스킬을 제거할 수 없습니다.",
         saveSelectionFailed: "오케스트레이션 스킬 선택을 저장하지 못했습니다.",
         actions: {
-          install: "설치",
-          installing: "설치 중...",
-          installed: "설치됨",
           update: "업데이트",
           working: "작업 중...",
           remove: "제거",

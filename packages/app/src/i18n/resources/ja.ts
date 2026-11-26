@@ -3094,7 +3094,7 @@ export const ja: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "オーケストレーションスキル",
         title: "オーケストレーションスキル",
-        description: "エージェントがCLI経由でオーケストレーションできるようにします。",
+        description: "エージェントに Paseo ツールの使い方を教えます",
         updateAvailable: "更新が利用可能",
         updateTitle: "JianShanスキルを更新しますか？",
         updateFallback: "バンドルされたスキルをマシンに同期します。",
@@ -3116,9 +3116,6 @@ export const ja: TranslationResources = {
         uninstallFailed: "オーケストレーションスキルをアンインストールできません。",
         saveSelectionFailed: "オーケストレーションスキルの選択を保存できません。",
         actions: {
-          install: "インストール",
-          installing: "インストール中...",
-          installed: "インストール済み",
           update: "更新",
           working: "処理中...",
           remove: "削除",

@@ -3115,7 +3115,7 @@ export const ptBR: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "Skills de orquestração",
         title: "Skills de orquestração",
-        description: "Ensine seus agentes a orquestrar pela CLI",
+        description: "Ensine seus agentes a usar as ferramentas do Paseo",
         updateAvailable: "Atualização disponível",
         updateTitle: "Atualizar JianShan skills?",
         updateFallback: "Sincronize as skills incluídas com sua máquina.",
@@ -3137,9 +3137,6 @@ export const ptBR: TranslationResources = {
         uninstallFailed: "Não foi possível desinstalar as skills de orquestração.",
         saveSelectionFailed: "Não foi possível salvar a seleção de skills de orquestração.",
         actions: {
-          install: "Instalar",
-          installing: "Instalando...",
-          installed: "Instalado",
           update: "Atualizar",
           working: "Trabalhando...",
           remove: "Remover",

@@ -27,7 +27,6 @@ import {
 import type { Theme } from "@/styles/theme";
 
 type ButtonVariant = "default" | "secondary" | "outline" | "ghost" | "destructive";
-type ButtonSize = ButtonControlSize;
 
 type LeftIcon =
   | ReactElement
@@ -102,15 +101,11 @@ const styles = StyleSheet.create((theme) => {
     md: {
       ...geometry.buttonMd,
     },
-    xs: {
-      ...geometry.buttonXs,
-    },
     sm: {
       ...geometry.buttonSm,
     },
-    lg: {
-      ...geometry.buttonLg,
-    },
+    iconOnlySm: geometry.buttonIconOnlySm,
+    iconOnlyMd: geometry.buttonIconOnlyMd,
     default: {
       backgroundColor: theme.colors.accent,
       borderColor: theme.colors.accent,
@@ -139,11 +134,11 @@ const styles = StyleSheet.create((theme) => {
     },
     text: {
       color: theme.colors.foreground,
-      ...geometry.buttonText,
-      fontWeight: theme.fontWeight.normal,
+      ...geometry.buttonTextMd,
+      fontWeight: theme.fontWeight.medium,
     },
-    textXs: {
-      ...geometry.buttonTextXs,
+    textSm: {
+      ...geometry.buttonTextSm,
     },
     textDefault: {
       color: theme.colors.accentForeground,
@@ -178,7 +173,7 @@ export function Button({
   Omit<PressableProps, "style"> & {
     ref?: React.Ref<View>;
     variant?: ButtonVariant;
-    size?: ButtonSize;
+    size?: ButtonControlSize;
     leftIcon?: LeftIcon;
     trailing?: ReactNode;
     style?: StyleProp<ViewStyle>;
@@ -205,16 +200,10 @@ export function Button({
     variantStyle = styles.destructive;
   }
 
-  let sizeStyle: ViewStyle;
-  if (size === "xs") {
-    sizeStyle = styles.xs;
-  } else if (size === "sm") {
-    sizeStyle = styles.sm;
-  } else if (size === "lg") {
-    sizeStyle = styles.lg;
-  } else {
-    sizeStyle = styles.md;
-  }
+  const compactSize = size === "xs" || size === "sm";
+  const isIconOnly = children == null && leftIcon != null;
+  const sizeStyle = compactSize ? styles.sm : styles.md;
+  const iconOnlyStyle = compactSize ? styles.iconOnlySm : styles.iconOnlyMd;
   const isGhostHovered = hovered && variant === "ghost";
 
   const handleHoverIn = useCallback(() => setHovered(true), []);
@@ -224,25 +213,26 @@ export function Button({
     ({ pressed }: PressableStateCallbackType): StyleProp<ViewStyle> => [
       styles.base,
       sizeStyle,
+      isIconOnly ? iconOnlyStyle : null,
       variantStyle,
       pressed ? styles.pressed : null,
       isDisabled ? styles.disabled : null,
       style,
     ],
-    [sizeStyle, variantStyle, isDisabled, style],
+    [sizeStyle, isIconOnly, iconOnlyStyle, variantStyle, isDisabled, style],
   );
 
   const resolvedTextStyle = useMemo(
     () => [
       styles.text,
-      size === "xs" ? styles.textXs : null,
+      compactSize ? styles.textSm : null,
       variant === "default" ? styles.textDefault : null,
       variant === "destructive" ? styles.textDestructive : null,
       variant === "ghost" ? styles.textGhost : null,
       textStyle,
       isGhostHovered ? styles.textGhostHovered : null,
     ],
-    [size, variant, textStyle, isGhostHovered],
+    [compactSize, variant, textStyle, isGhostHovered],
   );
 
   const accessibilityState = useMemo(

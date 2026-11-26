@@ -3208,7 +3208,7 @@ export const en = {
       skills: {
         sectionTitle: "Orchestration skills",
         title: "Orchestration skills",
-        description: "Teach your agents to orchestrate through the CLI",
+        description: "Teach your agents how to use Paseo tools",
         docs: "Skills",
         openDocs: "Open skills documentation",
         unavailable: "Connect to this host to manage orchestration skills",
@@ -3233,9 +3233,6 @@ export const en = {
           "{{skills}} will be deleted from ~/.agents, ~/.claude, and ~/.codex on this host. Anything you added inside those skill folders is deleted too.",
         saveFailed: "Could not save your skill selection.",
         actions: {
-          install: "Install",
-          installing: "Installing...",
-          installed: "Installed",
           update: "Update",
           working: "Working...",
           remove: "Remove",

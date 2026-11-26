@@ -3043,7 +3043,7 @@ export const zhCN: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "编排 skills",
         title: "编排 skills",
-        description: "教会 Agent 通过 CLI 编排任务",
+        description: "教你的代理如何使用 Paseo 工具",
         updateAvailable: "有更新可用",
         updateTitle: "更新见山 skills？",
         updateFallback: "将内置 skills 同步到你的机器。",
@@ -3063,9 +3063,6 @@ export const zhCN: TranslationResources = {
         uninstallFailed: "无法卸载编排 skills。",
         saveSelectionFailed: "无法保存编排 skills 的选择。",
         actions: {
-          install: "安装",
-          installing: "正在安装...",
-          installed: "已安装",
           update: "更新",
           working: "处理中...",
           remove: "移除",

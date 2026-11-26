@@ -3138,7 +3138,7 @@ export const fr: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "Skills d’orchestration",
         title: "Skills d’orchestration",
-        description: "Apprenez à vos agents à orchestrer via la CLI",
+        description: "Apprenez à vos agents à utiliser les outils Paseo",
         updateAvailable: "Mise à jour disponible",
         updateTitle: "Mettre à jour les skills JianShan ?",
         updateFallback: "Synchronisez les skills fournis sur cet hôte.",
@@ -3160,9 +3160,6 @@ export const fr: TranslationResources = {
         uninstallFailed: "Impossible de désinstaller les skills d’orchestration.",
         saveSelectionFailed: "Impossible d’enregistrer la sélection des skills d’orchestration.",
         actions: {
-          install: "Installer",
-          installing: "Installation…",
-          installed: "Installé",
           update: "Mettre à jour",
           working: "En cours…",
           remove: "Supprimer",
