@@ -170,6 +170,7 @@ struct Index {
       ua: navigator.userAgent,
       clip: typeof window.paseoClipboard?.writeText,
       gallery: typeof window.paseoPhotoPicker?.pickImages,
+      galleryRead: typeof window.paseoPhotoPicker?.readImages,
     })`;
     this.controller.runJavaScript(script, (error: BusinessError, result: string) => {
       if (error) {

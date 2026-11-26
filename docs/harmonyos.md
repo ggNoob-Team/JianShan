@@ -104,9 +104,10 @@ path is for debugging rather than store builds.
 
 Every chat composer shows a Gallery button after `+`; it opens the platform
 image picker directly. On HarmonyOS the shell injects `window.paseoPhotoPicker`,
-backed by `PhotoViewPicker`, so the picker needs no media-library permission and
-grants temporary read access to the selected URIs, which `readImages` consumes
-in a second bridge call. **Add image** remains available in the attachment menu.
+backed by `PhotoViewPicker`, so the picker needs no media-library permission.
+Current shells return the downscaled photos from `pickImages` directly;
+`readImages` remains for older web bundles that consume the temporary URIs in a
+second bridge call. **Add image** remains available in the attachment menu.
 `utils/harmony-shell.ts` still marks the shell as a touch device so controls such
 as attachment removal do not depend on hover.
 

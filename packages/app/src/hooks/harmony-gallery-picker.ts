@@ -2,12 +2,13 @@ import type { PickedImageAttachmentInput } from "@/hooks/image-attachment-picker
 
 interface HarmonyGalleryBridge {
   pickImages(callback: (resultJson: string) => void): void;
-  readImages(urisJson: string, callback: (resultJson: string) => void): void;
+  readImages?: (urisJson: string, callback: (resultJson: string) => void) => void;
 }
 
 interface GalleryPickResponse {
   ok?: boolean;
   uris?: unknown;
+  photos?: GalleryPhoto[];
 }
 
 interface GalleryPhoto {
@@ -30,9 +31,7 @@ function harmonyGalleryBridge(): HarmonyGalleryBridge | null {
   }
   const bridge = (window as unknown as { paseoPhotoPicker?: Partial<HarmonyGalleryBridge> })
     .paseoPhotoPicker;
-  return typeof bridge?.pickImages === "function" && typeof bridge.readImages === "function"
-    ? (bridge as HarmonyGalleryBridge)
-    : null;
+  return typeof bridge?.pickImages === "function" ? (bridge as HarmonyGalleryBridge) : null;
 }
 
 export function hasHarmonyGalleryPicker(): boolean {
@@ -43,17 +42,23 @@ function requestBridgeValue<T>(
   start: (done: (value: T) => void) => void,
   timeoutMs: number,
 ): Promise<T | null> {
-  const result = new Promise<T | null>((resolve) => {
+  return new Promise<T | null>((resolve) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const finish = (value: T | null) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      // oxlint-disable-next-line eslint-plugin-promise/no-multiple-resolved -- guarded by settled.
+      resolve(value);
+    };
     try {
-      start((value) => resolve(value));
+      start(finish);
     } catch {
-      resolve(null);
+      finish(null);
     }
+    timeout = setTimeout(() => finish(null), timeoutMs);
   });
-  const timeout = new Promise<null>((resolve) => {
-    setTimeout(() => resolve(null), timeoutMs);
-  });
-  return Promise.race([result, timeout]);
 }
 
 function parseUris(resultJson: string | null): string[] {
@@ -102,9 +107,9 @@ function parsePhotos(resultJson: string | null): PickedImageAttachmentInput[] {
 }
 
 /**
- * Opens the HarmonyOS photo picker directly. PhotoViewPicker grants temporary
- * read access to the selected URIs, so no media-library permission is involved.
- * The URIs are read in a second bridge call after the picker returns.
+ * Opens the HarmonyOS photo picker directly. Current shells return the
+ * downscaled photos from pickImages itself; older shells return URIs and still
+ * use the readImages follow-up.
  */
 export async function pickImagesWithHarmonyGallery(): Promise<PickedImageAttachmentInput[] | null> {
   const bridge = harmonyGalleryBridge();
@@ -116,13 +121,22 @@ export async function pickImagesWithHarmonyGallery(): Promise<PickedImageAttachm
     (done) => bridge.pickImages((value) => done(value)),
     PICK_TIMEOUT_MS,
   );
+  const pickedPhotos = parsePhotos(pickJson);
+  if (pickedPhotos.length > 0) {
+    return pickedPhotos;
+  }
+
   const uris = parseUris(pickJson);
   if (uris.length === 0) {
     return null;
   }
+  const readImages = bridge.readImages;
+  if (typeof readImages !== "function") {
+    return null;
+  }
 
   const readJson = await requestBridgeValue<string>(
-    (done) => bridge.readImages(JSON.stringify(uris), (value) => done(value)),
+    (done) => readImages(JSON.stringify(uris), (value) => done(value)),
     READ_TIMEOUT_MS,
   );
   const photos = parsePhotos(readJson);

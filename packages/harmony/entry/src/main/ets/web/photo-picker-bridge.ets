@@ -14,6 +14,7 @@ interface GalleryPickResult {
   ok: boolean;
   error?: string;
   uris: string[];
+  photos?: GalleryPhoto[];
 }
 
 interface GalleryPhoto {
@@ -58,12 +59,13 @@ function fitWithin(width: number, height: number, maxEdge: number): image.Size {
  *
  * PhotoViewPicker opens the system gallery without requesting the restricted
  * READ_IMAGEVIDEO permission. The picker grants temporary read access to the
- * selected URIs; readImages runs as a separate bridge call after the picker
- * returns and returns downscaled JPEG data URLs to the web composer.
+ * selected URIs; pickImages now returns downscaled JPEG data URLs in the same
+ * bridge call. readImages remains for web bundles that still use the two-step
+ * protocol.
  */
 class PhotoPickerBridge {
   pickImages(callback: (resultJson: string) => void): void {
-    this.pick()
+    this.pickAndRead()
       .then((result: GalleryPickResult) => callback(JSON.stringify(result)))
       .catch((error: BusinessError) => callback(JSON.stringify(this.pickFailure(error))));
   }
@@ -101,6 +103,31 @@ class PhotoPickerBridge {
 
     const result = await new photoAccessHelper.PhotoViewPicker().select(options);
     return { ok: true, uris: result.photoUris };
+  }
+
+  private async pickAndRead(): Promise<GalleryPickResult> {
+    const picked = await this.pick();
+    if (!picked.ok || picked.uris.length === 0) {
+      const emptyResult: GalleryPickResult = {
+        ok: picked.ok,
+        uris: picked.uris,
+        photos: [],
+      };
+      if (picked.error) {
+        emptyResult.error = picked.error;
+      }
+      return emptyResult;
+    }
+    const read = await this.read(JSON.stringify(picked.uris));
+    const result: GalleryPickResult = {
+      ok: read.ok,
+      uris: picked.uris,
+      photos: read.photos,
+    };
+    if (read.error) {
+      result.error = read.error;
+    }
+    return result;
   }
 
   private async read(urisJson: string): Promise<GalleryReadResult> {
