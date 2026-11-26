@@ -2234,6 +2234,7 @@ export const es: TranslationResources = {
       errorTitle: "Error",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "Cargando oferta de maridaje...",
       failedToLoadOffer: "No se pudo cargar la oferta de emparejamiento.",
       relayDisabled: "El relé no está habilitado. Habilite el relé para emparejar un dispositivo.",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as QRCode from "qrcode";
@@ -7,9 +7,11 @@ import { useMutation } from "@tanstack/react-query";
 import { Check, Copy, Network, RotateCw, ShieldCheck } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
+import { MAX_CLIENT_NAME_LENGTH, normalizeClientName } from "@getpaseo/protocol/agent-actor";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "@/components/ui/external-link";
+import { Field, FormTextInput } from "@/components/ui/form-field";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFetchQuery } from "@/data/query";
 import { daemonPairingOfferQueryKey } from "@/data/daemon-pairing";
@@ -33,10 +35,82 @@ const accentBrightColorMapping = (theme: Theme) => ({ color: theme.colors.accent
 
 export interface PairDeviceSectionProps {
   serverId: string;
+  visible: boolean;
   onClose: () => void;
 }
 
-export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps) {
+type PairingClient = NonNullable<ReturnType<typeof useHostRuntimeClient>>;
+type DaemonConfigPatcher = ReturnType<typeof useDaemonConfig>["patchConfig"];
+
+interface PairDeviceRoleNameState {
+  roleName: string;
+  submittedRoleName: string | null;
+  canSubmit: boolean;
+  inputRef: RefObject<EditingTextInputHandle | null>;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}
+
+function usePairDeviceRoleName(visible: boolean): PairDeviceRoleNameState {
+  const inputRef = useRef<EditingTextInputHandle>(null);
+  const [roleName, setRoleName] = useState("");
+  const [submittedRoleName, setSubmittedRoleName] = useState<string | null>(null);
+  const normalizedRoleName = normalizeClientName(roleName);
+  const canSubmit =
+    normalizedRoleName !== undefined && normalizedRoleName.length <= MAX_CLIENT_NAME_LENGTH;
+
+  useEffect(() => {
+    if (visible) return;
+    setRoleName("");
+    setSubmittedRoleName(null);
+    inputRef.current?.replaceText("");
+  }, [visible]);
+
+  const onChange = useCallback((value: string) => setRoleName(value), []);
+  const onSubmit = useCallback(() => {
+    const nextRoleName = normalizeClientName(roleName);
+    if (!nextRoleName || nextRoleName.length > MAX_CLIENT_NAME_LENGTH) return;
+    setSubmittedRoleName(nextRoleName);
+  }, [roleName]);
+
+  return { roleName, submittedRoleName, canSubmit, inputRef, onChange, onSubmit };
+}
+
+function shouldAskForRoleName(input: {
+  supportsPairingRpc: boolean;
+  isConnected: boolean;
+  submittedRoleName: string | null;
+}): boolean {
+  return input.supportsPairingRpc && input.isConnected && input.submittedRoleName === null;
+}
+
+async function requestPairingOffer(input: {
+  client: PairingClient | null;
+  clientName: string | null;
+  disconnectedMessage: string;
+  roleNameRequiredMessage: string;
+}) {
+  if (!input.client) throw new Error(input.disconnectedMessage);
+  if (!input.clientName) throw new Error(input.roleNameRequiredMessage);
+  return input.client.getDaemonPairingOffer({ clientName: input.clientName });
+}
+
+async function enablePairingRelay(input: {
+  client: PairingClient | null;
+  patchConfig: DaemonConfigPatcher;
+  refetch: () => Promise<unknown>;
+  updateRequiredMessage: string;
+  disconnectedMessage: string;
+}) {
+  if (input.client?.getLastServerInfoMessage()?.features?.relayConfig !== true) {
+    throw new Error(input.updateRequiredMessage);
+  }
+  const config = await input.patchConfig({ relay: { enabled: true } });
+  if (!config) throw new Error(input.disconnectedMessage);
+  return input.refetch();
+}
+
+export function PairDeviceSection({ serverId, visible, onClose }: PairDeviceSectionProps) {
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const runtimeSnapshot = useHostRuntimeSnapshot(serverId);
@@ -46,31 +120,43 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
     runtimeSnapshot?.connectionStatus === "error";
   const { patchConfig } = useDaemonConfig(serverId);
   const [copied, setCopied] = useState(false);
+  const {
+    roleName,
+    submittedRoleName,
+    canSubmit: canSubmitRoleName,
+    inputRef: roleNameInputRef,
+    onChange: handleRoleNameChange,
+    onSubmit: handleSubmitRoleName,
+  } = usePairDeviceRoleName(visible);
   const serverFeatures = client?.getLastServerInfoMessage()?.features;
   const supportsPairingRpc = serverFeatures?.daemonStatusRpc === true;
   const canConfigureRelay = supportsPairingRpc && serverFeatures?.relayConfig === true;
 
   const pairingQuery = useFetchQuery({
-    queryKey: daemonPairingOfferQueryKey(serverId),
-    queryFn: async () => {
-      if (!client) throw new Error(t("workspace.terminal.hostDisconnected"));
-      return client.getDaemonPairingOffer();
-    },
-    enabled: supportsPairingRpc && Boolean(client && isConnected),
+    queryKey: [...daemonPairingOfferQueryKey(serverId), submittedRoleName],
+    queryFn: () =>
+      requestPairingOffer({
+        client,
+        clientName: submittedRoleName,
+        disconnectedMessage: t("workspace.terminal.hostDisconnected"),
+        roleNameRequiredMessage: t("pairing.device.roleNameRequired"),
+      }),
+    enabled:
+      visible && supportsPairingRpc && Boolean(client && isConnected && submittedRoleName !== null),
     dataShape: "value",
     staleTimeMs: 5 * 60 * 1000,
     retry: 1,
   });
 
   const enableRelay = useMutation({
-    mutationFn: async () => {
-      if (client?.getLastServerInfoMessage()?.features?.relayConfig !== true) {
-        throw new Error(t("pairing.device.updateRequired"));
-      }
-      const config = await patchConfig({ relay: { enabled: true } });
-      if (!config) throw new Error(t("workspace.terminal.hostDisconnected"));
-      return pairingQuery.refetch();
-    },
+    mutationFn: () =>
+      enablePairingRelay({
+        client,
+        patchConfig,
+        refetch: pairingQuery.refetch,
+        updateRequiredMessage: t("pairing.device.updateRequired"),
+        disconnectedMessage: t("workspace.terminal.hostDisconnected"),
+      }),
   });
 
   const qrQuery = useFetchQuery({
@@ -103,25 +189,95 @@ export function PairDeviceSection({ serverId, onClose }: PairDeviceSectionProps)
   }, [enableRelay]);
 
   const qrSvg = useMemo(() => qrQuery.data ?? null, [qrQuery.data]);
+  const needsRoleName = shouldAskForRoleName({
+    supportsPairingRpc,
+    isConnected,
+    submittedRoleName,
+  });
 
   return (
     <View testID="pair-device-content">
-      <PairDeviceBody
-        isPending={supportsPairingRpc && pairingQuery.isPending}
-        isDisconnected={isDisconnected}
-        error={pairingQuery.error}
-        offer={pairingQuery.data}
-        canConfigureRelay={canConfigureRelay}
-        enablePending={enableRelay.isPending}
-        enableError={enableRelay.error}
-        qrSvg={qrSvg}
-        qrError={qrQuery.isError}
-        copied={copied}
-        onRetry={handleRetry}
-        onEnableRelay={handleEnableRelay}
-        onClose={onClose}
-        onCopy={handleCopyPress}
-      />
+      {needsRoleName ? (
+        <PairDeviceRoleNameForm
+          roleName={roleName}
+          canSubmit={canSubmitRoleName}
+          inputRef={roleNameInputRef}
+          onChange={handleRoleNameChange}
+          onSubmit={handleSubmitRoleName}
+        />
+      ) : (
+        <PairDeviceBody
+          isPending={supportsPairingRpc && pairingQuery.isPending}
+          isDisconnected={isDisconnected}
+          error={pairingQuery.error}
+          offer={pairingQuery.data}
+          roleName={submittedRoleName}
+          canConfigureRelay={canConfigureRelay}
+          enablePending={enableRelay.isPending}
+          enableError={enableRelay.error}
+          qrSvg={qrSvg}
+          qrError={qrQuery.isError}
+          copied={copied}
+          onRetry={handleRetry}
+          onEnableRelay={handleEnableRelay}
+          onClose={onClose}
+          onCopy={handleCopyPress}
+        />
+      )}
+    </View>
+  );
+}
+
+function PairDeviceRoleNameForm({
+  roleName,
+  canSubmit,
+  inputRef,
+  onChange,
+  onSubmit,
+}: {
+  roleName: string;
+  canSubmit: boolean;
+  inputRef: RefObject<EditingTextInputHandle | null>;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <View style={styles.roleName}>
+      <View style={styles.hero}>
+        <RelayHeroBadge />
+        <Text style={styles.consentTitle}>{t("pairing.device.roleNameTitle")}</Text>
+        <Text style={styles.consentDescription}>{t("pairing.device.roleNameDescription")}</Text>
+      </View>
+      <Field
+        label={t("pairing.device.roleNameLabel")}
+        hint={t("pairing.device.roleNameHint")}
+        testID="pair-device-role-name-field"
+      >
+        <FormTextInput
+          ref={inputRef}
+          initialValue={roleName}
+          onChangeText={onChange}
+          onSubmitEditing={canSubmit ? onSubmit : undefined}
+          placeholder={t("pairing.device.roleNamePlaceholder")}
+          accessibilityLabel={t("pairing.device.roleNameLabel")}
+          testID="pair-device-role-name-input"
+          maxLength={MAX_CLIENT_NAME_LENGTH}
+          returnKeyType="go"
+          autoCapitalize="words"
+          autoCorrect={false}
+        />
+      </Field>
+      <Button
+        variant="default"
+        style={FLEX_ONE_STYLE}
+        onPress={onSubmit}
+        disabled={!canSubmit}
+        testID="pair-device-role-name-submit"
+      >
+        {t("pairing.device.generatePairingLink")}
+      </Button>
     </View>
   );
 }
@@ -130,7 +286,8 @@ interface PairDeviceBodyProps {
   isPending: boolean;
   isDisconnected: boolean;
   error: Error | null;
-  offer: { relayEnabled: boolean; url: string } | undefined;
+  offer: { relayEnabled: boolean; url: string; clientName?: string } | undefined;
+  roleName: string | null;
   canConfigureRelay: boolean;
   enablePending: boolean;
   enableError: Error | null;
@@ -237,8 +394,14 @@ function PairingOffer(props: PairDeviceBodyProps & { offer: { url: string } }) {
   const { t } = useTranslation();
   const inputRef = useRef<EditingTextInputHandle>(null);
   useEffect(() => inputRef.current?.replaceText(props.offer.url), [props.offer.url]);
+  const roleName = props.offer.clientName ?? props.roleName;
   return (
     <View style={styles.offer}>
+      {roleName ? (
+        <Text style={styles.roleNameSummary}>
+          {t("pairing.device.roleNameSummary", { name: roleName })}
+        </Text>
+      ) : null}
       <Text style={styles.offerHint}>{t("pairing.device.hint")}</Text>
       <View style={styles.qrTile}>
         <PairingQr svg={props.qrSvg} isError={props.qrError} />
@@ -297,6 +460,9 @@ const styles = StyleSheet.create((theme) => ({
   consent: {
     gap: theme.spacing[4],
   },
+  roleName: {
+    gap: theme.spacing[4],
+  },
   hero: {
     alignItems: "flex-start",
     gap: theme.spacing[2],
@@ -350,6 +516,12 @@ const styles = StyleSheet.create((theme) => ({
   offerHint: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
+    textAlign: "center",
+  },
+  roleNameSummary: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
     textAlign: "center",
   },
   qrTile: {

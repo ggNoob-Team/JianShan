@@ -2201,6 +2201,15 @@ export const en = {
       errorTitle: "Error",
     },
     device: {
+      roleNameTitle: "Set a role name",
+      roleNameDescription:
+        "Name the device before its pairing link is created. This name is written into the link and identifies the device in team activity.",
+      roleNameLabel: "Role name",
+      roleNameHint: "1–120 characters. This is the same value as paseo daemon pair --name.",
+      roleNamePlaceholder: "For example: Alex's phone",
+      generatePairingLink: "Generate pairing link",
+      roleNameSummary: "Pairing role: {{name}}",
+      roleNameRequired: "Enter a role name before generating a pairing link.",
       loadingOffer: "Loading pairing offer...",
       failedToLoadOffer: "Failed to load pairing offer.",
       relayDisabled: "Relay is not enabled. Enable relay to pair a device.",

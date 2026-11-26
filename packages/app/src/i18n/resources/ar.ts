@@ -2169,6 +2169,7 @@ export const ar: TranslationResources = {
       errorTitle: "خطأ",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "جارٍ تحميل عرض الإقران...",
       failedToLoadOffer: "فشل تحميل عرض الاقتران.",
       relayDisabled: "لم يتم تمكين التتابع. تمكين التتابع لإقران جهاز.",

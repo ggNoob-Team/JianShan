@@ -2209,6 +2209,7 @@ export const ru: TranslationResources = {
       errorTitle: "Ошибка",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "Загрузка данных для сопряжения...",
       failedToLoadOffer: "Не удалось загрузить данные для сопряжения.",
       relayDisabled:

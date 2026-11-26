@@ -2196,6 +2196,7 @@ export const ja: TranslationResources = {
       errorTitle: "エラー",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "ペアリングオファーを読み込み中...",
       failedToLoadOffer: "ペアリングオファーの読み込みに失敗しました。",
       relayDisabled:

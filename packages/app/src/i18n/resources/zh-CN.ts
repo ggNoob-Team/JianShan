@@ -2145,6 +2145,15 @@ export const zhCN: TranslationResources = {
       errorTitle: "错误",
     },
     device: {
+      roleNameTitle: "设置角色名称",
+      roleNameDescription:
+        "生成配对链接前，先为要连接的设备设置角色名称。该名称会写入配对链接，并显示在团队操作记录中。",
+      roleNameLabel: "角色名称",
+      roleNameHint: "1–120 个字符，对应 paseo daemon pair --name 的值。",
+      roleNamePlaceholder: "例如：张三的手机",
+      generatePairingLink: "生成配对链接",
+      roleNameSummary: "配对角色：{{name}}",
+      roleNameRequired: "请先输入角色名称，再生成配对链接。",
       loadingOffer: "正在加载配对 offer...",
       failedToLoadOffer: "加载配对 offer 失败。",
       relayDisabled: "Relay 未启用。启用 relay 后才能配对设备。",

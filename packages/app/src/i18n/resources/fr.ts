@@ -2231,6 +2231,7 @@ export const fr: TranslationResources = {
       errorTitle: "Erreur",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "Chargement de l’offre d’association…",
       failedToLoadOffer: "Impossible de charger l’offre d’association.",
       relayDisabled: "Le relais n’est pas activé. Activez-le pour associer un appareil.",

@@ -2187,6 +2187,7 @@ export const ko: TranslationResources = {
       errorTitle: "오류",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "페어링 정보 불러오는 중...",
       failedToLoadOffer: "페어링 정보를 불러오지 못했습니다.",
       relayDisabled:

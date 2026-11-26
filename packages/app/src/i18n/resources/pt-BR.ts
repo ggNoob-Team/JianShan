@@ -2216,6 +2216,7 @@ export const ptBR: TranslationResources = {
       errorTitle: "Erro",
     },
     device: {
+      ...en.pairing.device,
       loadingOffer: "Carregando oferta de pareamento...",
       failedToLoadOffer: "Falha ao carregar oferta de pareamento.",
       relayDisabled: "Relay não está ativado. Ative o relay para parear um dispositivo.",
