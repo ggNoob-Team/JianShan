@@ -1,3 +1,4 @@
+import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   AssistantFileLinkResolverProvider,
@@ -67,6 +68,7 @@ import { WorkspaceArchifyButton } from "@/screens/workspace/workspace-explorer-t
 import { ImportSessionSheet } from "@/components/import-session-sheet";
 import { useNavigateToImportedAgent } from "@/hooks/use-import-session";
 import { useToast } from "@/contexts/toast-context";
+import { useOpenOutsideWorkspaceFolder } from "@/workspace/open-in-file-manager/outside-folder";
 import { getOrCreateClientId } from "@/utils/client-id";
 import { selectIsAgentListOpen, usePanelStore } from "@/stores/panel-store";
 import { toggleDesktopSidebarsWithCheckoutIntent } from "@/utils/desktop-sidebar-toggle";
@@ -130,7 +132,6 @@ import {
   useWorkspaceSetupStore,
 } from "@/stores/workspace-setup-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
-import { useWorkspaceTerminalSessionRetention } from "@/terminal/hooks/use-workspace-terminal-session-retention";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
@@ -183,6 +184,8 @@ import {
   type WorkspacePaneContentModel,
 } from "@/screens/workspace/workspace-pane-content";
 import { useMountedTabSet } from "@/screens/workspace/use-mounted-tab-set";
+import { ensurePanelsRegistered } from "@/panels/register-panels";
+import { SheetPaneHostProvider, type SheetPaneHost } from "@/screens/workspace/sheet-pane";
 import { SheetTabs } from "@/screens/workspace/sheet-tabs";
 import type { PaneHost } from "@/panels/panel-manifest";
 import { WorkspaceFocusProvider } from "@/workspace/focus";
@@ -445,6 +448,10 @@ export const WorkspaceScreen = memo(function WorkspaceScreen({
   workspaceId,
   isRouteFocused,
 }: WorkspaceScreenProps) {
+  // Every reader of the panel registry renders inside the workspace screen, so it registers the
+  // panels before any of them renders. A reader importing the registration instead would import
+  // every panel, and the panels render readers.
+  ensurePanelsRegistered();
   const navigationFocused = useIsFocused();
   useEffect(() => {
     traceInstant("paseo.workspace.mount", { serverId, workspaceId });
@@ -788,13 +795,17 @@ function WorkspaceScreenGateFrame({ children }: { children: ReactNode }) {
 function WorkspaceContentProviders({
   children,
   workspaceKey,
+  sheetPaneHost,
 }: {
   children: ReactNode;
   workspaceKey: string | null;
+  sheetPaneHost: SheetPaneHost | null;
 }) {
   return (
     <WorkspaceFocusProvider workspaceKey={workspaceKey}>
-      <DiffDocumentWorkspaceCacheProvider>{children}</DiffDocumentWorkspaceCacheProvider>
+      <DiffDocumentWorkspaceCacheProvider>
+        <SheetPaneHostProvider value={sheetPaneHost}>{children}</SheetPaneHostProvider>
+      </DiffDocumentWorkspaceCacheProvider>
     </WorkspaceFocusProvider>
   );
 }
@@ -812,10 +823,11 @@ function WorkspacePanelSurface({
   children: ReactNode;
   tabIds: readonly string[];
 }) {
+  const isCompact = useIsCompactFormFactor();
   return (
     <WorkspaceComposerEditingSessionsProvider workspaceKey={workspaceKey} tabIds={tabIds}>
       <NewTabLauncherProvider value={launcher}>
-        <SheetHostScope>
+        <SheetHostScope enabled={!isCompact}>
           <View style={styles.threePaneRow} onLayout={onLayout}>
             {children}
           </View>
@@ -892,13 +904,6 @@ function shouldShowWorkspaceScreenHeader(input: {
   isMobile: boolean;
 }): boolean {
   return !input.isFocusModeEnabled || input.isMobile;
-}
-
-function buildWorkspaceTerminalScopeKey(serverId: string, workspaceId: string): string | null {
-  if (!serverId || !workspaceId) {
-    return null;
-  }
-  return `${serverId}:${workspaceId}`;
 }
 
 /**
@@ -1082,14 +1087,6 @@ function WorkspaceScreenContent({
   const { handleRetryHost, handleManageHost, handleDismissMissingWorkspace } =
     useWorkspaceRouteActions(normalizedServerId);
 
-  const workspaceTerminalScopeKey = useMemo(
-    () => buildWorkspaceTerminalScopeKey(normalizedServerId, normalizedWorkspaceId),
-    [normalizedServerId, normalizedWorkspaceId],
-  );
-  useWorkspaceTerminalSessionRetention({
-    scopeKey: workspaceTerminalScopeKey,
-  });
-
   const client = useHostRuntimeClient(normalizedServerId);
   const isConnected = useHostRuntimeIsConnected(normalizedServerId);
   const supportsProvidersSnapshot = useSessionStore(
@@ -1159,22 +1156,15 @@ function WorkspaceScreenContent({
     ) => openTab({ workspaceKey, target, intent: "reveal", parentTabId, placement }),
     [openTab],
   );
-  // File targets stay identity-stable so the same path reuses its tab. Keep navigation
-  // requests separate so clicking an unchanged path:line can still recenter the pane.
-  const [fileNavigationRevisionByTabId, setFileNavigationRevisionByTabId] = useState<
-    Record<string, number>
-  >({});
-  const requestFileNavigation = useCallback((tabId: string) => {
-    setFileNavigationRevisionByTabId((current) => ({
-      ...current,
-      [tabId]: (current[tabId] ?? 0) + 1,
-    }));
-  }, []);
+  const panelRevisions = useWorkspaceLayoutStore((state) =>
+    persistenceKey ? state.panelRevisionByWorkspace[persistenceKey] : undefined,
+  );
   const focusWorkspacePane = useWorkspaceLayoutStore((state) => state.focusPane);
   const hasHydratedWorkspaces = useSessionStore(
     (state) => state.sessions[normalizedServerId]?.hasHydratedWorkspaces ?? false,
   );
   const pendingOpenTarget = usePendingWorkspaceOpen({
+    onOpened: revealWorkspaceTab,
     workspaceKey: persistenceKey,
     hasHydratedWorkspaces,
     workspaceExists: workspaceDescriptor !== null,
@@ -1375,10 +1365,6 @@ function WorkspaceScreenContent({
   const sheets = useWorkspaceLayoutStore((state) =>
     persistenceKey ? (state.sheetsByWorkspace[persistenceKey] ?? NO_SHEETS) : NO_SHEETS,
   );
-  // Only the top sheet is on screen.
-  const sheetTab = useWorkspaceLayoutStore((state) =>
-    persistenceKey ? (state.sheetsByWorkspace[persistenceKey]?.at(-1)?.tab ?? null) : null,
-  );
   const unpinWorkspaceAgent = useWorkspaceLayoutStore((state) => state.unpinAgent);
   const hideWorkspaceAgent = useWorkspaceLayoutStore((state) => state.hideAgent);
   const setWorkspaceTabState = useWorkspaceLayoutStore((state) => state.setTabState);
@@ -1450,7 +1436,6 @@ function WorkspaceScreenContent({
   const visibleAgentIds = useVisibleAgentIds({
     layout: workspaceLayout,
     tabs: uiTabs,
-    sheetTab,
     routeFocused: isRouteFocused,
     focusedPaneOnly: syncFocusedPaneOnly,
     explorerPaneId: explorerSidebarPaneId,
@@ -1698,9 +1683,6 @@ function WorkspaceScreenContent({
       if (!normalizedLocation) {
         return;
       }
-      if (isMobile) {
-        showMobileAgent();
-      }
       if (!persistenceKey) {
         return;
       }
@@ -1709,19 +1691,10 @@ function WorkspaceScreenContent({
         ? revealWorkspaceChildTab(persistenceKey, target, parentTabId, FOCUSED_PANE_PLACEMENT)
         : openWorkspaceTabFocused(persistenceKey, target, FOCUSED_PANE_PLACEMENT);
       if (tabId) {
-        requestFileNavigation(tabId);
         navigateToTabId(tabId);
       }
     },
-    [
-      isMobile,
-      navigateToTabId,
-      openWorkspaceTabFocused,
-      revealWorkspaceChildTab,
-      persistenceKey,
-      requestFileNavigation,
-      showMobileAgent,
-    ],
+    [navigateToTabId, openWorkspaceTabFocused, revealWorkspaceChildTab, persistenceKey],
   );
 
   const handleOpenPreferredAssistantFile = useCallback(
@@ -1734,18 +1707,15 @@ function WorkspaceScreenContent({
         return;
       }
 
-      const tabId = openPreferredWorkspaceTarget({
+      openPreferredWorkspaceTarget({
         workspaceKey: persistenceKey,
         target: createWorkspaceFileTabTarget(location),
         source: "chatFiles",
         preferences: openInSidePane,
         parentTabId: input.parentTabId,
       });
-      if (tabId) {
-        requestFileNavigation(tabId);
-      }
     },
-    [openInSidePane, persistenceKey, requestFileNavigation],
+    [openInSidePane, persistenceKey],
   );
 
   const handleOpenWorkspaceFileFromPane = useStableEvent(function handleOpenWorkspaceFileFromPane({
@@ -1765,14 +1735,11 @@ function WorkspaceScreenContent({
     if (request.disposition === "side") {
       const location = normalizeWorkspaceFileLocation(request.location);
       if (!location || !persistenceKey) return;
-      const tabId = openWorkspaceTargetBeside({
+      openWorkspaceTargetBeside({
         workspaceKey: persistenceKey,
         target: createWorkspaceFileTabTarget(location),
         parentTabId,
       });
-      if (tabId) {
-        requestFileNavigation(tabId);
-      }
       return;
     }
     if (request.disposition === "preferred") {
@@ -2271,8 +2238,7 @@ function WorkspaceScreenContent({
         const sessionState = useSessionStore.getState().sessions[normalizedServerId];
         const currentCursor = sessionState?.agentTimelineCursor.get(agentId);
         await getHostRuntimeStore().fetchAgentTimeline(normalizedServerId, agentId, {
-          direction: "tail",
-          projection: "projected",
+          ...planTimelineTailFetch(),
           ...(currentCursor
             ? { cursor: { epoch: currentCursor.epoch, seq: currentCursor.endSeq } }
             : {}),
@@ -3007,6 +2973,8 @@ function WorkspaceScreenContent({
       paneId?: string | null;
       focusPaneBeforeOpen?: boolean;
       host?: PaneHost;
+      /** Overrides the guarded tab close, for a host that closes the tab its own way. */
+      onCloseCurrentTab?: () => void;
     }) =>
       buildWorkspacePaneContentModel({
         tab: input.tab,
@@ -3015,7 +2983,7 @@ function WorkspaceScreenContent({
         host:
           input.host ??
           (input.paneId !== null && input.paneId === explorerSidebarPaneId ? "explorer" : "main"),
-        fileNavigationRevision: fileNavigationRevisionByTabId[input.tab.tabId] ?? 0,
+        panelRevision: panelRevisions?.[input.tab.tabId] ?? 0,
         onOpenTab: (target) => {
           if (!persistenceKey) {
             return;
@@ -3043,7 +3011,7 @@ function WorkspaceScreenContent({
         },
         onOpenPreferredTarget: (target, source) => {
           if (!persistenceKey) return;
-          const tabId = openPreferredWorkspacePreview({
+          openPreferredWorkspacePreview({
             workspaceKey: persistenceKey,
             serverId: normalizedServerId,
             workspaceId: normalizedWorkspaceId,
@@ -3053,7 +3021,6 @@ function WorkspaceScreenContent({
             source,
             preferences: openInSidePane,
           });
-          if (tabId && target.kind === "file") requestFileNavigation(tabId);
         },
         onOpenTargetToSide:
           canRenderDesktopPaneSplits &&
@@ -3061,17 +3028,18 @@ function WorkspaceScreenContent({
           input.paneId === explorerSidebarPaneId
             ? (target) => {
                 if (!persistenceKey) return;
-                const tabId = openWorkspaceTargetBeside({
+                openWorkspaceTargetBeside({
                   workspaceKey: persistenceKey,
                   target,
                   parentTabId: input.tab.tabId,
                 });
-                if (tabId && target.kind === "file") requestFileNavigation(tabId);
               }
             : undefined,
-        onCloseCurrentTab: () => {
-          void handleCloseTabById(input.tab.tabId);
-        },
+        onCloseCurrentTab:
+          input.onCloseCurrentTab ??
+          (() => {
+            void handleCloseTabById(input.tab.tabId);
+          }),
         onRetargetCurrentTab: (target) => {
           if (!persistenceKey) {
             return;
@@ -3095,7 +3063,7 @@ function WorkspaceScreenContent({
       }),
     [
       handleCloseTabById,
-      fileNavigationRevisionByTabId,
+      panelRevisions,
       handleOpenWorkspaceFileFromPane,
       navigateToTabId,
       normalizedServerId,
@@ -3104,7 +3072,6 @@ function WorkspaceScreenContent({
       canRenderDesktopPaneSplits,
       openImportSheet,
       openInSidePane,
-      requestFileNavigation,
       revealWorkspaceChildTab,
       persistenceKey,
       replaceWorkspaceTabTarget,
@@ -3148,15 +3115,35 @@ function WorkspaceScreenContent({
     [buildPaneContentModel],
   );
   const buildSheetPaneContentModel = useCallback(
-    function buildSheetPaneContentModel(tab: WorkspaceTabDescriptor) {
+    function buildSheetPaneContentModel(tab: WorkspaceTabDescriptor, closeCurrentTab: () => void) {
       return buildPaneContentModel({
         tab,
         paneId: null,
         focusPaneBeforeOpen: false,
         host: "sheet",
+        onCloseCurrentTab: closeCurrentTab,
       });
     },
     [buildPaneContentModel],
+  );
+  const sheetPaneHost = useMemo<SheetPaneHost | null>(
+    () =>
+      persistenceKey
+        ? {
+            workspaceKey: persistenceKey,
+            serverId: normalizedServerId,
+            workspaceId: normalizedWorkspaceId,
+            isWorkspaceFocused: isRouteFocused,
+            buildContent: buildSheetPaneContentModel,
+          }
+        : null,
+    [
+      buildSheetPaneContentModel,
+      isRouteFocused,
+      normalizedServerId,
+      normalizedWorkspaceId,
+      persistenceKey,
+    ],
   );
   const handleFocusPane = useStableEvent(function handleFocusPane(paneId: string) {
     if (!persistenceKey || paneFocusSuppressedRef.current) {
@@ -3310,6 +3297,7 @@ function WorkspaceScreenContent({
           <WorkspaceOpenInEditorButton
             serverId={normalizedServerId}
             cwd={workspaceDirectory}
+            projectId={workspaceDescriptor?.projectId ?? null}
             activeFile={activeFileLocation}
             hideLabels
           />
@@ -3532,6 +3520,7 @@ function WorkspaceScreenContent({
           />
           <WorkspaceHeaderMenuMobile
             normalizedServerId={normalizedServerId}
+            normalizedWorkspaceId={normalizedWorkspaceId}
             scripts={compactHeaderScripts}
             currentBranchName={currentBranchName}
             showWorkspaceSetup={showWorkspaceSetup}
@@ -3680,7 +3669,7 @@ function WorkspaceScreenContent({
     composerFullscreen: useComposerTabFullscreen(workspacePanelKey, activeTabId),
   });
 
-  // Compact sheets use the shared workspace scope, above both center and Explorer.
+  // Compact sheets escape to the app overlay host, above both sidebars.
   const workspaceCenterColumn = isMobile ? (
     <View style={styles.centerColumn}>
       <FloatingHeaderLayout
@@ -3693,14 +3682,7 @@ function WorkspaceScreenContent({
           </StreamTopOverlayProvider>
         )}
       </FloatingHeaderLayout>
-      <SheetTabs
-        workspaceKey={persistenceKey}
-        serverId={normalizedServerId}
-        workspaceId={normalizedWorkspaceId}
-        isWorkspaceFocused={isRouteFocused}
-        buildContent={buildSheetPaneContentModel}
-        onCloseTab={handleCloseTabById}
-      />
+      <SheetTabs onCloseTab={handleCloseTabById} />
     </View>
   ) : (
     <View style={styles.centerColumn}>
@@ -3836,6 +3818,7 @@ function WorkspaceScreenContent({
       view: "files",
     });
   });
+  const openMarkdownOutsideDirectory = useOpenOutsideWorkspaceFolder(normalizedServerId);
   const markdownPathOpener = useMemo(
     () =>
       createInlinePathOpener({
@@ -3843,8 +3826,15 @@ function WorkspaceScreenContent({
         client,
         openFile: openMarkdownFile,
         openDirectory: openMarkdownDirectory,
+        openOutsideDirectory: openMarkdownOutsideDirectory,
       }),
-    [workspaceDirectory, client, openMarkdownFile, openMarkdownDirectory],
+    [
+      workspaceDirectory,
+      client,
+      openMarkdownFile,
+      openMarkdownDirectory,
+      openMarkdownOutsideDirectory,
+    ],
   );
   useEffect(() => {
     if (!isRouteFocused) markdownPathOpener.cancel();
@@ -3912,7 +3902,11 @@ function WorkspaceScreenContent({
     return gatedWorkspaceScreen;
   }
   return (
-    <WorkspaceContentProviders key={persistenceKey} workspaceKey={persistenceKey}>
+    <WorkspaceContentProviders
+      key={persistenceKey}
+      workspaceKey={persistenceKey}
+      sheetPaneHost={sheetPaneHost}
+    >
       <AssistantFileLinkResolverProvider
         client={client}
         serverId={normalizedServerId}

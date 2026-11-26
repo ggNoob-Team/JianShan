@@ -89,6 +89,9 @@ export function serializeRelayConnectionUri(parts: ParsedRelayConnectionUri): st
   );
   url.searchParams.set("key", parts.offer.daemonPublicKeyB64);
   if (parts.offer.relay.useTls) url.searchParams.set("ssl", "true");
+  if (parts.offer.minimumSecurityMode) {
+    url.searchParams.set("security", parts.offer.minimumSecurityMode);
+  }
   if (parts.password) url.searchParams.set("password", parts.password);
   return url.toString();
 }

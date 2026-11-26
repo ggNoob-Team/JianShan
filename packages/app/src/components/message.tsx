@@ -30,6 +30,7 @@ import { writeMarkdownToRichClipboard } from "@/utils/rich-clipboard";
 import { getDefaultMarkdownClipboardEnvironment } from "@/utils/rich-clipboard-default-environment";
 import { formatDuration, formatMessageTimestamp, formatMessageTimestamp24Hour } from "@/utils/time";
 import { resolveToolCallIcon } from "@/utils/tool-call-icon";
+import { useToolCallExpanded } from "@/tool-calls/expansion-context";
 import { useTargetAgentTitle } from "@/tool-calls/use-target-agent-title";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { AgentActor } from "@getpaseo/protocol/agent-actor";
@@ -93,6 +94,7 @@ export type { InlinePathTarget } from "@/assistant-file-links";
 export type { AssistantForkTarget };
 
 interface UserMessageProps {
+  sender?: AgentMessage["sender"];
   serverId?: string;
   agentId?: string;
   messageId?: string;
@@ -407,7 +409,9 @@ function UserMessageImagePill({ image, onOpen, accessibilityLabel }: UserMessage
 
 const MESSAGE_TEXT_DATASET = { messageText: "true" };
 
+// oxlint-disable-next-line complexity -- message rendering keeps all fork presentation states in one component
 export const UserMessage = memo(function UserMessage({
+  sender,
   serverId,
   agentId,
   messageId,
@@ -434,6 +438,7 @@ export const UserMessage = memo(function UserMessage({
     [lightboxMetadata],
   );
   const resolvedDisableOuterSpacing = useDisableOuterSpacing(disableOuterSpacing);
+  const senderLabel = sender?.title ?? actor?.clientName;
   const hasText = message.trim().length > 0;
   const hasImages = images.length > 0;
   const hasAttachments = attachments.length > 0;
@@ -540,13 +545,13 @@ export const UserMessage = memo(function UserMessage({
             pointerEvents={showTrailingRow ? "auto" : "none"}
             testID="user-message-trailing-row"
           >
-            {actor?.clientName ? (
+            {senderLabel ? (
               <Text
                 style={userMessageStylesheet.actorText}
                 numberOfLines={1}
                 testID="user-message-actor"
               >
-                {actor.clientName}
+                {senderLabel}
               </Text>
             ) : null}
             <Text style={userMessageStylesheet.timestampText} testID="user-message-timestamp">
@@ -578,8 +583,9 @@ export const UserMessage = memo(function UserMessage({
 });
 
 interface AssistantTurnFooterProps {
-  getContent: () => string;
+  getContent?: () => string;
   completedAt?: Date;
+  durationMs?: number | null;
   onFork?: (target: AssistantForkTarget) => Promise<void> | void;
 }
 
@@ -627,14 +633,18 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
 
   return (
     <View style={assistantTurnFooterStylesheet.container} testID="turn-completed-footer">
-      <TurnCopyButton
-        getContent={getContent}
-        containerStyle={assistantTurnFooterStylesheet.copyButton}
-      />
-      <AddToNotesButton
-        getContent={getContent}
-        containerStyle={assistantTurnFooterStylesheet.copyButton}
-      />
+      {getContent ? (
+        <>
+          <TurnCopyButton
+            getContent={getContent}
+            containerStyle={assistantTurnFooterStylesheet.copyButton}
+          />
+          <AddToNotesButton
+            getContent={getContent}
+            containerStyle={assistantTurnFooterStylesheet.copyButton}
+          />
+        </>
+      ) : null}
       {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
       {timestampLabel ? (
         <Text style={assistantTurnFooterStylesheet.metadataText} testID="turn-completed-timestamp">
@@ -956,6 +966,10 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
+  // Details that do not sit in a card leave the header as a lone highlighted pill.
+  pressableExpandedDetached: {
+    borderRadius: theme.borderRadius.full,
+  },
   detailWrapperBorderless: {
     borderWidth: 0,
   },
@@ -1171,6 +1185,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     >
       <MarkdownRenderer
         text={revealedMessage}
+        agentCommands
         streaming={phase !== "complete" || revealedMessage.length < renderedMessage.text.length}
         client={client}
         workspaceRoot={workspaceRoot}
@@ -2099,7 +2114,10 @@ export const ExpandableBadge = memo(function ExpandableBadge({
       expandableBadgeStylesheet.pressable,
       isPressed && isInteractive ? expandableBadgeStylesheet.pressablePressed : null,
       isExpanded && expandableBadgeStylesheet.pressableExpanded,
-      isExpanded && !borderlessWhenExpanded && expandableBadgeStylesheet.pressableExpandedAttached,
+      isExpanded &&
+        (borderlessWhenExpanded
+          ? expandableBadgeStylesheet.pressableExpandedDetached
+          : expandableBadgeStylesheet.pressableExpandedAttached),
     ],
     [borderlessWhenExpanded, isExpanded, isInteractive, isPressed],
   );
@@ -2284,6 +2302,9 @@ interface ToolCallProps {
   defaultExpanded?: boolean;
   forceInline?: boolean;
   maxDetailHeight?: number;
+  itemId: string;
+  /** Shown as its own row rather than inside a tool call group. */
+  standalone?: boolean;
 }
 
 export const ToolCall = memo(function ToolCall({
@@ -2308,9 +2329,15 @@ export const ToolCall = memo(function ToolCall({
   defaultExpanded,
   forceInline = false,
   maxDetailHeight = 400,
+  itemId,
+  standalone = true,
 }: ToolCallProps) {
   const { openToolCall } = useToolCallSheet();
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false);
+  const { expanded: isExpanded, toggle: toggleExpanded } = useToolCallExpanded({
+    callId: itemId,
+    defaultExpanded: defaultExpanded ?? false,
+    standalone,
+  });
 
   const isMobile = useIsCompactFormFactor();
   const shouldRenderInline = !isMobile || forceInline;
@@ -2365,10 +2392,11 @@ export const ToolCall = memo(function ToolCall({
         showLoadingSkeleton: presentation.isLoadingDetails,
       });
     } else {
-      setIsExpanded((prev) => !prev);
+      toggleExpanded();
     }
   }, [
     shouldRenderInline,
+    toggleExpanded,
     openToolCall,
     toolName,
     presentation.detail,
@@ -2458,6 +2486,7 @@ export const ToolCall = memo(function ToolCall({
   );
 }, areToolCallPropsEqual);
 
+// oxlint-disable-next-line complexity -- comparator mirrors every rendered tool-call property
 function areToolCallPropsEqual(previous: ToolCallProps, next: ToolCallProps) {
   if (previous.toolName !== next.toolName) return false;
   if (previous.displayLabel !== next.displayLabel) return false;
@@ -2478,5 +2507,7 @@ function areToolCallPropsEqual(previous: ToolCallProps, next: ToolCallProps) {
   if (previous.defaultExpanded !== next.defaultExpanded) return false;
   if (previous.forceInline !== next.forceInline) return false;
   if (previous.maxDetailHeight !== next.maxDetailHeight) return false;
+  if (previous.itemId !== next.itemId) return false;
+  if (previous.standalone !== next.standalone) return false;
   return true;
 }

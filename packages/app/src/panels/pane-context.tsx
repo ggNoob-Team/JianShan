@@ -13,7 +13,7 @@ export interface PaneContextValue {
   tabId: string;
   target: WorkspaceTabTarget;
   state?: JsonValue;
-  fileNavigationRevision?: number;
+  panelRevision?: number;
   openTab: (target: WorkspaceTabTarget) => void;
   /** Opens an agent in the focused pane and pins it against internal-agent pruning. */
   openAgentTab?: (agentId: string) => void;

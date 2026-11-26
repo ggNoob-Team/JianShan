@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { LocalJobSnapshot } from "@getpaseo/protocol/messages";
 import type { TerminalManager } from "../../terminal/terminal-manager.js";
-import { captureTerminalLines } from "../../terminal/terminal-capture.js";
-import type { TerminalExitInfo, TerminalSession } from "../../terminal/terminal.js";
+import stripAnsi from "strip-ansi";
+import type {
+  LocalTerminalSession,
+  TerminalExitInfo,
+  TerminalSession,
+} from "../../terminal/terminal.js";
 
 interface LocalJobRecord {
   jobId: string;
@@ -16,6 +20,9 @@ interface LocalJobRecord {
   signal: number | null;
   error: string | null;
   session: TerminalSession;
+  outputTail: string[];
+  outputPartial: string;
+  unsubscribe: () => void;
   timeout: ReturnType<typeof setTimeout> | null;
   termination: "canceled" | "timed-out" | null;
   completed: Promise<void>;
@@ -50,13 +57,29 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
   const maxRetainedJobs = options.maxRetainedJobs ?? 100;
   const jobs = new Map<string, LocalJobRecord>();
 
-  function outputTail(record: LocalJobRecord): string[] {
-    const lines = captureTerminalLines(record.session, { stripAnsi: true }).lines;
-    let end = lines.length;
-    while (end > 0 && lines[end - 1]?.trim() === "") {
-      end -= 1;
+  function appendOutput(record: LocalJobRecord, chunk: string): void {
+    const normalized = stripAnsi(chunk).replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+    const lines = (record.outputPartial + normalized).split("\n");
+    record.outputPartial = lines.pop() ?? "";
+    record.outputTail.push(...lines);
+    if (record.outputTail.length > OUTPUT_TAIL_LINES) {
+      record.outputTail.splice(0, record.outputTail.length - OUTPUT_TAIL_LINES);
     }
-    return lines.slice(Math.max(0, end - OUTPUT_TAIL_LINES), end);
+  }
+
+  function replaceOutput(record: LocalJobRecord, lines: string[]): void {
+    let end = lines.length;
+    while (end > 0 && lines[end - 1]?.trim() === "") end -= 1;
+    record.outputTail = lines.slice(Math.max(0, end - OUTPUT_TAIL_LINES), end);
+    record.outputPartial = "";
+  }
+
+  async function refreshCapturedOutput(record: LocalJobRecord): Promise<void> {
+    const captured = await options.terminalManager
+      .captureTerminal(record.session.id, { stripAnsi: true })
+      .catch(() => null);
+    if (!captured) return;
+    replaceOutput(record, captured.lines);
   }
 
   function snapshot(record: LocalJobRecord): LocalJobSnapshot {
@@ -70,7 +93,10 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
       finishedAt: record.finishedAt,
       exitCode: record.exitCode,
       signal: record.signal,
-      outputTail: outputTail(record),
+      outputTail: [
+        ...record.outputTail,
+        ...(record.outputPartial ? [record.outputPartial] : []),
+      ].slice(-OUTPUT_TAIL_LINES),
       error: record.error,
     };
   }
@@ -101,6 +127,7 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
           ? "Local job exited without an exit code"
           : `Local job exited with code ${exit.exitCode}`;
     }
+    record.unsubscribe();
     record.finish();
   }
 
@@ -150,17 +177,36 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
         signal: null,
         error: null,
         session,
+        outputTail: [],
+        outputPartial: "",
+        unsubscribe: () => {},
         timeout: null,
         termination: null,
         completed,
         finish: () => finish(),
       };
       jobs.set(jobId, record);
-
-      session.onExit((exit) => finishRunningJob(record, exit));
+      record.unsubscribe = session.subscribe((message) => {
+        if (message.type === "output") {
+          appendOutput(record, message.data);
+          return;
+        }
+        if (message.type === "snapshotReady") {
+          const captureLines = (session as Partial<LocalTerminalSession>).captureLines;
+          if (captureLines) replaceOutput(record, captureLines({ stripAnsi: true }).lines);
+        }
+      });
+      const captureAndFinish = (exit: TerminalExitInfo): void => {
+        if (record.status === "running") {
+          const captureLines = (session as Partial<LocalTerminalSession>).captureLines;
+          if (captureLines) replaceOutput(record, captureLines({ stripAnsi: true }).lines);
+        }
+        finishRunningJob(record, exit);
+      };
+      session.onExit(captureAndFinish);
       const existingExit = session.getExitInfo();
       if (existingExit) {
-        finishRunningJob(record, existingExit);
+        captureAndFinish(existingExit);
       }
       if (input.timeoutMs !== undefined && record.status === "running") {
         record.timeout = setTimeout(() => {
@@ -201,6 +247,7 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
       }
       record.termination = "canceled";
       await options.terminalManager.killTerminalAndWait(jobId);
+      await refreshCapturedOutput(record);
       if (record.status === "running") {
         record.status = "canceled";
         record.error = "Canceled by remote requester";
@@ -226,6 +273,7 @@ export function createLocalJobService(options: LocalJobServiceOptions): LocalJob
         }),
       ]);
       if (timer) clearTimeout(timer);
+      await refreshCapturedOutput(record);
       return snapshot(record);
     },
   };

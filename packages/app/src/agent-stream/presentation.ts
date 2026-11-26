@@ -1,3 +1,5 @@
+import { isTurnBoundary } from "./turn-membership";
+import type { ChatDisplay } from "@/hooks/use-settings";
 import type { TimelineItemTransform } from "@/plugins/timeline/model";
 import { projectPluginTimelineItems } from "@/plugins/timeline/projection";
 import {
@@ -5,114 +7,50 @@ import {
   projectToolCallDetailLevel,
   type PreparedToolCallHistory,
   type ToolCallDetailLevel,
+  type ToolCallDetailProjection,
 } from "@/tool-calls/detail-level/projection";
-import type { StreamItem, TurnActivityItem, UserMessageItem } from "@/types/stream";
-import { startsNewTurn } from "./turn-membership";
+import type { StreamItem, UserMessageItem } from "@/types/stream";
+import { collapseTurns, type TurnCollapse } from "./turn-collapse/model";
+import type { ReadingRowReplacements } from "./reading-anchor";
 
 interface PresentationInput {
   tail: StreamItem[];
   head: StreamItem[];
   transform: TimelineItemTransform | undefined;
-  level: ToolCallDetailLevel;
+  display: ChatDisplay;
+  autoExpandReasoning?: boolean;
+  /** User messages whose collapsed turn the reader opened. */
+  expandedTurnHostIds: ReadonlySet<string>;
   isTurnActive: boolean;
+  activeTurnId?: string | null;
 }
 
-/** Find and scrolling address a plugin row by the source it replaces. */
-export function getStreamItemMessageId(item: StreamItem): string {
-  if (item.kind === "plugin") return item.sourceId ?? item.id;
-  return item.id;
+export interface StreamPresentation extends ToolCallDetailProjection {
+  turns: Omit<TurnCollapse, "tail">;
+  readingRowReplacements: ReadingRowReplacements;
 }
 
-function isTurnActivityDetail(item: StreamItem): boolean {
-  if (item.kind === "thought" || item.kind === "user_message" || item.kind === "turn_activity") {
-    return false;
-  }
-  if (item.kind === "assistant_message") {
-    return item.text.trim().length > 0;
-  }
-  return true;
-}
-
-function foldCompletedTurn(segment: StreamItem[]): StreamItem[] | null {
-  const first = segment[0];
-  if (!first) {
-    return null;
-  }
-
-  // A restored timeline slice can start mid-turn: the replica keeps the most recent
-  // items, so the prompt row of the oldest loaded turn is often missing. Fold those
-  // segments too, otherwise a cold start leaves the whole loaded trace expanded.
-  const prompt = first.kind === "user_message" ? first : null;
-  const detailStart = prompt ? 1 : 0;
-  let finalIndex = -1;
-  for (let index = segment.length - 1; index >= detailStart; index -= 1) {
-    const item = segment[index];
-    if (item?.kind === "assistant_message" && item.text.trim().length > 0) {
-      finalIndex = index;
-      break;
+function groupedRowHosts(
+  rows: readonly StreamItem[],
+  groups: ToolCallDetailProjection["groupsByHostId"],
+): ReadonlyMap<string, string> {
+  const hosts = new Map<string, string>();
+  for (const row of rows) {
+    const group = groups.get(row.id);
+    if (!group) continue;
+    for (const call of group.run.calls) {
+      if (call.id !== row.id) hosts.set(call.id, row.id);
     }
   }
-  if (finalIndex <= detailStart) {
-    return null;
-  }
-
-  const final = segment[finalIndex];
-  if (final?.kind !== "assistant_message") {
-    return null;
-  }
-
-  const details = segment.slice(detailStart, finalIndex).filter(isTurnActivityDetail);
-  const trailing = segment.slice(finalIndex + 1).filter((item) => item.kind !== "thought");
-  const turnId =
-    first.turnId !== undefined && first.turnId === final.turnId ? first.turnId : undefined;
-  const activity: TurnActivityItem = {
-    kind: "turn_activity",
-    // Keyed on the final answer rather than the segment's first row: loading older
-    // history can prepend the missing prompt, and the scroll anchor must keep the
-    // same row id across that re-fold.
-    id: `turn-activity:${final.id}`,
-    ...(turnId ? { turnId } : {}),
-    timestamp: final.timestamp,
-    durationMs: Math.max(0, final.timestamp.getTime() - first.timestamp.getTime()),
-    assistantItemId: final.id,
-    items: details,
-  };
-  return [...(prompt ? [prompt] : []), activity, final, ...trailing];
+  return hosts;
 }
 
-const completedTurnGroupingCache = new WeakMap<StreamItem[], StreamItem[]>();
-
-/**
- * Folds each completed user turn into one summary row followed by its final answer.
- * The process rows live inside that summary so they keep their chronological order.
- * Segments that begin mid-turn (a restored slice missing its prompt row) fold as well.
- */
-export function groupCompletedTurns(items: StreamItem[]): StreamItem[] {
-  const cached = completedTurnGroupingCache.get(items);
-  if (cached) return cached;
-
-  const output: StreamItem[] = [];
-  let changed = false;
-  let start = 0;
-  for (let index = 1; index <= items.length; index += 1) {
-    const isBoundary =
-      index === items.length || startsNewTurn(items[index], items[index - 1] ?? null);
-    if (!isBoundary) continue;
-    const segment = items.slice(start, index);
-    const folded = foldCompletedTurn(segment);
-    if (folded) {
-      output.push(...folded);
-      changed = true;
-    } else {
-      output.push(...segment);
-    }
-    start = index;
-  }
-
-  const result = changed ? output : items;
-  completedTurnGroupingCache.set(items, result);
-  return result;
-}
+const NO_COLLAPSED_TURNS: StreamPresentation["turns"] = collapseTurns({
+  tail: [],
+  isLatestTurnOpen: false,
+  expandedHostIds: new Set(),
+  getGroupedCalls: () => undefined,
+});
 
 /** Source messages reach plugins before display projection. */
 export function createStreamPresentation() {
@@ -137,14 +75,89 @@ export function createStreamPresentation() {
   let historyTransform: TimelineItemTransform | undefined;
   let historyRows: StreamItem[] = [];
   let preparedTail: StreamItem[] | undefined;
+  let preparedAutoExpandReasoning: boolean | undefined;
   let preparedLevel: ToolCallDetailLevel | undefined;
   let preparedHistory: PreparedToolCallHistory | null = null;
+  let historyGroupHosts: ReadonlyMap<string, string> = new Map();
+  let collapsedSource: StreamItem[] | undefined;
+  let collapsedIsLatestTurnOpen = false;
+  let collapsedExpandedHostIds: ReadonlySet<string> | undefined;
+  let collapsed: TurnCollapse | undefined;
 
   function presentRows(item: StreamItem): StreamItem[] {
+    if (item.kind === "tool_call" && item.payload.source === "agent") {
+      const message = item.payload.data.agentMessage;
+      if (message?.event === "message") {
+        return [
+          {
+            kind: "user_message",
+            id: item.id,
+            turnId: item.turnId,
+            timelineCursor: item.timelineCursor,
+            timestamp: item.timestamp,
+            text: message.text,
+            sender: message.sender,
+          },
+        ];
+      }
+    }
     return [item.kind === "user_message" ? presentUserMessage(item) : item];
   }
 
-  return (input: PresentationInput) => {
+  function collapse(
+    projection: ToolCallDetailProjection,
+    input: PresentationInput,
+  ): Omit<StreamPresentation, "readingRowReplacements"> {
+    if (input.display !== "collapseTurns") {
+      return { ...projection, turns: NO_COLLAPSED_TURNS };
+    }
+    // Live text updates reach the head only, so the folded history is reused until the
+    // retained rows, the latest turn's liveness, or the reader's expanded turns change.
+    const last = projection.tail.at(-1) ?? null;
+    const first = projection.head[0] ?? null;
+    const activeTurnIsAnother = Boolean(
+      input.activeTurnId && last?.turnId && input.activeTurnId !== last.turnId,
+    );
+    // Without head rows, the latest retained turn is live only while the active run is that
+    // turn. A run that has not opened yet carries no id and belongs to the next turn.
+    const isLatestTurnOpen = first
+      ? !isTurnBoundary(last, first) && !activeTurnIsAnother
+      : input.isTurnActive && (last?.turnId === undefined || input.activeTurnId === last.turnId);
+    if (
+      !collapsed ||
+      collapsedSource !== projection.tail ||
+      collapsedIsLatestTurnOpen !== isLatestTurnOpen ||
+      collapsedExpandedHostIds !== input.expandedTurnHostIds
+    ) {
+      collapsed = collapseTurns({
+        tail: projection.tail,
+        isLatestTurnOpen,
+        expandedHostIds: input.expandedTurnHostIds,
+        getGroupedCalls: (itemId) => projection.groupsByHostId.get(itemId)?.run.calls,
+      });
+      collapsedSource = projection.tail;
+      collapsedIsLatestTurnOpen = isLatestTurnOpen;
+      collapsedExpandedHostIds = input.expandedTurnHostIds;
+    }
+    const { tail, ...turns } = collapsed;
+    if (turns.nestedItemIds.size === 0) return { ...projection, tail, turns };
+    // Opening a turn reveals its raw calls; those rows must not become group hosts again.
+    const withoutExpandedRows = (groups: StreamPresentation["groupsByHostId"]) => ({
+      size: groups.size - [...turns.nestedItemIds].filter((id) => groups.has(id)).length,
+      get: (id: string) => (turns.nestedItemIds.has(id) ? undefined : groups.get(id)),
+      has: (id: string) => !turns.nestedItemIds.has(id) && groups.has(id),
+    });
+    return {
+      ...projection,
+      tail,
+      turns,
+      groupsByHostId: withoutExpandedRows(projection.groupsByHostId),
+      historyGroupUpdatesByHostId: withoutExpandedRows(projection.historyGroupUpdatesByHostId),
+    };
+  }
+
+  return (input: PresentationInput): StreamPresentation => {
+    const level: ToolCallDetailLevel = input.display === "full" ? "detailed" : "overview";
     // Retained history is not reprojected or regrouped on each live text update.
     if (historySource !== input.tail || historyTransform !== input.transform) {
       historyRows = projectPluginTimelineItems(input.tail, input.transform).flatMap<StreamItem>(
@@ -158,22 +171,48 @@ export function createStreamPresentation() {
       const blocks = presentRows(item);
       head.push(...blocks);
     }
-    if (preparedTail !== historyRows || preparedLevel !== input.level) {
-      preparedHistory = prepareToolCallHistory(input.level, historyRows);
+    if (
+      preparedTail !== historyRows ||
+      preparedLevel !== level ||
+      preparedAutoExpandReasoning !== input.autoExpandReasoning
+    ) {
+      preparedHistory = prepareToolCallHistory(level, historyRows, input.autoExpandReasoning);
+      historyGroupHosts = preparedHistory
+        ? groupedRowHosts(preparedHistory.grouped.tail, preparedHistory.grouped.groupsByHostId)
+        : new Map();
       preparedTail = historyRows;
-      preparedLevel = input.level;
+      preparedLevel = level;
+      preparedAutoExpandReasoning = input.autoExpandReasoning;
     }
-    const projected = projectToolCallDetailLevel({
-      level: input.level,
+    const projection = projectToolCallDetailLevel({
+      level,
       tail: historyRows,
       head,
       preparedHistory,
       isTurnActive: input.isTurnActive,
     });
-    const tail = groupCompletedTurns(projected.tail);
-    const projectedHead = input.isTurnActive ? projected.head : groupCompletedTurns(projected.head);
-    return tail === projected.tail && projectedHead === projected.head
-      ? projected
-      : { ...projected, tail, head: projectedHead };
+    const result = collapse(projection, input);
+    // Only the trailing retained group can absorb head rows. Reuse the retained
+    // index across streaming updates rather than walking the full history again.
+    const last = projection.tail.at(-1);
+    const liveGroupHosts = groupedRowHosts(
+      last ? [last, ...projection.head] : projection.head,
+      projection.groupsByHostId,
+    );
+    const retainedGroupHosts = historyGroupHosts;
+    return {
+      ...result,
+      readingRowReplacements: {
+        get(id) {
+          if (result.turns.nestedItemIds.has(id)) return undefined;
+          const groupHost = liveGroupHosts.get(id) ?? retainedGroupHosts.get(id) ?? id;
+          return (
+            result.turns.hostIdByHiddenRowId.get(id) ??
+            result.turns.hostIdByHiddenRowId.get(groupHost) ??
+            (groupHost === id ? undefined : groupHost)
+          );
+        },
+      },
+    };
   };
 }

@@ -1,3 +1,4 @@
+/* oxlint-disable paseo/no-sync-io -- startup-only admin asset and key discovery */
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";

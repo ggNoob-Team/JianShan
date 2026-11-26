@@ -5,6 +5,31 @@ import { createNodeEntrypointInvocation } from "../runtime-paths.js";
 import { resolveExternalCliEntrypoint } from "./entrypoints.js";
 import { getBundledCliShimPath } from "../../integrations/cli-install/index.js";
 
+/** A CLI command that exited non-zero, with the `--json` error it printed when there was one. */
+export class ExternalCliCommandError extends Error {
+  readonly code: string | null;
+  readonly error: Record<string, unknown> | null;
+
+  constructor(message: string, error: Record<string, unknown> | null) {
+    super(message);
+    this.name = "ExternalCliCommandError";
+    this.error = error;
+    this.code = typeof error?.code === "string" ? error.code : null;
+  }
+}
+
+// `--json` commands print `{ "error": { code, message, ... } }` on stderr when they fail.
+function parseJsonCliError(stderr: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(stderr) as { error?: unknown };
+    return typeof parsed.error === "object" && parsed.error !== null
+      ? (parsed.error as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function createExternalCliInvocation(args: string[]): NodeEntrypointInvocation {
   const invocation = createNodeEntrypointInvocation({
     entrypoint: resolveExternalCliEntrypoint(),
@@ -90,7 +115,10 @@ export async function runExternalCliJsonCommand(args: string[]): Promise<unknown
       stderr: stderr.slice(0, 500),
       command: invocation.command,
     });
-    throw new Error(externalCliFailureMessage(result.exitCode, stdout, stderr));
+    throw new ExternalCliCommandError(
+      externalCliFailureMessage(result.exitCode, stdout, stderr),
+      parseJsonCliError(stderr),
+    );
   }
 
   const stdout = result.stdout.trim();

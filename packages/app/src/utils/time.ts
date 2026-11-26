@@ -136,6 +136,11 @@ function get24HourTimeFormatter(): Intl.DateTimeFormat {
   return cached24HourTimeFormatter;
 }
 
+/** A clock time in the device's 12h/24h preference: "3:00 PM" or "15:00". */
+export function formatTimeOfDay(date: Date): string {
+  return getTimeFormatter().format(date);
+}
+
 function formatMessageTimestampWithTime(date: Date, now: Date, time: string): string {
   const daysAgo = localCalendarDaysBetween(date, now);
 

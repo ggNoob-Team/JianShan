@@ -58,14 +58,17 @@ class FakeDirectoryClient {
   supportsWorkspaceLabels = false;
   listWorkspaceLabelsCalls = 0;
   fetchAgentsCalls = 0;
+  observeAgentsCalls = 0;
   lastAgentOptions: unknown;
   rejectAgentReadyOnRelease = false;
   rejectWorkspaceReadyOnRelease = false;
   fetchWorkspacesCalls = 0;
+  observeWorkspacesCalls = 0;
   lastWorkspaceOptions: unknown;
   listProjectsCalls = 0;
   lastProjectOptions: unknown;
   projectResult: ProjectListResult | null = null;
+  readonly listSnapshots: Promise<unknown>[] = [];
   private pendingAgentFetch: Promise<AgentFetchResult> | null = null;
   private pendingWorkspaceFetch: Promise<WorkspaceFetchResult> | null = null;
   private pendingProjectFetch: Promise<ProjectListResult> | null = null;
@@ -1614,7 +1617,14 @@ it("fills every cached workspace beneath live updates received during the SQLite
       type: "workspace_update",
       payload: {
         kind: "upsert",
-        workspace: { ...workspaces[0], name: "Live", activityAt: null, statusEnteredAt: null },
+        workspace: {
+          ...workspaces[0],
+          createdAt: undefined,
+          lastUserMessageAt: null,
+          name: "Live",
+          activityAt: null,
+          statusEnteredAt: null,
+        },
       },
     });
   });

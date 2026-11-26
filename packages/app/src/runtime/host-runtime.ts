@@ -1,3 +1,4 @@
+import { createHostPluginClientBundleStore } from "@/plugins/client-bundles";
 import { watchdog } from "@/watchdog";
 import { createHostChannelTransport } from "@getpaseo/client/internal/hosts";
 import type { OwnedSubscription } from "@getpaseo/client";
@@ -18,6 +19,7 @@ import {
   createRemoteSshHostConnection,
   findCachedClientName,
   normalizeStoredHostProfile,
+  pinRelayProtectedSecurityInProfiles,
   resolveHostClientName,
   resolveLocalServerIdFromHosts,
   upsertHostConnectionInProfiles,
@@ -193,6 +195,12 @@ function hashForLog(value: string): string {
     hash = (hash * 31 + value.charCodeAt(index)) | 0;
   }
   return `h_${Math.abs(hash).toString(16)}`;
+}
+
+/** A daemon identity that negotiated protected relay security. */
+export interface RelaySecurityPin {
+  serverId: string;
+  daemonPublicKeyB64: string;
 }
 
 export interface HostRuntimeControllerDeps {
@@ -507,6 +515,29 @@ function buildConnectionCandidates(host: HostProfile): ConnectionCandidate[] {
   }));
 }
 
+/**
+ * A pin learned from the active client is already enforced by that client, so
+ * it keeps running. A pin that arrived from elsewhere (a strict offer) while
+ * the active client is still legacy needs a client that enforces it.
+ */
+function connectionNeedsNewClient(
+  previous: HostConnection,
+  next: HostConnection,
+  activeClient: DaemonClient | null,
+): boolean {
+  if (previous.type === "relay" && next.type === "relay") {
+    const { minimumSecurityMode: previousPin, ...previousRest } = previous;
+    const { minimumSecurityMode: nextPin, ...nextRest } = next;
+    if (!equal(previousRest, nextRest)) return true;
+    return (
+      nextPin === "protected" &&
+      previousPin !== "protected" &&
+      activeClient?.relaySecurityFloor !== "protected"
+    );
+  }
+  return !equal(previous, next);
+}
+
 function findConnectionById(host: HostProfile, connectionId: string | null): HostConnection | null {
   if (!connectionId) {
     return null;
@@ -517,13 +548,18 @@ function findConnectionById(host: HostProfile, connectionId: string | null): Hos
 function shouldReactivateActiveConnection(input: {
   previous: HostConnection | null;
   next: HostConnection | null;
+  activeClient: DaemonClient | null;
   passwordChanged: boolean;
   clientNameChanged: boolean;
 }): boolean {
   if (!input.previous || !input.next) {
     return false;
   }
-  return !equal(input.previous, input.next) || input.passwordChanged || input.clientNameChanged;
+  return (
+    connectionNeedsNewClient(input.previous, input.next, input.activeClient) ||
+    input.passwordChanged ||
+    input.clientNameChanged
+  );
 }
 
 function probeIntervalForConnection(
@@ -580,6 +616,7 @@ function createDefaultDeps(
         capabilities: appCapabilities,
         trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
         providerSnapshots: "wire",
+        createPluginClientBundleStore: createHostPluginClientBundleStore,
         ...(host.password ? { password: host.password } : {}),
         localCredential: () => readDesktopManagedLocalCredential(connection),
       } satisfies Omit<DaemonClientConfig, "url">;
@@ -637,6 +674,9 @@ function createDefaultDeps(
         e2ee: {
           enabled: true,
           daemonPublicKeyB64: connection.daemonPublicKeyB64,
+          ...(connection.minimumSecurityMode
+            ? { minimumMode: connection.minimumSecurityMode }
+            : {}),
         },
       });
     },
@@ -661,6 +701,7 @@ function createDefaultDeps(
           ),
           reconnect: { enabled: false },
           appVersion: resolveAppVersion() ?? undefined,
+          createPluginClientBundleStore: createHostPluginClientBundleStore,
         });
         try {
           await client.connect();
@@ -679,6 +720,7 @@ function createDefaultDeps(
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         capabilities: appCapabilities,
         trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
+        createPluginClientBundleStore: createHostPluginClientBundleStore,
       });
     },
     getClientId: () => getOrCreateClientId(),
@@ -706,6 +748,7 @@ export class HostRuntimeController {
   private host: HostProfile;
   private deps: HostRuntimeControllerDeps;
   private onReconcileServerId: ((oldId: string, newId: string) => void) | null;
+  private onRelayProtectedSecurityNegotiated: ((input: RelaySecurityPin) => void) | null;
   private connectionMachineState: HostRuntimeConnectionMachineState;
   private connectionEpoch = 0;
   private snapshot: HostRuntimeSnapshot;
@@ -730,10 +773,12 @@ export class HostRuntimeController {
     host: HostProfile;
     deps?: HostRuntimeControllerDeps;
     onReconcileServerId?: (oldId: string, newId: string) => void;
+    onRelayProtectedSecurityNegotiated?: (input: RelaySecurityPin) => void;
   }) {
     this.host = input.host;
     this.deps = input.deps ?? createDefaultDeps();
     this.onReconcileServerId = input.onReconcileServerId ?? null;
+    this.onRelayProtectedSecurityNegotiated = input.onRelayProtectedSecurityNegotiated ?? null;
     this.connectionMachineState = {
       tag: "booting",
     };
@@ -844,6 +889,7 @@ export class HostRuntimeController {
       shouldReactivateActiveConnection({
         previous: previousActiveConnection,
         next: nextActiveConnection,
+        activeClient: this.activeClient,
         passwordChanged,
         clientNameChanged,
       });
@@ -1500,6 +1546,7 @@ export class HostRuntimeController {
           void failConnection(new DaemonAuthenticationError(client.authFailureReason));
           return;
         }
+        if (state.status === "connected") this.learnRelaySecurity(client, connection.id);
         this.applyConnectionEvent({ type: "client_state", state, lastError: client.lastError });
         this.updateSnapshot({
           ...toSnapshotConnectionPatch(this.connectionMachineState, this.connectionEpoch),
@@ -1511,6 +1558,25 @@ export class HostRuntimeController {
     } catch (error) {
       await failConnection(error);
     }
+  }
+
+  // The active client is the one place every connection path meets: clients
+  // created here and probe clients adopted from `connectToDaemon` both land in
+  // `switchToConnection`. A protected handshake observed here becomes the
+  // persisted pin for that daemon identity.
+  private learnRelaySecurity(client: DaemonClient, connectionId: string): void {
+    const connection = findConnectionById(this.host, connectionId);
+    if (
+      connection?.type !== "relay" ||
+      connection.minimumSecurityMode === "protected" ||
+      client.relaySecurityFloor !== "protected"
+    ) {
+      return;
+    }
+    this.onRelayProtectedSecurityNegotiated?.({
+      serverId: this.host.serverId,
+      daemonPublicKeyB64: connection.daemonPublicKeyB64,
+    });
   }
 
   adoptReconciledServerId(newServerId: string): void {
@@ -2302,17 +2368,23 @@ export class HostRuntimeStore {
     replaceConnectionId?: string,
   ): Promise<HostProfile> {
     const connection = relayConnectionFromOffer(offer);
-    return this.upsertRelayConnection({
+    if (!connection.daemonPublicKeyB64) {
+      throw new Error("daemonPublicKeyB64 is required");
+    }
+    const profile = await this.upsertHostConnection({
       serverId: offer.serverId,
-      relayEndpoint: connection.relayEndpoint,
-      useTls: connection.useTls,
-      daemonPublicKeyB64: connection.daemonPublicKeyB64,
       label,
       clientName: offer.clientName,
       role: offer.role,
       password,
       replaceConnectionId,
+      connection,
     });
+    if (password) {
+      await this.setHostPassword(profile.serverId, password);
+      return this.hosts.find((host) => host.serverId === profile.serverId) ?? profile;
+    }
+    return profile;
   }
 
   private async probeAndUpsertOffer(
@@ -2365,6 +2437,13 @@ export class HostRuntimeStore {
       label: input.hostname ?? undefined,
       connection,
     });
+  }
+
+  private async pinRelayProtectedSecurity(input: RelaySecurityPin): Promise<void> {
+    const next = pinRelayProtectedSecurityInProfiles({ profiles: this.hosts, ...input });
+    if (next === this.hosts) return;
+    this.setHostsAndSync(next);
+    await this.persistHosts();
   }
 
   private async updateHost(
@@ -2694,6 +2773,7 @@ export class HostRuntimeStore {
         host,
         deps: this.deps,
         onReconcileServerId: (oldId, newId) => this.reconcileServerId(oldId, newId),
+        onRelayProtectedSecurityNegotiated: (pin) => void this.pinRelayProtectedSecurity(pin),
       });
       this.controllers.set(host.serverId, controller);
       useSessionStore.getState().initializeSession(host.serverId, null);

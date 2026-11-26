@@ -27,6 +27,8 @@ export async function generateLocalPairingOffer(args: {
   relayPublicEndpoint?: string;
   relayUseTls?: boolean;
   relayPublicUseTls?: boolean;
+  /** Stamp the offer so new clients require protected endpoint security from their first handshake. */
+  relayRequireProtectedSecurity?: boolean;
   appBaseUrl?: string;
   includeQr?: boolean;
   clientName?: string;

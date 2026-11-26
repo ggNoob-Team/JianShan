@@ -38,6 +38,7 @@ function menuContext(overrides: Partial<MenuContextValue> = {}): MenuContextValu
     openSub: vi.fn(),
     closeSub: vi.fn(),
     goBack: vi.fn(),
+    prunePages: vi.fn(),
     ...overrides,
   };
 }

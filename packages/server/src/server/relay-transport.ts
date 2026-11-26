@@ -8,8 +8,9 @@ import {
   type KeyPair,
 } from "@getpaseo/relay/e2ee";
 import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
-import type { ExternalSocketMetadata } from "./websocket-server.js";
+import { webSocketProxyAgent } from "./network/index.js";
 import { createEncryptedRelaySocket } from "./websocket/encrypted-relay-socket.js";
+import type { ExternalSocketMetadata } from "./websocket-server.js";
 
 export interface RelayTransportOptions {
   logger: pino.Logger;
@@ -30,13 +31,12 @@ export interface RelaySocketLike {
   bufferedAmount?: number;
   send: (data: string | Uint8Array | ArrayBuffer, callback?: (error?: Error) => void) => void;
   close: (code?: number, reason?: string) => void;
-  terminate?: () => void;
+  terminate: () => void;
   on: (event: "message" | "close" | "error", listener: (...args: unknown[]) => void) => void;
   once: (event: "close" | "error", listener: (...args: unknown[]) => void) => void;
 }
 
 interface RelayWebSocketLike extends RelaySocketLike {
-  terminate: () => void;
   ping: () => void;
   on: (
     event: "open" | "message" | "close" | "error" | "pong",
@@ -65,7 +65,7 @@ const RELAY_WEBSOCKET_OPTIONS = {
 } as const;
 
 function createDefaultRelayWebSocket(url: string): RelayWebSocketLike {
-  return new WebSocket(url, RELAY_WEBSOCKET_OPTIONS);
+  return new WebSocket(url, { ...RELAY_WEBSOCKET_OPTIONS, agent: webSocketProxyAgent(url) });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -7,6 +7,7 @@ import {
   goBack as goBackPath,
   MENU_ROOT_PATH,
   openSubPage,
+  pruneMissingPages,
   type MenuPath,
 } from "./menu-navigation";
 import type { Rect } from "../anchor";
@@ -38,12 +39,15 @@ export interface MenuContextValue {
   setAnchorRect: (rect: Rect | null) => void;
   presentation: MenuPresentation;
   path: MenuPath;
-  /** Bumps when menu content changes identity or size, so floating surfaces release stale height. */
+  /** Lets asynchronously loaded menu content signal a rerender after sizing changes. */
   revision: number;
   bumpRevision: () => void;
   openSub: (sub: { id: string; depth: number }) => void;
   closeSub: (depth: number) => void;
-  goBack: () => void;
+  /** Pops the open page. False at the root, where Back is the surface's to answer. */
+  goBack: () => boolean;
+  /** Closes any open page that no longer has a definition, falling back to its parent. */
+  prunePages: (hasPage: (id: string) => boolean) => void;
 }
 
 const MenuContext = createContext<MenuContextValue | null>(null);
@@ -164,11 +168,17 @@ export function useMenuState({
   }, []);
 
   const goBack = useCallback(() => {
+    if (path.length === 0) return false;
     setPath((current) => goBackPath(current));
-  }, []);
+    return true;
+  }, [path.length]);
 
   const bumpRevision = useCallback(() => {
     setRevision((current) => current + 1);
+  }, []);
+
+  const prunePages = useCallback((hasPage: (id: string) => boolean) => {
+    setPath((current) => pruneMissingPages(current, hasPage));
   }, []);
 
   return useMemo(
@@ -186,6 +196,7 @@ export function useMenuState({
       openSub,
       closeSub,
       goBack,
+      prunePages,
     }),
     [
       isOpen,
@@ -199,6 +210,7 @@ export function useMenuState({
       openSub,
       closeSub,
       goBack,
+      prunePages,
     ],
   );
 }

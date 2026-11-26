@@ -1,5 +1,5 @@
 import { getMimeTypeFromPath } from "@/attachments/file-types";
-import { readDesktopFileChunk } from "@/desktop/local-files";
+import { readDesktopFileChunk, statDesktopFile } from "@/desktop/local-files";
 
 export interface SelectedFile {
   fileName: string;
@@ -64,4 +64,19 @@ export function selectedFileFromDesktopPath(path: string, size: number): Selecte
     readChunk: (offset, length) => readDesktopFileChunk({ path, offset, length }),
     close: async () => {},
   };
+}
+
+/** Reads a desktop path for callers that require an in-memory terminal payload. */
+export async function readDesktopFileBytes(path: string): Promise<Uint8Array> {
+  const { size } = await statDesktopFile(path);
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  while (offset < size) {
+    const length = Math.min(READ_ALL_CHUNK_BYTES, size - offset);
+    const chunk = await readDesktopFileChunk({ path, offset, length });
+    if (chunk.byteLength !== length) throw new Error(`Could not read ${path}.`);
+    bytes.set(chunk, offset);
+    offset += length;
+  }
+  return bytes;
 }

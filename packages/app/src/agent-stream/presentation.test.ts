@@ -4,6 +4,7 @@ import { transformTimelineItem, type TimelineItemTransform } from "@/plugins/tim
 import type { InstalledPlugin } from "@/plugins/types";
 import {
   applyStreamEvent,
+  getStreamItemMessageId,
   hydrateStreamState,
   type StreamItem,
   type ToolCallItem,
@@ -13,11 +14,8 @@ import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { buildAgentStreamRenderModel } from "./model";
-import {
-  createStreamPresentation,
-  getStreamItemMessageId,
-  groupCompletedTurns,
-} from "./presentation";
+import { createStreamPresentation } from "./presentation";
+import { createReadingAnchor } from "./reading-anchor";
 
 const runtime = {
   paseo: {},
@@ -101,7 +99,11 @@ function pluginData(items: StreamItem[]): unknown[] {
   return items.flatMap((item) => (item.kind === "plugin" ? [item.data] : []));
 }
 
-const presentationOptions = { level: "overview" as const, isTurnActive: true };
+const presentationOptions = {
+  display: "collapseToolCalls" as const,
+  expandedTurnHostIds: new Set<string>(),
+  isTurnActive: true,
+};
 
 function streamHarness(transform?: TimelineItemTransform) {
   let state: { tail: StreamItem[]; head: StreamItem[] } = { tail: [], head: [] };
@@ -129,210 +131,6 @@ function assistant(text: string, messageId = "message-1"): AgentStreamEventPaylo
 function rows(result: { tail: StreamItem[]; head: StreamItem[] }): StreamItem[] {
   return [...result.tail, ...result.head];
 }
-
-function turnUser(id: string, at: number): UserMessageItem {
-  return {
-    kind: "user_message",
-    id,
-    messageId: id,
-    turnId: `turn-${id}`,
-    text: id,
-    timestamp: new Date(at),
-  };
-}
-
-function turnAssistant(id: string, at: number, text: string): StreamItem {
-  return {
-    kind: "assistant_message",
-    id,
-    messageId: id,
-    turnId: `turn-${id.split(":")[0]}`,
-    text,
-    timestamp: new Date(at),
-  };
-}
-
-function turnThought(id: string, at: number, text: string): StreamItem {
-  return {
-    kind: "thought",
-    id,
-    turnId: `turn-${id.split(":")[0]}`,
-    text,
-    status: "ready",
-    timestamp: new Date(at),
-  };
-}
-
-describe("completed turn activity grouping", () => {
-  it("keeps commentary and tool calls in chronological order inside one summary row", () => {
-    const items: StreamItem[] = [
-      turnUser("prompt-1", 1_000),
-      turnAssistant("prompt-1:commentary", 2_000, "Checking the repo first."),
-      { ...toolCall("call-1", "bash"), turnId: "turn-prompt-1", timestamp: new Date(3_000) },
-      turnAssistant("prompt-1:final", 5_000, "Done."),
-    ];
-
-    const grouped = groupCompletedTurns(items);
-
-    expect(grouped.map((item) => item.kind)).toEqual([
-      "user_message",
-      "turn_activity",
-      "assistant_message",
-    ]);
-    const activity = grouped[1];
-    if (activity?.kind !== "turn_activity") throw new Error("Expected turn activity");
-    expect(activity.durationMs).toBe(4_000);
-    expect(activity.assistantItemId).toBe("prompt-1:final");
-    expect(activity.items.map((item) => item.kind)).toEqual(["assistant_message", "tool_call"]);
-    expect(activity.items[0]).toMatchObject({ text: "Checking the repo first." });
-  });
-
-  it("omits raw reasoning from details and trailing positions", () => {
-    const items: StreamItem[] = [
-      turnUser("prompt-2", 1_000),
-      turnThought("prompt-2:thought-1", 1_500, "Hidden reasoning"),
-      turnAssistant("prompt-2:commentary", 2_000, "I will inspect the build."),
-      turnThought("prompt-2:thought-2", 2_500, "More hidden reasoning"),
-      { ...toolCall("call-2", "bash"), turnId: "turn-prompt-2", timestamp: new Date(3_000) },
-      turnAssistant("prompt-2:final", 4_000, "Build is clean."),
-      turnThought("prompt-2:thought-3", 4_500, "Trailing reasoning"),
-    ];
-
-    const grouped = groupCompletedTurns(items);
-
-    expect(grouped.map((item) => item.kind)).toEqual([
-      "user_message",
-      "turn_activity",
-      "assistant_message",
-    ]);
-    const activity = grouped[1];
-    if (activity?.kind !== "turn_activity") throw new Error("Expected turn activity");
-    expect(activity.items).toHaveLength(2);
-    expect(activity.items.some((item) => item.kind === "thought")).toBe(false);
-  });
-
-  it("folds a restored history slice that begins mid-turn", () => {
-    const items: StreamItem[] = [
-      turnThought("prompt-3:thought-1", 500, "Continuing an older turn."),
-      { ...toolCall("call-3", "bash"), turnId: "turn-prompt-3", timestamp: new Date(1_000) },
-      turnAssistant("prompt-3:final", 2_000, "Older answer."),
-      turnUser("prompt-4", 3_000),
-      turnAssistant("prompt-4:final", 4_000, "Newer answer."),
-    ];
-
-    const grouped = groupCompletedTurns(items);
-
-    // The replica slice drops the prompt row of the oldest turn, so that segment
-    // must still collapse instead of exposing its reasoning and commands.
-    expect(grouped.map((item) => item.kind)).toEqual([
-      "turn_activity",
-      "assistant_message",
-      "user_message",
-      "assistant_message",
-    ]);
-    const activity = grouped[0];
-    if (activity?.kind !== "turn_activity") throw new Error("Expected turn activity");
-    expect(activity.items.map((item) => item.kind)).toEqual(["tool_call"]);
-    expect(activity.assistantItemId).toBe("prompt-3:final");
-    expect(activity.durationMs).toBe(1_500);
-  });
-
-  it("keeps a single late reply untouched when no process precedes it", () => {
-    const items: StreamItem[] = [turnAssistant("prompt-8:final", 1_000, "Only an answer.")];
-
-    expect(groupCompletedTurns(items)).toBe(items);
-  });
-
-  it("keeps the summary row id when an older page supplies the missing prompt", () => {
-    const partial: StreamItem[] = [
-      turnAssistant("prompt-9:commentary", 2_000, "Still working."),
-      { ...toolCall("call-9", "bash"), turnId: "turn-prompt-9", timestamp: new Date(3_000) },
-      turnAssistant("prompt-9:final", 4_000, "Final answer."),
-    ];
-    const complete: StreamItem[] = [turnUser("prompt-9", 1_000), ...partial];
-
-    const partialActivity = groupCompletedTurns(partial)[0];
-    const completeActivity = groupCompletedTurns(complete)[1];
-    if (partialActivity?.kind !== "turn_activity") throw new Error("Expected turn activity");
-    if (completeActivity?.kind !== "turn_activity") throw new Error("Expected turn activity");
-
-    // Scroll anchoring keys off this id: prepending the prompt must not replace the row.
-    expect(completeActivity.id).toBe(partialActivity.id);
-    expect(completeActivity.durationMs).toBe(3_000);
-  });
-
-  it("does not add a summary when the turn has no process rows", () => {
-    const items: StreamItem[] = [
-      turnUser("prompt-4", 1_000),
-      turnAssistant("prompt-4:final", 2_000, "Direct answer."),
-    ];
-
-    expect(groupCompletedTurns(items)).toBe(items);
-  });
-
-  it("folds each completed turn but keeps the final answers outside the summary", () => {
-    const items: StreamItem[] = [
-      turnUser("prompt-5", 1_000),
-      turnAssistant("prompt-5:commentary", 1_500, "First process note."),
-      turnAssistant("prompt-5:final", 2_000, "First answer."),
-      turnUser("prompt-6", 3_000),
-      turnAssistant("prompt-6:commentary", 3_500, "Second process note."),
-      turnAssistant("prompt-6:final", 4_000, "Second answer."),
-    ];
-
-    const grouped = groupCompletedTurns(items);
-
-    expect(grouped.map((item) => item.kind)).toEqual([
-      "user_message",
-      "turn_activity",
-      "assistant_message",
-      "user_message",
-      "turn_activity",
-      "assistant_message",
-    ]);
-    expect(grouped.filter((item) => item.kind === "turn_activity")).toHaveLength(2);
-    expect(grouped.filter((item) => item.kind === "assistant_message")).toMatchObject([
-      { text: "First answer." },
-      { text: "Second answer." },
-    ]);
-  });
-
-  it("keeps the active turn expanded and folds it once the turn is no longer active", () => {
-    const items: StreamItem[] = [
-      turnUser("prompt-7", 1_000),
-      turnAssistant("prompt-7:commentary", 2_000, "Working through it."),
-      { ...toolCall("call-7", "bash"), turnId: "turn-prompt-7", timestamp: new Date(3_000) },
-      turnAssistant("prompt-7:final", 4_000, "Answer."),
-    ];
-    const present = createStreamPresentation();
-    const active = present({
-      level: "detailed",
-      tail: [],
-      head: items,
-      transform: undefined,
-      isTurnActive: true,
-    });
-    const completed = createStreamPresentation()({
-      level: "detailed",
-      tail: [],
-      head: items,
-      transform: undefined,
-      isTurnActive: false,
-    });
-
-    expect(active.head.map((item) => item.kind)).toEqual([
-      "user_message",
-      "assistant_message",
-      "tool_call",
-      "assistant_message",
-    ]);
-    expect(completed.head.map((item) => item.kind)).toEqual([
-      "user_message",
-      "turn_activity",
-      "assistant_message",
-    ]);
-  });
-});
 
 describe("whole-message Markdown presentation", () => {
   it("keeps paragraphs, fences and quotes in one progressively updated row", () => {
@@ -791,3 +589,197 @@ describe("timeline presentation", () => {
     expect(projectTimelineItems([source], () => [])).toEqual([]);
   });
 });
+
+it("opening a turn reveals individual calls rather than another tool group", () => {
+  const present = createStreamPresentation();
+  const timestamp = new Date();
+  const tail: StreamItem[] = [
+    { kind: "user_message", id: "prompt", text: "Work", timestamp },
+    toolCall("one", "Bash"),
+    toolCall("two", "Bash"),
+    { kind: "assistant_message", id: "reply", text: "Done", timestamp },
+  ];
+  const result = present({
+    ...presentationOptions,
+    transform: undefined,
+    tail,
+    head: [],
+    display: "collapseTurns",
+    isTurnActive: false,
+    expandedTurnHostIds: new Set(["prompt"]),
+  });
+  expect(result.tail.map((item) => item.id)).toEqual(tail.map((item) => item.id));
+  expect(result.groupsByHostId.size).toBe(0);
+  expect(result.readingRowReplacements.get("tool-two")).toBeUndefined();
+});
+
+it.each(["collapseToolCalls", "collapseTurns"] as const)(
+  "preserves the reader when a prepend extends a group in %s",
+  (display) => {
+    const present = createStreamPresentation();
+    const anchor = createReadingAnchor();
+    const calls = [toolCall("one", "Bash"), toolCall("two", "Bash")];
+    const input = {
+      ...presentationOptions,
+      transform: undefined,
+      display,
+      head: [],
+      isTurnActive: false,
+    };
+    const partial = present({ ...input, tail: calls.slice(1) });
+    anchor.reconcile(0, [{ id: partial.tail[0]!.id, top: 48, height: 200 }]);
+    const completed = present({ ...input, tail: calls });
+    const groupId = completed.tail[0]!.id;
+    expect(anchor.getRowId(completed.readingRowReplacements)).toBe(groupId);
+    expect(
+      anchor.reconcile(
+        0,
+        [{ id: groupId, top: 448, height: 200 }],
+        false,
+        completed.readingRowReplacements,
+      ),
+    ).toBe(400);
+    expect(anchor.getRowId()).toBe(groupId);
+    const timestamp = new Date();
+    const folded = present({
+      ...input,
+      display: "collapseTurns",
+      tail: [
+        { kind: "user_message", id: "prompt", text: "Work", timestamp },
+        ...calls,
+        { kind: "assistant_message", id: "reply", text: "Done", timestamp },
+      ],
+    });
+    // Both the original partial group and its replacement resolve directly to the turn.
+    expect(folded.readingRowReplacements.get(calls[1]!.id)).toBe("prompt");
+    expect(anchor.getRowId(folded.readingRowReplacements)).toBe("prompt");
+    const opened = present({ ...input, tail: calls, display: "full" });
+    expect(opened.readingRowReplacements.get(calls[1]!.id)).toBeUndefined();
+  },
+);
+
+it("presents received agent messages as attributed bubbles with the original turn identity", () => {
+  const call = toolCall("received", "agent_message");
+  if (call.payload.source !== "agent") throw new Error("Expected agent tool");
+  call.turnId = "turn";
+  call.payload.data.agentMessage = {
+    event: "message",
+    sender: { id: "sender", title: "Reviewer" },
+    text: "Ready",
+  };
+  const result = createStreamPresentation()({
+    ...presentationOptions,
+    transform: undefined,
+    tail: [call],
+    head: [],
+  });
+  expect(result.tail[0]).toMatchObject({
+    kind: "user_message",
+    id: call.id,
+    turnId: "turn",
+    text: "Ready",
+    sender: { id: "sender", title: "Reviewer" },
+  });
+});
+
+it("does not reopen the previous turn while a new run waits for its first row", () => {
+  const timestamp = new Date();
+  const tail: StreamItem[] = [
+    { kind: "user_message", id: "prompt", text: "Work", timestamp },
+    toolCall("one", "Bash"),
+    { kind: "assistant_message", id: "reply", text: "Done", timestamp },
+  ];
+  for (const item of tail) item.turnId = "completed";
+  const result = createStreamPresentation()({
+    ...presentationOptions,
+    transform: undefined,
+    tail,
+    head: [],
+    display: "collapseTurns",
+    isTurnActive: true,
+    activeTurnId: "new",
+  });
+  expect(result.tail.map((item) => item.id)).toEqual(["prompt", "reply"]);
+});
+
+// A sent prompt counts as activity before the daemon opens its turn, so the only known turn is
+// the completed one; it must stay folded until the new turn's rows arrive.
+it("keeps the previous turn folded while a sent prompt waits for its turn to open", () => {
+  const timestamp = new Date();
+  const tail: StreamItem[] = [
+    { kind: "user_message", id: "prompt", text: "Work", timestamp },
+    toolCall("one", "Bash"),
+    { kind: "assistant_message", id: "reply", text: "Done", timestamp },
+  ];
+  for (const item of tail) item.turnId = "completed";
+  const result = createStreamPresentation()({
+    ...presentationOptions,
+    transform: undefined,
+    tail,
+    head: [],
+    display: "collapseTurns",
+    isTurnActive: true,
+    activeTurnId: null,
+  });
+  expect(result.tail.map((item) => item.id)).toEqual(["prompt", "reply"]);
+});
+
+it("groups reasoning with tools unless Expand thinking is enabled, including setting changes", () => {
+  const present = createStreamPresentation();
+  const timestamp = new Date();
+  const thought: StreamItem = {
+    kind: "thought",
+    id: "thought",
+    text: "Consider this",
+    status: "ready",
+    timestamp,
+  };
+  const tail: StreamItem[] = [toolCall("one", "Bash"), thought, toolCall("two", "Bash")];
+  for (const item of tail) item.turnId = "run";
+  const input = {
+    ...presentationOptions,
+    transform: undefined,
+    tail,
+    head: [],
+    display: "collapseToolCalls" as const,
+    isTurnActive: false,
+  };
+  const grouped = present({ ...input, autoExpandReasoning: false });
+  expect(grouped.tail).toHaveLength(1);
+  expect(grouped.groupsByHostId.get("tool-one")?.run.calls).toEqual(tail);
+  const separate = present({ ...input, autoExpandReasoning: true });
+  expect(separate.tail.map((item) => item.id)).toEqual(["tool-one", "thought", "tool-two"]);
+  expect(separate.groupsByHostId.has("thought")).toBe(false);
+  const next = { ...thought, id: "next", turnId: "next-run" };
+  const bounded = present({ ...input, tail: [...tail, next], autoExpandReasoning: false });
+  expect(bounded.tail.map((item) => item.id)).toEqual(["tool-one", "next"]);
+});
+
+it.each([false, true])(
+  "reveals raw reasoning when opening a turn (Expand thinking %s)",
+  (autoExpandReasoning) => {
+    const timestamp = new Date();
+    const tail: StreamItem[] = [
+      { kind: "user_message", id: "prompt", text: "Work", timestamp },
+      { kind: "thought", id: "thought", text: "Consider this", status: "ready", timestamp },
+      toolCall("one", "Bash"),
+      { kind: "assistant_message", id: "reply", text: "Done", timestamp },
+    ];
+    const input = {
+      ...presentationOptions,
+      transform: undefined,
+      tail,
+      head: [],
+      display: "collapseTurns" as const,
+      isTurnActive: false,
+      autoExpandReasoning,
+    };
+    const present = createStreamPresentation();
+    const closed = present(input);
+    expect(closed.tail.some((item) => item.id === "thought")).toBe(false);
+    const opened = present({ ...input, expandedTurnHostIds: new Set(["prompt"]) });
+    expect(opened.tail).toEqual(tail);
+    expect(opened.turns.nestedItemIds.has("thought")).toBe(true);
+    expect(opened.groupsByHostId.size).toBe(0);
+  },
+);

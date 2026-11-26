@@ -3,13 +3,11 @@ import pino from "pino";
 import type { StreamingTranscriptionSession } from "../../speech-provider.js";
 import type { TurnDetectionSession } from "../../turn-detection-provider.js";
 import { getLocalSpeechModelDir, type LocalSttModelId, type LocalTtsModelId } from "./models.js";
+import { getLocalSttEngine, getLocalTtsEngine } from "./sherpa/model-catalog.js";
 import { SherpaOfflineRecognizerEngine } from "./sherpa/sherpa-offline-recognizer.js";
-import { SherpaOfflineRealtimeTranscriptionSession } from "./sherpa/sherpa-offline-realtime-session.js";
-import { SherpaOnnxStt } from "./sherpa/sherpa-stt.js";
-import { SherpaSttDecoder } from "./sherpa/sherpa-stt-decoder.js";
-import { SherpaVadSegmenter } from "./sherpa/sherpa-vad-segmenter.js";
+import { SherpaOnnxParakeetSTT } from "./sherpa/sherpa-parakeet-stt.js";
+import { SherpaParakeetRealtimeTranscriptionSession } from "./sherpa/sherpa-parakeet-realtime-session.js";
 import { SherpaOnnxTTS } from "./sherpa/sherpa-tts.js";
-import { resolveSherpaSttModel } from "./sherpa/stt-model.js";
 import {
   ensureSileroVadModel,
   SherpaSileroTurnDetectionProvider,
@@ -23,18 +21,14 @@ import { bufferToWorkerBytes, workerBytesToBuffer } from "./worker-bytes.js";
 
 process.title = "Paseo Voice";
 
-interface LocalSttRuntime {
-  engine: SherpaOfflineRecognizerEngine;
-  decoder: SherpaSttDecoder;
-}
+type LocalSttEngine = SherpaOfflineRecognizerEngine;
 
 const logger = pino({
   level: process.env.PASEO_LOG_LEVEL ?? "info",
 }).child({ module: "speech", component: "local-worker" });
 
-const sttEngines = new Set<SherpaOfflineRecognizerEngine>();
-const sttRuntimes = new Map<string, Promise<LocalSttRuntime>>();
-const sttProviders = new Map<string, SherpaOnnxStt>();
+const sttEngines = new Map<string, LocalSttEngine>();
+const sttProviders = new Map<string, SherpaOnnxParakeetSTT>();
 const ttsProviders = new Map<string, SherpaOnnxTTS>();
 const sessions = new Map<string, StreamingTranscriptionSession | TurnDetectionSession>();
 const unsubscribeBySessionId = new Map<string, Array<() => void>>();
@@ -66,7 +60,7 @@ function ttsModelId(config: LocalSpeechWorkerConfig): LocalTtsModelId {
   return config.voiceTtsModel as LocalTtsModelId;
 }
 
-function sttRuntimeKey(config: LocalSpeechWorkerConfig, modelId: LocalSttModelId): string {
+function sttEngineKey(config: LocalSpeechWorkerConfig, modelId: LocalSttModelId): string {
   return `${config.modelsDir}:${modelId}`;
 }
 
@@ -79,64 +73,41 @@ function ttsKey(config: LocalSpeechWorkerConfig): string {
   ].join(":");
 }
 
-async function createSttRuntime(
-  config: LocalSpeechWorkerConfig,
-  modelId: LocalSttModelId,
-): Promise<LocalSttRuntime> {
-  const modelDir = getLocalSpeechModelDir(config.modelsDir, modelId);
-  const model = resolveSherpaSttModel({ modelId, modelDir });
-  const engine = new SherpaOfflineRecognizerEngine(
-    { model: model.engine, numThreads: 2, debug: 0 },
-    logger,
-  );
-  sttEngines.add(engine);
-  const vad = model.usesVad
-    ? {
-        segmenter: new SherpaVadSegmenter(
-          { modelPath: await ensureSileroVadModel(config.modelsDir, logger) },
-          logger,
-        ),
-      }
-    : null;
-  return {
-    engine,
-    decoder: new SherpaSttDecoder({ engine, ...(vad ? { vad } : {}) }, logger),
-  };
-}
-
-async function getSttRuntime(
+function getSttEngine(
   config: LocalSpeechWorkerConfig,
   model: "voice" | "dictation",
-): Promise<LocalSttRuntime> {
+): LocalSttEngine {
   const modelId = sttModelId(config, model);
-  const key = sttRuntimeKey(config, modelId);
-  const existing = sttRuntimes.get(key);
+  const key = sttEngineKey(config, modelId);
+  const existing = sttEngines.get(key);
   if (existing) {
     return existing;
   }
-
-  const runtime = createSttRuntime(config, modelId);
-  sttRuntimes.set(key, runtime);
-  try {
-    return await runtime;
-  } catch (error) {
-    sttRuntimes.delete(key);
-    throw error;
-  }
+  const modelDir = getLocalSpeechModelDir(config.modelsDir, modelId);
+  const created = new SherpaOfflineRecognizerEngine(
+    {
+      modelDir,
+      engine: getLocalSttEngine(modelId),
+      numThreads: 2,
+      debug: 0,
+    },
+    logger,
+  );
+  sttEngines.set(key, created);
+  return created;
 }
 
-async function getSttProvider(
+function getSttProvider(
   config: LocalSpeechWorkerConfig,
   model: "voice" | "dictation",
-): Promise<SherpaOnnxStt> {
+): SherpaOnnxParakeetSTT {
   const modelId = sttModelId(config, model);
-  const key = sttRuntimeKey(config, modelId);
+  const key = sttEngineKey(config, modelId);
   const existing = sttProviders.get(key);
   if (existing) {
     return existing;
   }
-  const { decoder } = await getSttRuntime(config, model);
-  const created = new SherpaOnnxStt({ decoder }, logger);
+  const created = new SherpaOnnxParakeetSTT({ engine: getSttEngine(config, model) }, logger);
   sttProviders.set(key, created);
   return created;
 }
@@ -150,8 +121,9 @@ function getTtsProvider(config: LocalSpeechWorkerConfig): SherpaOnnxTTS {
   const modelDir = getLocalSpeechModelDir(config.modelsDir, ttsModelId(config));
   const created = new SherpaOnnxTTS(
     {
-      preset: ttsModelId(config),
+      modelId: ttsModelId(config),
       modelDir,
+      engine: getLocalTtsEngine(ttsModelId(config)),
       speakerId: config.voiceTtsSpeakerId,
       speed: config.voiceTtsSpeed,
     },
@@ -239,12 +211,11 @@ async function createSession(
   }
 
   const model = message.kind === "voiceStt" ? "voice" : "dictation";
+  const engine = getSttEngine(message.config, model);
   const session =
     message.kind === "voiceStt"
-      ? (await getSttProvider(message.config, "voice")).createSession({ logger })
-      : new SherpaOfflineRealtimeTranscriptionSession({
-          decoder: (await getSttRuntime(message.config, model)).decoder,
-        });
+      ? getSttProvider(message.config, "voice").createSession({ logger })
+      : new SherpaParakeetRealtimeTranscriptionSession({ engine });
   trackTranscriptionSession(message.sessionId, session);
   await session.connect();
   sessions.set(message.sessionId, session);
@@ -319,8 +290,7 @@ async function handleRequest(message: LocalSpeechWorkerRequest): Promise<void> {
   }
 
   if (message.type === "stt.transcribe") {
-    const provider = await getSttProvider(message.config, message.model);
-    const result = await provider.transcribeAudio(
+    const result = await getSttProvider(message.config, message.model).transcribeAudio(
       workerBytesToBuffer(message.audio),
       message.format,
     );

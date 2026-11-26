@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
+import path from "node:path";
 import type pino from "pino";
 
-import { loadSherpaOnnxNode, type SherpaOnnxNodeModule } from "./sherpa-onnx-node-loader.js";
+import { engineFiles, type SttEngine } from "./model-catalog.js";
+import { loadSherpaOnnxNode } from "./sherpa-onnx-node-loader.js";
 
 function assertFileExists(filePath: string, label: string): void {
   if (!existsSync(filePath)) {
@@ -9,26 +11,43 @@ function assertFileExists(filePath: string, label: string): void {
   }
 }
 
-export interface SherpaNemoTransducerModel {
-  kind: "nemo_transducer";
-  encoder: string;
-  decoder: string;
-  joiner: string;
-  tokens: string;
+// Each engine family takes its own block under sherpa's modelConfig.
+function buildModelConfig(modelDir: string, engine: SttEngine): Record<string, unknown> {
+  const file = (name: string) => path.join(modelDir, name);
+  switch (engine.family) {
+    case "transducer":
+      return {
+        transducer: {
+          encoder: file(engine.encoder),
+          decoder: file(engine.decoder),
+          joiner: file(engine.joiner),
+        },
+        modelType: "nemo_transducer",
+      };
+    case "whisper":
+      // An empty language makes Whisper detect the spoken language.
+      return {
+        whisper: {
+          encoder: file(engine.encoder),
+          decoder: file(engine.decoder),
+          language: "",
+          task: "transcribe",
+        },
+      };
+    case "sense_voice":
+      return {
+        senseVoice: { model: file(engine.model), language: "", useInverseTextNormalization: 1 },
+      };
+    case "dolphin":
+      return { dolphin: { model: file(engine.model) } };
+    case "nemo_ctc":
+      return { nemoCtc: { model: file(engine.model) } };
+  }
 }
-
-export interface SherpaSenseVoiceModel {
-  kind: "sense_voice";
-  model: string;
-  tokens: string;
-  language?: string;
-  useInverseTextNormalization?: boolean;
-}
-
-export type SherpaOfflineRecognizerModel = SherpaNemoTransducerModel | SherpaSenseVoiceModel;
 
 export interface SherpaOfflineRecognizerConfig {
-  model: SherpaOfflineRecognizerModel;
+  modelDir: string;
+  engine: SttEngine;
   numThreads?: number;
   provider?: "cpu";
   debug?: 0 | 1;
@@ -52,94 +71,38 @@ interface SherpaOfflineStreamNative {
   free?: () => void;
 }
 
-function assertModelFiles(model: SherpaOfflineRecognizerModel): void {
-  switch (model.kind) {
-    case "nemo_transducer":
-      assertFileExists(model.encoder, "offline encoder");
-      assertFileExists(model.decoder, "offline decoder");
-      assertFileExists(model.joiner, "offline joiner");
-      assertFileExists(model.tokens, "tokens");
-      return;
-    case "sense_voice":
-      assertFileExists(model.model, "SenseVoice model");
-      assertFileExists(model.tokens, "tokens");
-  }
-}
-
-function buildModelConfig(params: {
-  model: SherpaOfflineRecognizerModel;
-  numThreads: number;
-  provider: "cpu";
-  debug: 0 | 1;
-}): Record<string, unknown> {
-  const shared = {
-    numThreads: params.numThreads,
-    provider: params.provider,
-    debug: params.debug,
-  };
-  switch (params.model.kind) {
-    case "nemo_transducer":
-      return {
-        transducer: {
-          encoder: params.model.encoder,
-          decoder: params.model.decoder,
-          joiner: params.model.joiner,
-        },
-        tokens: params.model.tokens,
-        modelType: "nemo_transducer",
-        ...shared,
-      };
-    case "sense_voice":
-      return {
-        senseVoice: {
-          model: params.model.model,
-          ...(params.model.language ? { language: params.model.language } : {}),
-          useInverseTextNormalization: params.model.useInverseTextNormalization === false ? 0 : 1,
-        },
-        tokens: params.model.tokens,
-        ...shared,
-      };
-  }
-}
-
 export class SherpaOfflineRecognizerEngine {
   public readonly recognizer: SherpaOfflineRecognizerNative;
   public readonly sampleRate: number;
   private readonly logger: pino.Logger;
 
-  constructor(
-    config: SherpaOfflineRecognizerConfig,
-    logger: pino.Logger,
-    loadModule: () => SherpaOnnxNodeModule = loadSherpaOnnxNode,
-  ) {
+  constructor(config: SherpaOfflineRecognizerConfig, logger: pino.Logger) {
     this.logger = logger.child({
       module: "speech",
       provider: "local",
       component: "offline-recognizer",
     });
 
-    assertModelFiles(config.model);
+    for (const name of engineFiles(config.engine)) {
+      assertFileExists(path.join(config.modelDir, name), `${config.engine.family} model file`);
+    }
 
-    const sherpa = loadModule();
-    const numThreads = config.numThreads ?? 1;
+    const sherpa = loadSherpaOnnxNode();
 
     const recognizerConfig = {
       featConfig: {
         sampleRate: config.sampleRate ?? 16000,
         featureDim: config.featureDim ?? 80,
       },
-      modelConfig: buildModelConfig({
-        model: config.model,
-        numThreads,
+      modelConfig: {
+        ...buildModelConfig(config.modelDir, config.engine),
+        tokens: path.join(config.modelDir, config.engine.tokens),
+        numThreads: config.numThreads ?? 1,
         provider: config.provider ?? "cpu",
         debug: config.debug ?? 0,
-      }),
-      ...(config.model.kind === "nemo_transducer"
-        ? {
-            decodingMethod: config.decodingMethod ?? "greedy_search",
-            maxActivePaths: config.maxActivePaths ?? 4,
-          }
-        : {}),
+      },
+      decodingMethod: config.decodingMethod ?? "greedy_search",
+      maxActivePaths: config.maxActivePaths ?? 4,
     };
 
     this.recognizer = new (
@@ -154,11 +117,7 @@ export class SherpaOfflineRecognizerEngine {
         : recognizerConfig.featConfig.sampleRate;
 
     this.logger.info(
-      {
-        kind: config.model.kind,
-        sampleRate: this.sampleRate,
-        numThreads: recognizerConfig.modelConfig.numThreads,
-      },
+      { sampleRate: this.sampleRate, numThreads: recognizerConfig.modelConfig.numThreads },
       "Sherpa offline recognizer initialized",
     );
   }
