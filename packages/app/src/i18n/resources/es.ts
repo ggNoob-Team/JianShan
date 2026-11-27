@@ -1800,6 +1800,9 @@ export const es: TranslationResources = {
         title: "Consola de administración local",
         hint: "Inicia sesión con la clave que muestra `paseo admin key`",
         open: "Abrir consola",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "Archivo de registro",

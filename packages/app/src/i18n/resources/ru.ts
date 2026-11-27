@@ -1776,6 +1776,9 @@ export const ru: TranslationResources = {
         title: "Локальная панель управления",
         hint: "Войдите с ключом, который показывает `paseo admin key`",
         open: "Открыть панель",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "Файл журнала",

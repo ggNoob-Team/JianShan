@@ -1779,6 +1779,9 @@ export const en = {
         title: "Local admin console",
         hint: "Sign in with the key shown by `paseo admin key`",
         open: "Open console",
+        browserOpen: "Open in browser",
+        unavailable: "Admin console unavailable",
+        webviewUnavailable: "The embedded admin console is unavailable in this build.",
       },
       logs: {
         title: "Log file",

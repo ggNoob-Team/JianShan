@@ -1771,6 +1771,9 @@ export const ja: TranslationResources = {
         title: "ローカル管理コンソール",
         hint: "`paseo admin key` に表示されるキーでサインインします",
         open: "コンソールを開く",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "ログファイル",

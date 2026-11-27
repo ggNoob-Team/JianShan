@@ -1748,6 +1748,9 @@ export const ar: TranslationResources = {
         title: "وحدة الإدارة المحلية",
         hint: "سجّل الدخول بالمفتاح الذي يعرضه `paseo admin key`",
         open: "فتح وحدة الإدارة",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "ملف السجل",

@@ -88,9 +88,10 @@ The packaged Windows desktop app also installs the bundled CLI in the
 current-user Startup folder by default. Its settings page shows the toggle.
 Signing in starts the built-in daemon without opening the client window.
 
-The desktop daemon status includes the sidecar URL. Open the local daemon
-section in desktop settings and use **Open console** rather than looking up the
-port manually.
+The desktop daemon status includes the sidecar URL. **本机管理台** in desktop
+settings opens the console in an embedded, sandboxed WebView. Its toolbar shows
+the current address and provides **Open in browser** for switching to the
+system browser.
 
 ## Team attribution
 

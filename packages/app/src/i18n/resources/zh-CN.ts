@@ -1732,6 +1732,9 @@ export const zhCN: TranslationResources = {
         title: "本机管理台",
         hint: "使用 `paseo admin key` 显示的密钥登录",
         open: "打开管理台",
+        browserOpen: "浏览器打开",
+        unavailable: "本机管理台不可用",
+        webviewUnavailable: "此版本无法显示内嵌的本机管理台。",
       },
       logs: {
         title: "日志文件",

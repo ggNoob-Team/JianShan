@@ -1763,6 +1763,9 @@ export const ko: TranslationResources = {
         title: "로컬 관리 콘솔",
         hint: "`paseo admin key`에 표시된 키로 로그인하세요",
         open: "콘솔 열기",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "로그 파일",

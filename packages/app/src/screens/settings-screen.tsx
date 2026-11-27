@@ -92,6 +92,7 @@ import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissi
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
 import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-section";
 import { LocalAdminConsoleSection } from "@/desktop/components/local-admin-console-section";
+import { LocalAdminConsolePage } from "@/desktop/components/local-admin-console-page";
 import { IntegrationsSection } from "@/desktop/components/integrations-section";
 import { isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
@@ -1473,6 +1474,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     }
     return null;
   })();
+  const isAdminConsoleView = view.kind === "section" && view.section === "admin";
 
   if (settingsLoading) {
     return (
@@ -1566,9 +1568,13 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         </WindowChromeRegion>
         <WindowChromeRegion corners="top-right">
           <View style={desktopStyles.contentPane} testID="settings-detail-pane">
-            <PageLayout title={detailTitle} titleTestID="settings-detail-header-title">
-              {content}
-            </PageLayout>
+            {isAdminConsoleView ? (
+              <LocalAdminConsolePage />
+            ) : (
+              <PageLayout title={detailTitle} titleTestID="settings-detail-header-title">
+                {content}
+              </PageLayout>
+            )}
           </View>
         </WindowChromeRegion>
       </View>

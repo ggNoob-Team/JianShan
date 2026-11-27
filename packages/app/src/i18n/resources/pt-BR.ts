@@ -1788,6 +1788,9 @@ export const ptBR: TranslationResources = {
         title: "Console de administração local",
         hint: "Entre com a chave exibida por `paseo admin key`",
         open: "Abrir console",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "Arquivo de log",

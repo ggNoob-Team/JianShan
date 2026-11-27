@@ -1794,6 +1794,9 @@ export const fr: TranslationResources = {
         title: "Console d'administration locale",
         hint: "Connectez-vous avec la clé affichée par `paseo admin key`",
         open: "Ouvrir la console",
+        browserOpen: en.desktop.daemon.admin.browserOpen,
+        unavailable: en.desktop.daemon.admin.unavailable,
+        webviewUnavailable: en.desktop.daemon.admin.webviewUnavailable,
       },
       logs: {
         title: "Fichier journal",
