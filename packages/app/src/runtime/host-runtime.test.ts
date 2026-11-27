@@ -3945,6 +3945,47 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
+  it("setHostClientIdentity updates the local workspace owner identity", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: {
+        createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
+        connectToDaemon: async ({ host }) => ({
+          client: makeConnectedProbeClient(5) as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: host.label ?? null,
+        }),
+        getClientId: async () => "cid_test_runtime",
+      },
+    });
+
+    try {
+      await store.upsertDirectConnection({
+        serverId: "srv_local_role",
+        endpoint: "localhost:6767",
+        label: "Local",
+      });
+
+      await store.setHostClientIdentity("srv_local_role", {
+        clientName: " 书记 ",
+        role: "admin",
+      });
+
+      expect(store.getHosts().find((host) => host.serverId === "srv_local_role")).toMatchObject({
+        clientName: "书记",
+        role: "admin",
+      });
+      await expect(
+        store.setHostClientIdentity("srv_local_role", {
+          clientName: "x".repeat(121),
+          role: "admin",
+        }),
+      ).rejects.toThrow("Client role name");
+    } finally {
+      store.syncHosts([]);
+    }
+  });
+
   it("preserves a manual host rename when desktop status re-advertises the daemon hostname", async () => {
     const advertisedHostname = "macbook-pro.local";
     const store = new HostRuntimeStore({

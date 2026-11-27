@@ -17,6 +17,7 @@ import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
 import { useComposerEditingSession, useComposerFullscreen } from "@/composer/editing-session";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
+import { Button } from "@/components/ui/button";
 import {
   resolveComposerAttachmentSubmitFormat,
   splitComposerAttachmentsForSubmit,
@@ -62,7 +63,7 @@ import type { KeyboardActionId } from "@/keyboard/keyboard-action-dispatcher";
 import { useFormPreferences } from "@/hooks/use-form-preferences";
 import type { CreateAgentInitialValues } from "@/hooks/use-agent-form-state";
 import { toErrorMessage } from "@/utils/error-messages";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { buildSettingsAddHostRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import {
   getHostProjectId,
   getWorktreeSupportForHostProject,
@@ -119,6 +120,7 @@ import {
 } from "./workspace/terminals/state";
 import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
 import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
+import { useSelectedLocalHostRoleSetup } from "./new-workspace/use-local-host-role-setup";
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
   draftId: string | undefined;
@@ -865,6 +867,10 @@ export function NewWorkspaceScreen({
     projectId,
     displayName: displayNameProp,
   });
+  const { localRoleErrorMessage, ensureLocalRoleReady } = useSelectedLocalHostRoleSetup({
+    hosts: allHosts,
+    selectedServerId,
+  });
   // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
   const supportsWorkspaceMultiplicity = useHostFeature(selectedServerId, "workspaceMultiplicity");
   const supportsForgeSearch = useHostFeature(selectedServerId, "forgeSearch");
@@ -1275,8 +1281,9 @@ export function NewWorkspaceScreen({
 
   const handleSubmitNewWorkspace = useCallback(
     async (payload: MessagePayload) => {
+      setErrorMessage(null);
+      if (!ensureLocalRoleReady()) return;
       try {
-        setErrorMessage(null);
         await composerState?.persistFormPreferences();
         await updateFormPreferences({ launchTarget });
         if (isEmptyWorkspaceSubmission(payload)) {
@@ -1339,6 +1346,7 @@ export function NewWorkspaceScreen({
       chatDraft.clear,
       draftKey,
       ensureWorkspace,
+      ensureLocalRoleReady,
       forkDraftSetup,
       isStillOnCreateScreen,
       launchTarget,
@@ -1353,8 +1361,9 @@ export function NewWorkspaceScreen({
   );
 
   const handleSubmitTerminalLaunch = useCallback(async () => {
+    setErrorMessage(null);
+    if (!ensureLocalRoleReady()) return;
     try {
-      setErrorMessage(null);
       await updateFormPreferences({ launchTarget });
       setPendingAction("terminal");
       let outcome: SubmitOutcome = "background";
@@ -1414,6 +1423,7 @@ export function NewWorkspaceScreen({
     }
   }, [
     ensureWorkspace,
+    ensureLocalRoleReady,
     isStillOnCreateScreen,
     launchTarget,
     queryClient,
@@ -1427,6 +1437,11 @@ export function NewWorkspaceScreen({
     updateFormPreferences,
     withConnectedClient,
   ]);
+
+  const openLocalHostRoleSettings = useCallback(() => {
+    leaveFullscreen();
+    router.push(buildSettingsHostSectionRoute(selectedServerId, "host"));
+  }, [leaveFullscreen, selectedServerId]);
 
   const agentControlsWithDisabled = useMemo(
     () =>
@@ -1581,10 +1596,37 @@ export function NewWorkspaceScreen({
         onImportSession={importSession.open}
       >
         {composer}
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        <NewWorkspaceError
+          message={errorMessage ?? localRoleErrorMessage}
+          showHostOverview={localRoleErrorMessage !== null}
+          onOpenHostOverview={openLocalHostRoleSettings}
+        />
       </NewWorkspaceLayout>
       {importSession.sheet}
     </FileDropZone>
+  );
+}
+
+function NewWorkspaceError({
+  message,
+  showHostOverview,
+  onOpenHostOverview,
+}: {
+  message: string | null;
+  showHostOverview: boolean;
+  onOpenHostOverview: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!message) return null;
+  return (
+    <View style={styles.errorRow}>
+      <Text style={styles.errorText}>{message}</Text>
+      {showHostOverview ? (
+        <Button variant="outline" size="sm" onPress={onOpenHostOverview}>
+          {t("newWorkspace.errors.openHostOverview")}
+        </Button>
+      ) : null}
+    </View>
   );
 }
 
@@ -1688,5 +1730,12 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     color: theme.colors.destructive,
     lineHeight: 20,
+  },
+  errorRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    paddingHorizontal: theme.spacing[4],
   },
 }));

@@ -1708,6 +1708,8 @@ export const es: TranslationResources = {
       createWorktreeFailed: "No se pudo crear el árbol de trabajo",
       composerStateRequired: "Se requiere el estado del compositor",
       selectModel: "Selecciona un modelo",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choose the project",
@@ -2967,6 +2969,7 @@ export const es: TranslationResources = {
       password: {
         guidance: "Elimina este host y vuelve a añadirlo con la contraseña que pide este daemon.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "Apariencia",
         name: {

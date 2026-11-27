@@ -1656,6 +1656,8 @@ export const ar: TranslationResources = {
       createWorktreeFailed: "فشل في إنشاء شجرة العمل",
       composerStateRequired: "حالة الملحن مطلوبة",
       selectModel: "اختر نموذجا",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choose the project",
@@ -2931,6 +2933,7 @@ export const ar: TranslationResources = {
       password: {
         guidance: "أزل هذا المضيف ثم أضفه مرة أخرى بكلمة المرور التي يطلبها هذا الخادم.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "المظهر",
         name: {

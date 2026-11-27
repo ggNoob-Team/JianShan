@@ -132,6 +132,11 @@ change it. An unnamed client cannot create a workspace or agent, except that CLI
 returns **请联系管理员分配角色**. Host profiles created before `clientName` was stored backfill it
 from cached agent creator metadata; do not treat the fallback as a user-selected name.
 
+The local desktop Host may set its own `clientName` in the Host overview because the user owns that
+daemon. Its first assigned name defaults the local UI role to `admin`; `admin`/`member` only controls
+local UI access such as the Team entry, not daemon authority. Remote Host names and roles remain
+assigned by the pairing link and are not self-editable on the client.
+
 See the [SDK reference](../public-docs/sdk/reference.md#clienthosts),
 [CLI reference](../public-docs/cli.md#connected-hosts), and
 [plugin reference](../public-docs/plugins/reference.md#connected-hosts).

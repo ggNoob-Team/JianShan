@@ -1696,6 +1696,8 @@ export const ptBR: TranslationResources = {
       createWorktreeFailed: "Falha ao criar worktree",
       composerStateRequired: "O estado do composer é obrigatório",
       selectModel: "Selecione um modelo",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choose the project",
@@ -2946,6 +2948,7 @@ export const ptBR: TranslationResources = {
       password: {
         guidance: "Remova este host e adicione-o novamente com a senha que este daemon pede.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "Aparência",
         name: {

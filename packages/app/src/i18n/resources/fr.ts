@@ -1702,6 +1702,8 @@ export const fr: TranslationResources = {
       createWorktreeFailed: "Impossible de créer le worktree",
       composerStateRequired: "L’état de la zone de saisie est requis",
       selectModel: "Sélectionnez un modèle",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choisir le projet",
@@ -2969,6 +2971,7 @@ export const fr: TranslationResources = {
         guidance:
           "Supprimez cet hôte puis ajoutez-le à nouveau avec le mot de passe demandé par ce daemon.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "Apparence",
         name: {

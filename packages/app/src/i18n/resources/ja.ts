@@ -1679,6 +1679,8 @@ export const ja: TranslationResources = {
       createWorktreeFailed: "ワークツリーの作成に失敗しました",
       composerStateRequired: "コンポーザーの状態が必要です",
       selectModel: "モデルを選択してください",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choose the project",
@@ -2927,6 +2929,7 @@ export const ja: TranslationResources = {
         guidance:
           "このホストを削除し、このデーモンが求めるパスワードを入力して追加し直してください。",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "外観",
         name: {

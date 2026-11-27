@@ -2,7 +2,11 @@ import { watchdog } from "@/watchdog";
 import { createHostChannelTransport } from "@getpaseo/client/internal/hosts";
 import type { OwnedSubscription } from "@getpaseo/client";
 import type { HostDirectory } from "@getpaseo/protocol/hosts";
-import type { PairingRole } from "@getpaseo/protocol/agent-actor";
+import {
+  MAX_CLIENT_NAME_LENGTH,
+  normalizeClientName,
+  type PairingRole,
+} from "@getpaseo/protocol/agent-actor";
 import { useSyncExternalStore, useMemo } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import equal from "fast-deep-equal/es6";
@@ -2383,6 +2387,17 @@ export class HostRuntimeStore {
     await this.updateHost(serverId, (host) => ({ ...host, label }));
   }
 
+  async setHostClientIdentity(
+    serverId: string,
+    input: { clientName: string; role: PairingRole },
+  ): Promise<void> {
+    const clientName = normalizeClientName(input.clientName);
+    if (!clientName || clientName.length > MAX_CLIENT_NAME_LENGTH) {
+      throw new Error("Client role name is required and must not be too long.");
+    }
+    await this.updateHost(serverId, (host) => ({ ...host, clientName, role: input.role }));
+  }
+
   async setHostPassword(serverId: string, password: string): Promise<void> {
     await this.updateHost(serverId, (host) => {
       const { password: _previous, ...rest } = host;
@@ -3378,6 +3393,10 @@ export interface HostMutations {
   }) => Promise<{ profile: HostProfile; serverId: string; hostname: string | null }>;
   beginLinkPairing: (targetServerId?: string) => LinkPairing;
   renameHost: (serverId: string, label: string) => Promise<void>;
+  setHostClientIdentity: (
+    serverId: string,
+    input: { clientName: string; role: PairingRole },
+  ) => Promise<void>;
   setHostColor: (serverId: string, color: HostColor) => Promise<void>;
   setHostBadgeDisplay: (serverId: string, badgeDisplay: HostBadgeDisplay) => Promise<void>;
   setRemoteLocalHostAccess: (serverId: string, enabled: boolean) => Promise<void>;
@@ -3395,6 +3414,7 @@ export function useHostMutations(): HostMutations {
       probeAndUpsertRemoteSshConnection: (input) => store.probeAndUpsertRemoteSshConnection(input),
       beginLinkPairing: (targetServerId) => store.beginLinkPairing(targetServerId),
       renameHost: (serverId, label) => store.renameHost(serverId, label),
+      setHostClientIdentity: (serverId, input) => store.setHostClientIdentity(serverId, input),
       setHostColor: (serverId, color) => store.setHostColor(serverId, color),
       setHostBadgeDisplay: (serverId, badgeDisplay) =>
         store.setHostBadgeDisplay(serverId, badgeDisplay),

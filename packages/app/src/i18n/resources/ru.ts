@@ -1683,6 +1683,8 @@ export const ru: TranslationResources = {
       createWorktreeFailed: "Не удалось создать worktree.",
       composerStateRequired: "Редактор сообщения ещё не готов.",
       selectModel: "Выберите модель",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Выберите проект",
@@ -2946,6 +2948,7 @@ export const ru: TranslationResources = {
         guidance:
           "Удалите этот хост и добавьте его снова с паролем, который запрашивает этот демон.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "Оформление",
         name: {

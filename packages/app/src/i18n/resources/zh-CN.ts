@@ -1641,6 +1641,8 @@ export const zhCN: TranslationResources = {
       createWorktreeFailed: "创建 worktree 失败",
       composerStateRequired: "Composer 状态必填",
       selectModel: "请选择模型",
+      localRoleRequired: "本机尚未设置角色名称。请先在 Host 概览中设置角色名称。",
+      openHostOverview: "打开 Host 概览",
     },
     tooltips: {
       project: "Choose the project",
@@ -2869,6 +2871,28 @@ export const zhCN: TranslationResources = {
       },
       password: {
         guidance: "移除此主机，然后使用此守护进程要求的密码重新添加。",
+      },
+      localRole: {
+        title: "本机客户端角色",
+        name: {
+          label: "角色名称",
+          hint: "用于标记从这台设备创建的 workspace 和 Agent 归属。",
+          unset: "未设置",
+          editLabel: "编辑本机角色名称",
+          modalTitle: "设置本机角色名称",
+          placeholder: "例如：张三",
+          submit: "保存角色名称",
+        },
+        type: {
+          label: "角色类型",
+          hint: "管理员会显示本机 Host 的团队入口，不会改变 daemon 权限。",
+          accessibilityLabel: "本机角色类型：{{value}}",
+          nameRequired: "请先设置角色名称，再选择角色类型。",
+          options: {
+            admin: "管理员",
+            member: "成员",
+          },
+        },
       },
       appearance: {
         title: "外观",

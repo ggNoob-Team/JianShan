@@ -1671,6 +1671,8 @@ export const ko: TranslationResources = {
       createWorktreeFailed: "워크트리를 생성하지 못했습니다",
       composerStateRequired: "작성기 상태가 필요합니다",
       selectModel: "모델을 선택하세요",
+      localRoleRequired: en.newWorkspace.errors.localRoleRequired,
+      openHostOverview: en.newWorkspace.errors.openHostOverview,
     },
     tooltips: {
       project: "Choose the project",
@@ -2914,6 +2916,7 @@ export const ko: TranslationResources = {
       password: {
         guidance: "이 호스트를 제거한 뒤 이 데몬이 요구하는 비밀번호로 다시 추가하세요.",
       },
+      localRole: en.settings.host.localRole,
       appearance: {
         title: "모양",
         name: {

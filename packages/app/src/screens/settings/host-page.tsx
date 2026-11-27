@@ -53,6 +53,7 @@ import {
 import { ProvidersSection } from "@/screens/settings/providers-section";
 import { HostUsageSection } from "@/usage";
 import { HostAppearanceSection } from "@/screens/settings/host-appearance-section";
+import { HostClientRoleSection } from "@/screens/settings/host-client-role-section";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
@@ -387,6 +388,7 @@ export function HostSettingsPage({
       <HostStatusBadges serverId={serverId} />
       <HostConnectionError serverId={serverId} />
 
+      {isLocalDaemon ? <HostClientRoleSection host={host} /> : null}
       <HostAppearanceSection host={host} />
 
       {isLocalDaemon ? <LocalDaemonSection /> : null}

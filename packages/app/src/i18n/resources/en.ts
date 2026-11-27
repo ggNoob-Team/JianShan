@@ -1671,6 +1671,8 @@ export const en = {
       createWorktreeFailed: "Failed to create worktree",
       composerStateRequired: "Composer state is required",
       selectModel: "Select a model",
+      localRoleRequired: "This device has no role name. Set one in the Host overview first.",
+      openHostOverview: "Open Host overview",
     },
     tooltips: {
       project: "Choose the project",
@@ -3033,6 +3035,28 @@ export const en = {
       },
       password: {
         guidance: "Remove this host and add it again with the password this daemon asks for.",
+      },
+      localRole: {
+        title: "Local client role",
+        name: {
+          label: "Role name",
+          hint: "Used as the owner name for workspaces and agents created from this device.",
+          unset: "Not set",
+          editLabel: "Edit local role name",
+          modalTitle: "Set local role name",
+          placeholder: "For example: Alex",
+          submit: "Save role name",
+        },
+        type: {
+          label: "Role type",
+          hint: "Admin shows the Team entry for this local Host. It does not change daemon permissions.",
+          accessibilityLabel: "Local role type, {{value}}",
+          nameRequired: "Set a role name before choosing a role type.",
+          options: {
+            admin: "Admin",
+            member: "Member",
+          },
+        },
       },
       appearance: {
         title: "Appearance",
