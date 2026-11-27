@@ -4,15 +4,15 @@ import * as Clipboard from "expo-clipboard";
 import * as QRCode from "qrcode";
 import { SvgXml } from "react-native-svg";
 import { useMutation } from "@tanstack/react-query";
-import { Check, Copy, Network, RotateCw, ShieldCheck } from "lucide-react-native";
+import { Check, Copy, RotateCw, ShieldCheck } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { MAX_CLIENT_NAME_LENGTH, normalizeClientName } from "@getpaseo/protocol/agent-actor";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "@/components/ui/external-link";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { RelayConsentPrompt } from "@/components/relay-consent-prompt";
 import { useFetchQuery } from "@/data/query";
 import { daemonPairingOfferQueryKey } from "@/data/daemon-pairing";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
@@ -27,7 +27,6 @@ const RELAY_DOCS_URL = "https://paseo.sh/docs/security";
 const FLEX_ONE_STYLE = { flex: 1 } as const;
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedShieldCheck = withUnistyles(ShieldCheck);
-const ThemedNetwork = withUnistyles(Network);
 const foregroundMutedColorMapping = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 });
@@ -335,50 +334,25 @@ function OfferLoadError({ message, onRetry }: { message: string; onRetry: () => 
 
 function RelayConsent(props: PairDeviceBodyProps) {
   const { t } = useTranslation();
-  let enableButtonLabel = t("pairing.device.enableRelay");
-  if (props.enablePending) {
-    enableButtonLabel = t("pairing.device.enablingRelay");
-  } else if (props.enableError) {
-    enableButtonLabel = t("pairing.device.retry");
-  }
   return (
-    <View style={styles.consent}>
-      <View style={styles.hero}>
-        <RelayHeroBadge />
-        <Text style={styles.consentTitle}>{t("pairing.device.enableTitle")}</Text>
-        <Text style={styles.consentDescription}>{t("pairing.device.enableDescription")}</Text>
-        <ExternalLink
-          href={RELAY_DOCS_URL}
-          label={t("pairing.device.relayDocs")}
-          accessibilityLabel={t("pairing.device.relayDocsAccessibility")}
-        />
-      </View>
-      {props.enableError ? (
-        <Alert size="sm" variant="error" description={props.enableError.message} />
-      ) : null}
-      {!props.canConfigureRelay ? (
-        <Alert size="sm" variant="warning" description={t("pairing.device.updateRequired")} />
-      ) : null}
-      <View style={styles.actions}>
-        <Button variant="secondary" style={FLEX_ONE_STYLE} onPress={props.onClose}>
-          {t("pairing.device.notNow")}
-        </Button>
-        {props.canConfigureRelay ? (
-          <Button
-            variant="default"
-            style={FLEX_ONE_STYLE}
-            loading={props.enablePending}
-            onPress={props.onEnableRelay}
-          >
-            {enableButtonLabel}
-          </Button>
-        ) : null}
-      </View>
-      <View style={styles.directRow}>
-        <ThemedNetwork size={14} style={styles.directIcon} />
-        <Text style={styles.directHint}>{t("pairing.device.directConnectionHint")}</Text>
-      </View>
-    </View>
+    <RelayConsentPrompt
+      title={t("pairing.device.enableTitle")}
+      description={t("pairing.device.enableDescription")}
+      docsUrl={RELAY_DOCS_URL}
+      docsLabel={t("pairing.device.relayDocs")}
+      docsAccessibilityLabel={t("pairing.device.relayDocsAccessibility")}
+      enableLabel={t("pairing.device.enableRelay")}
+      enablingLabel={t("pairing.device.enablingRelay")}
+      retryLabel={t("pairing.device.retry")}
+      cancelLabel={t("pairing.device.notNow")}
+      updateRequired={t("pairing.device.updateRequired")}
+      footerHint={t("pairing.device.directConnectionHint")}
+      pending={props.enablePending}
+      error={props.enableError?.message ?? null}
+      canConfigureRelay={props.canConfigureRelay}
+      onEnable={props.onEnableRelay}
+      onCancel={props.onClose}
+    />
   );
 }
 
@@ -457,9 +431,6 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     paddingVertical: theme.spacing[6],
   },
-  consent: {
-    gap: theme.spacing[4],
-  },
   roleName: {
     gap: theme.spacing[4],
   },
@@ -487,28 +458,6 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
     lineHeight: theme.fontSize.base * 1.5,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: theme.spacing[3],
-  },
-  directRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: theme.spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    paddingTop: theme.spacing[4],
-  },
-  directIcon: {
-    color: theme.colors.foregroundMuted,
-    marginTop: 1, // optical: seats the glyph on the hint's first text line
-  },
-  directHint: {
-    flex: 1,
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: theme.fontSize.sm * 1.5,
   },
   offer: {
     gap: theme.spacing[4],

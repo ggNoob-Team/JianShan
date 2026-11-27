@@ -40,7 +40,7 @@ import { useDaemonStatus } from "@/desktop/hooks/use-daemon-status";
 import { useDesktopSettings } from "@/desktop/settings/desktop-settings";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { useIsLocalDaemon, useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import {
   getHostRuntimeStore,
   isHostRuntimeConnected,
@@ -54,6 +54,7 @@ import { ProvidersSection } from "@/screens/settings/providers-section";
 import { HostUsageSection } from "@/usage";
 import { HostAppearanceSection } from "@/screens/settings/host-appearance-section";
 import { HostClientRoleSection } from "@/screens/settings/host-client-role-section";
+import { RemoteLocalHostAccessCard } from "@/screens/settings/remote-local-host-access-card";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
@@ -406,69 +407,6 @@ export function HostSettingsPage({
         onClose={closeUpdateHost}
       />
     </View>
-  );
-}
-
-function RemoteLocalHostAccessCard({ host }: { host: HostProfile }) {
-  const { t } = useTranslation();
-  const localServerId = useLocalDaemonServerId();
-  const remoteConnected = useHostRuntimeIsConnected(host.serverId);
-  const localConnected = useHostRuntimeIsConnected(localServerId ?? "");
-  const { setRemoteLocalHostAccess } = useHostMutations();
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const enabled =
-    host.remoteLocalHost?.enabled === true && host.remoteLocalHost.localServerId === localServerId;
-
-  const handleValueChange = useCallback(
-    (next: boolean) => {
-      setIsSaving(true);
-      setError(null);
-      void setRemoteLocalHostAccess(host.serverId, next)
-        .catch((cause) => {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        })
-        .finally(() => setIsSaving(false));
-    },
-    [host.serverId, setRemoteLocalHostAccess],
-  );
-
-  if (!localServerId || localServerId === host.serverId) return null;
-
-  return (
-    <SettingsSection title={t("settings.host.remoteLocalHost.title")}>
-      <View style={settingsStyles.card} testID="host-page-remote-local-host-card">
-        <View style={settingsStyles.row}>
-          <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.host.remoteLocalHost.toggle")}</Text>
-            <Text style={settingsStyles.rowHint}>{t("settings.host.remoteLocalHost.hint")}</Text>
-            {!remoteConnected || !localConnected ? (
-              <Text style={settingsStyles.rowHint}>
-                {t("settings.host.remoteLocalHost.offline")}
-              </Text>
-            ) : null}
-          </View>
-          <Switch
-            value={enabled}
-            disabled={isSaving || !remoteConnected || !localConnected}
-            onValueChange={handleValueChange}
-            accessibilityLabel={t("settings.host.remoteLocalHost.accessibilityLabel")}
-            testID="host-page-remote-local-host-switch"
-          />
-        </View>
-        {error ? (
-          <View style={settingsStyles.row}>
-            <InlineAlert
-              size="sm"
-              variant="error"
-              title={t("settings.host.remoteLocalHost.failed")}
-              description={error}
-              testID="host-page-remote-local-host-error"
-            />
-          </View>
-        ) : null}
-      </View>
-    </SettingsSection>
   );
 }
 

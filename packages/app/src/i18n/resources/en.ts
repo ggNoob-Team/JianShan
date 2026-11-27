@@ -3115,6 +3115,12 @@ export const en = {
         offline: "Both this host and the local daemon must be online to change this setting.",
         accessibilityLabel: "Allow this remote host to use this device",
         failed: "Unable to update local host sharing",
+        relayPrompt: {
+          title: "Enable relay",
+          description:
+            "Relay must be enabled on this device before the remote Host can use it. Relay traffic is end-to-end encrypted.",
+          footerHint: "Without relay, this remote Host cannot run work on this device.",
+        },
       },
       pairDevices: {
         title: "Pair devices",

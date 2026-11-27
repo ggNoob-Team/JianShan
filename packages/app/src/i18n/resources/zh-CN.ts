@@ -2951,6 +2951,11 @@ export const zhCN: TranslationResources = {
         offline: "此远程 Host 和本地 daemon 都需要在线才能修改。",
         accessibilityLabel: "允许此远程 Host 使用这台设备",
         failed: "无法更新本机 Host 共享",
+        relayPrompt: {
+          title: "启用中继",
+          description: "需要先在这台设备上启用中继，远程 Host 才能使用它。中继流量采用端到端加密。",
+          footerHint: "未启用中继时，此远程 Host 无法在这台设备上运行任务。",
+        },
       },
       pairDevices: {
         title: "配对设备",

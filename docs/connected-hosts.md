@@ -40,7 +40,9 @@ Sharing is opt-in per remote host. The first enable action confirms that the rem
 on the local machine. The client then registers the local daemon with a relay pairing offer, using
 the local `serverId` as the stable `sourceKey`. Later reconnects update that registration
 automatically. Disabling sharing removes the automatic registration before clearing the local
-opt-in.
+opt-in. If local relay is disabled, enabling sharing first presents the same relay consent used by
+device pairing; only after confirmation does the client enable relay and grant the remote host
+access.
 
 Multiple local daemons remain distinct registrations. `current` identifies the daemon associated
 with the active client origin; `registrationId` identifies its reverse execution link. An agent
